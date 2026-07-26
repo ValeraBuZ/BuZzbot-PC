@@ -253,6 +253,17 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertTrue(healing_troop_form_is_visible(frame))
 
+        selected = frame.copy()
+        cv2.circle(
+            selected,
+            (275, 570),
+            52,
+            (30, 180, 240),
+            thickness=-1,
+        )
+        selected[592:642, 900:1155] = (30, 180, 240)
+        self.assertTrue(healing_troop_form_is_visible(selected))
+
         unrelated = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
         cv2.rectangle(
             unrelated,

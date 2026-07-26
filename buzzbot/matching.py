@@ -420,15 +420,26 @@ def healing_troop_form_is_visible(frame_bgr):
     quick_heal_case = hsv[140:380, 230:630]
     hospital_capacity = hsv[515:630, 220:330]
     troop_rows = hsv[115:500, 650:1150]
+    ordinary_heal = hsv[592:642, 900:1155]
     dark_rows = troop_rows[:, :, 2] <= 90
     dark_rows_ratio = (
         float(np.count_nonzero(dark_rows)) / float(dark_rows.size)
     )
+    colored_heal = (
+        (ordinary_heal[:, :, 1] >= 45)
+        & (ordinary_heal[:, :, 2] >= 90)
+    )
+    colored_heal_ratio = (
+        float(np.count_nonzero(colored_heal)) / float(colored_heal.size)
+    )
 
     return (
         red_ratio(quick_heal_case) >= 0.18
-        and red_ratio(hospital_capacity) >= 0.16
         and dark_rows_ratio >= 0.60
+        and (
+            red_ratio(hospital_capacity) >= 0.16
+            or colored_heal_ratio >= 0.30
+        )
     )
 
 

@@ -40,7 +40,7 @@ class HealingTests(unittest.TestCase):
             frame,
             (275, 570),
             52,
-            (20, 30, 220),
+            (30, 180, 240) if selected else (20, 30, 220),
             thickness=-1,
         )
         frame[592:642, 900:1155] = (
