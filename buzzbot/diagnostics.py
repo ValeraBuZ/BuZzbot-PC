@@ -79,7 +79,7 @@ def create_diagnostic_report(
 
     config = {}
     if config_path.is_file():
-        with config_path.open("r", encoding="utf-8") as handle:
+        with config_path.open("r", encoding="utf-8-sig") as handle:
             config = json.load(handle)
     images = config.get("images", []) if isinstance(config, dict) else []
     tasks = config.get("routine_tasks", []) if isinstance(config, dict) else []

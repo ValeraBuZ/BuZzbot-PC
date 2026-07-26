@@ -401,6 +401,7 @@ DEFAULT_ROUTINE_TASKS = (
         "settings": {
             "troop_count": 2500,
             "collection_delay_seconds": 2,
+            "repeat_delay_seconds": 2,
             "collect_finished": True,
             "repeat": True,
         },
@@ -603,6 +604,13 @@ TASK_SETTING_SPECS = {
             "min": 1,
             "max": 3600,
         },
+        {
+            "key": "repeat_delay_seconds",
+            "label": "Повтор задачи через, сек",
+            "kind": "int",
+            "min": 1,
+            "max": 3600,
+        },
         {"key": "collect_finished", "label": "Собирать вылеченных", "kind": "bool"},
         {"key": "repeat", "label": "Повторять лечение", "kind": "bool"},
     ),
@@ -765,7 +773,7 @@ def no_action_retry_delay(task):
         settings = task.get("settings", {})
         if settings.get("_collection_pending", False):
             return healing_collection_delay(task)
-        return max(5.0, min(10.0, interval_seconds))
+        return healing_repeat_delay(task)
     return max(30.0, min(300.0, interval_seconds))
 
 
@@ -774,6 +782,16 @@ def healing_collection_delay(task):
     settings = task.get("settings", {})
     try:
         delay = float(settings.get("collection_delay_seconds", 2) or 2)
+    except (TypeError, ValueError):
+        delay = 2.0
+    return max(1.0, min(3600.0, delay))
+
+
+def healing_repeat_delay(task):
+    """Return the per-account delay before the healing task runs again."""
+    settings = task.get("settings", {})
+    try:
+        delay = float(settings.get("repeat_delay_seconds", 2) or 2)
     except (TypeError, ValueError):
         delay = 2.0
     return max(1.0, min(3600.0, delay))
@@ -1927,6 +1945,8 @@ def next_run_after_finish(task, now):
     fixed_utc_hours = task.get("settings", {}).get("fixed_utc_hours", ())
     if fixed_utc_hours:
         return next_fixed_utc_run(now, fixed_utc_hours)
+    if task.get("id") == "heal":
+        return float(now) + healing_repeat_delay(task)
     interval_seconds = float(task.get("interval_minutes", 1.0)) * 60.0
     return float(now) + max(6.0, interval_seconds)
 

@@ -110,18 +110,20 @@ class TaskSettingsDialog:
             self.vars[spec["key"]] = (variable, spec)
             row += 1
 
-        ttk.Label(form, text="Повтор, минут").grid(row=row, column=0, sticky="w", padx=(0, 12), pady=5)
-        self.interval_var = tk.DoubleVar(value=float(self.task.get("interval_minutes", 1.0)))
-        interval_spin = ttk.Spinbox(
-            form,
-            from_=0.1,
-            to=1440,
-            increment=0.5,
-            textvariable=self.interval_var,
-            width=12,
-        )
-        interval_spin.grid(row=row, column=1, sticky="w", pady=5)
-        _bind_numeric_wheel(interval_spin, self.interval_var, 0.1, 1440, 0.5)
+        self.interval_var = None
+        if self.task["id"] != "heal":
+            ttk.Label(form, text="Повтор, минут").grid(row=row, column=0, sticky="w", padx=(0, 12), pady=5)
+            self.interval_var = tk.DoubleVar(value=float(self.task.get("interval_minutes", 1.0)))
+            interval_spin = ttk.Spinbox(
+                form,
+                from_=0.1,
+                to=1440,
+                increment=0.5,
+                textvariable=self.interval_var,
+                width=12,
+            )
+            interval_spin.grid(row=row, column=1, sticky="w", pady=5)
+            _bind_numeric_wheel(interval_spin, self.interval_var, 0.1, 1440, 0.5)
 
         group = effective_task_group(self.task)
         templates = [image for image in self.bot.search_images if image.get("group") == group]
@@ -160,7 +162,8 @@ class TaskSettingsDialog:
             if spec["kind"] == "choice":
                 value = spec["reverse"].get(value, "off")
             settings[key] = value
-        self.task["interval_minutes"] = max(0.1, float(self.interval_var.get()))
+        if self.interval_var is not None:
+            self.task["interval_minutes"] = max(0.1, float(self.interval_var.get()))
         self.task["group"] = effective_task_group(self.task)
         self.task["completion_uid"] = self.completion_map.get(self.completion_var.get(), "")
         if self.task["id"] == "gathering_boost":

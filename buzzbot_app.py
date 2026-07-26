@@ -77,6 +77,7 @@ from buzzbot.routines import (
     format_wait_duration,
     gathering_boost_active_until,
     gathering_boost_duration_hours,
+    healing_repeat_delay,
     image_is_allowed_for_routine,
     is_radar_task_id,
     is_task_effectively_enabled,
@@ -2315,7 +2316,7 @@ class AutoClicker:
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
             try:
-                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                with open(CONFIG_FILE, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
                     self.search_images = data.get('images', [])
                     self.groups = data.get('groups', {})
@@ -3608,7 +3609,17 @@ class AutoClicker:
                 // 60.0
             ),
         )
-        if radar_has_in_progress:
+        if task.get("id") == "heal":
+            repeat_seconds = max(
+                1,
+                int(healing_repeat_delay(task) + 0.999),
+            )
+            self.set_status_message(
+                f"Задача «{self.get_routine_task_name(task)}» завершена | "
+                f"следующий запуск через {repeat_seconds} сек",
+                force=True,
+            )
+        elif radar_has_in_progress:
             self.set_status_message(
                 f"Радар: быстрый проход завершён, задания с отрядами проверю через {next_run_minutes} мин",
                 force=True,

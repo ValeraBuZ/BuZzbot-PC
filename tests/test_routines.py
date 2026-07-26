@@ -111,10 +111,12 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(by_id["processing_factory"]["complete_when_idle"])
         self.assertTrue(by_id["processing_contest"]["complete_when_idle"])
         self.assertEqual(by_id["heal"]["settings"]["collection_delay_seconds"], 2)
+        self.assertEqual(by_id["heal"]["settings"]["repeat_delay_seconds"], 2)
         heal_setting_keys = {
             spec["key"] for spec in task_setting_specs("heal")
         }
         self.assertIn("collection_delay_seconds", heal_setting_keys)
+        self.assertIn("repeat_delay_seconds", heal_setting_keys)
         self.assertEqual(by_id["collective_mind"]["settings"]["level"], 6)
         collective_level = next(
             spec for spec in task_setting_specs("collective_mind") if spec["key"] == "level"
@@ -444,6 +446,15 @@ class RoutineTaskTests(unittest.TestCase):
         task = {"interval_minutes": 2.5}
         self.assertEqual(next_run_after_finish(task, 100.0), 250.0)
 
+    def test_healing_next_run_uses_configured_seconds(self):
+        task = {
+            "id": "heal",
+            "interval_minutes": 0.1,
+            "settings": {"repeat_delay_seconds": 1},
+        }
+
+        self.assertEqual(next_run_after_finish(task, 100.0), 101.0)
+
     def test_next_fixed_utc_run_uses_noon_and_midnight(self):
         before_noon = datetime(2026, 7, 15, 11, 59, tzinfo=timezone.utc).timestamp()
         at_noon = datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc).timestamp()
@@ -464,7 +475,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(no_action_retry_delay({"interval_minutes": 0.1}), 30.0)
         self.assertEqual(
             no_action_retry_delay({"id": "heal", "interval_minutes": 0.1}),
-            6.0,
+            2.0,
         )
         self.assertEqual(no_action_retry_delay({"interval_minutes": 2.0}), 120.0)
         self.assertEqual(no_action_retry_delay({"interval_minutes": 60.0}), 300.0)
@@ -497,6 +508,7 @@ class RoutineTaskTests(unittest.TestCase):
         )
 
         self.assertEqual(healing["settings"]["collection_delay_seconds"], 2)
+        self.assertEqual(healing["settings"]["repeat_delay_seconds"], 2)
 
     def test_home_recovery_only_runs_before_the_first_march_action(self):
         task = {"uses_march": True, "timeout_seconds": 1800.0}
