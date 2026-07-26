@@ -7,7 +7,13 @@ from buzzbot_app import AutoClicker
 
 
 class FakeHealingAdbClient:
-    def __init__(self, available_rows=4, reset_succeeds=True, reported_value=None):
+    def __init__(
+        self,
+        available_rows=4,
+        reset_succeeds=True,
+        reported_value=None,
+        row_capacities=None,
+    ):
         self.available_row_y = {173, 263, 353, 443}
         self.available_row_y = set(sorted(self.available_row_y)[:available_rows])
         self.reset_succeeds = reset_succeeds
@@ -17,6 +23,8 @@ class FakeHealingAdbClient:
         self.taps = []
         self.inputs = []
         self.current_input = ""
+        self.current_row_y = None
+        self.row_capacities = row_capacities or {}
         self.clear_calls = 0
         self.unsafe_ok_taps = 0
 
@@ -26,6 +34,7 @@ class FakeHealingAdbClient:
             self.selection_cleared = self.reset_succeeds
         elif x == 1085 and y in {173, 263, 353, 443}:
             self.editor_open = y in self.available_row_y
+            self.current_row_y = y if self.editor_open else None
             self.current_input = "0"
         elif (x, y) == (1198, 669):
             if not self.editor_open:
@@ -38,7 +47,12 @@ class FakeHealingAdbClient:
 
     def input_text(self, value):
         self.inputs.append(str(value))
-        self.current_input = str(value)
+        capacity = self.row_capacities.get(self.current_row_y)
+        self.current_input = str(
+            min(int(value), int(capacity))
+            if capacity is not None
+            else value
+        )
 
     def focused_edit_text_value(self):
         if not self.editor_open:
@@ -52,13 +66,20 @@ class FakeHealingAdbClient:
 
 
 class HealingWorkflowTests(unittest.TestCase):
-    def make_bot(self, available_rows=4, reset_succeeds=True, reported_value=None):
+    def make_bot(
+        self,
+        available_rows=4,
+        reset_succeeds=True,
+        reported_value=None,
+        row_capacities=None,
+    ):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeHealingAdbClient(
             available_rows=available_rows,
             reset_succeeds=reset_succeeds,
             reported_value=reported_value,
+            row_capacities=row_capacities,
         )
         bot.stop_event = threading.Event()
         bot.stop_hotkey_pressed = False
@@ -79,27 +100,29 @@ class HealingWorkflowTests(unittest.TestCase):
         initial_frame, _origin = capture_screen_bgr(force=True)
         return bot, initial_frame
 
-    def test_enters_four_quotas_only_while_editor_is_visible(self):
+    def test_uses_one_troop_type_when_it_can_fill_the_limit(self):
         bot, frame = self.make_bot()
 
         self.assertTrue(bot._configure_healing_troop_count(2000, frame))
-        self.assertEqual(bot.adb_client.inputs, ["500", "500", "500", "500"])
-        self.assertEqual(bot.adb_client.clear_calls, 4)
+        self.assertEqual(bot.adb_client.inputs, ["2000"])
+        self.assertEqual(bot.adb_client.clear_calls, 1)
         self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
         self.assertEqual(bot.adb_client.taps[0], (1195, 468))
 
-    def test_configures_2500_as_four_equal_safe_quotas(self):
+    def test_configures_2500_without_forcing_four_troop_types(self):
         bot, frame = self.make_bot()
 
         self.assertTrue(bot._configure_healing_troop_count(2500, frame))
-        self.assertEqual(bot.adb_client.inputs, ["625", "625", "625", "625"])
+        self.assertEqual(bot.adb_client.inputs, ["2500"])
         self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
 
-    def test_limit_is_redistributed_when_only_one_troop_row_is_available(self):
-        bot, frame = self.make_bot(available_rows=1)
+    def test_uses_next_rows_only_for_the_remaining_limit(self):
+        bot, frame = self.make_bot(
+            row_capacities={173: 1000, 263: 800, 353: 1000},
+        )
 
-        self.assertTrue(bot._configure_healing_troop_count(2000, frame))
-        self.assertEqual(bot.adb_client.inputs, ["500", "2000"])
+        self.assertTrue(bot._configure_healing_troop_count(2500, frame))
+        self.assertEqual(bot.adb_client.inputs, ["2500", "1500", "700"])
         self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
 
     def test_no_editable_rows_aborts_without_blind_ok_tap(self):
@@ -120,7 +143,7 @@ class HealingWorkflowTests(unittest.TestCase):
         bot, frame = self.make_bot(reported_value="206001")
 
         self.assertFalse(bot._configure_healing_troop_count(2000, frame))
-        self.assertEqual(bot.adb_client.inputs, ["500"])
+        self.assertEqual(bot.adb_client.inputs, ["2000"])
         self.assertNotIn((1198, 669), bot.adb_client.taps)
         self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
 

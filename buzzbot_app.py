@@ -5711,11 +5711,7 @@ class AutoClicker:
         field_x = int(round(1085 * scale_x))
         ok_x, ok_y = int(round(1198 * scale_x)), int(round(669 * scale_y))
         row_positions = (173, 263, 353, 443)
-        base_quota, extra = divmod(max(1, int(troop_count)), len(row_positions))
-        row_quotas = [
-            base_quota + (1 if index < extra else 0)
-            for index in range(len(row_positions))
-        ]
+        troop_limit = max(1, int(troop_count))
 
         if healing_auto_fill_is_checked(frame):
             if self.uses_adb:
@@ -5790,11 +5786,16 @@ class AutoClicker:
                 )
                 return False
 
+            actual_quota = quota
             if self.uses_adb:
                 entered_value = self.adb_client.focused_edit_text_value()
-                if entered_value != str(quota):
+                try:
+                    actual_quota = int(str(entered_value))
+                except (TypeError, ValueError):
+                    actual_quota = -1
+                if not 0 <= actual_quota <= quota:
                     logger.error(
-                        "Healing row %s input mismatch: expected %s, found %r",
+                        "Healing row %s input is unsafe: maximum %s, found %r",
                         row_index,
                         quota,
                         entered_value,
@@ -5830,46 +5831,42 @@ class AutoClicker:
                     force=True,
                 )
                 return False
-            logger.info("Healing row %s configured with quota %s", row_index, quota)
-            return True
+            logger.info(
+                "Healing row %s configured with %s of requested %s",
+                row_index,
+                actual_quota,
+                quota,
+            )
+            return actual_quota
 
-        configured_rows = []
-        for row_index, (row_y, quota) in enumerate(
-            zip(row_positions, row_quotas),
-            start=1,
-        ):
-            result = configure_row(row_index, row_y, quota)
+        selected_total = 0
+        for row_index, row_y in enumerate(row_positions, start=1):
+            remaining = troop_limit - selected_total
+            if remaining <= 0:
+                break
+            result = configure_row(row_index, row_y, remaining)
             if result is None:
                 break
             if result is False:
                 return False
-            configured_rows.append((row_index, row_y))
+            selected_total += int(result)
 
-        if not configured_rows:
+        if selected_total <= 0:
             self.set_status_message(
                 "Лечение не запущено: доступные строки раненых не найдены",
                 force=True,
             )
             return False
 
-        if len(configured_rows) < len(row_positions):
-            base_quota, extra = divmod(max(1, int(troop_count)), len(configured_rows))
-            actual_quotas = [
-                base_quota + (1 if index < extra else 0)
-                for index in range(len(configured_rows))
-            ]
-            logger.info(
-                "Healing redistributes limit %s across %s available rows",
-                troop_count,
-                len(configured_rows),
-            )
-            for (row_index, row_y), quota in zip(configured_rows, actual_quotas):
-                if configure_row(row_index, row_y, quota) is not True:
-                    self.set_status_message(
-                        f"Лечение не запущено: не удалось уточнить количество в строке {row_index}",
-                        force=True,
-                    )
-                    return False
+        logger.info(
+            "Healing selected %s troops with configured maximum %s",
+            selected_total,
+            troop_limit,
+        )
+        self.set_status_message(
+            f"Лечение: выбрано {selected_total} из максимум {troop_limit}",
+            force=True,
+        )
 
         final_frame, _origin = self._capture_screen_bgr(force=True)
         if healing_auto_fill_is_checked(final_frame):

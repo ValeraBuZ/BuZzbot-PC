@@ -282,6 +282,18 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertTrue(219 <= target[0] <= 221)
         self.assertTrue(166 <= target[1] <= 168)
 
+    def test_detects_single_bronze_finished_healing_marker(self):
+        frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (725, 136),
+            (766, 177),
+            (35, 80, 145),
+            thickness=3,
+        )
+
+        self.assertEqual(detect_finished_healing_target(frame), (746, 157))
+
 
 if __name__ == "__main__":
     unittest.main()

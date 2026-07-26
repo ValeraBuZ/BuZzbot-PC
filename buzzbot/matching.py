@@ -399,7 +399,7 @@ def healing_selection_is_empty(frame_bgr):
 
 
 def detect_finished_healing_target(frame_bgr):
-    """Find the red-framed troop portrait cluster above a finished hospital."""
+    """Find a red or bronze troop portrait marker above a finished hospital."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
@@ -415,29 +415,37 @@ def detect_finished_healing_target(frame_bgr):
         np.array([170, 80, 70], dtype=np.uint8),
         np.array([179, 255, 255], dtype=np.uint8),
     )
+    bronze_mask = cv2.inRange(
+        hsv,
+        np.array([8, 60, 60], dtype=np.uint8),
+        np.array([25, 255, 255], dtype=np.uint8),
+    )
 
     # Finished-healing portraits appear over shelter buildings. Excluding the
     # HUD keeps red notification badges and bottom navigation out of the scan.
-    red_mask[:140, :] = 0
-    red_mask[500:, :] = 0
-    red_mask[:, :160] = 0
-    red_mask[:, 1080:] = 0
-
     portrait_boxes = []
-    contours, _hierarchy = cv2.findContours(
-        red_mask,
-        cv2.RETR_LIST,
-        cv2.CHAIN_APPROX_SIMPLE,
-    )
-    for contour in contours:
-        x, y, width, height = cv2.boundingRect(contour)
-        area = float(cv2.contourArea(contour))
-        if (
-            18 <= width <= 46
-            and 32 <= height <= 46
-            and area >= 80.0
-        ):
-            portrait_boxes.append((x, y, width, height, area))
+    for marker_mask in (red_mask, bronze_mask):
+        marker_mask[:120, :] = 0
+        marker_mask[520:, :] = 0
+        # The persistent quest panel occupies the left edge and contains bronze
+        # square icons that resemble a single finished-healing portrait.
+        marker_mask[:, :230] = 0
+        marker_mask[:, 1100:] = 0
+
+        contours, _hierarchy = cv2.findContours(
+            marker_mask,
+            cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE,
+        )
+        for contour in contours:
+            x, y, width, height = cv2.boundingRect(contour)
+            area = float(cv2.contourArea(contour))
+            if (
+                18 <= width <= 48
+                and 30 <= height <= 48
+                and area >= 80.0
+            ):
+                portrait_boxes.append((x, y, width, height, area))
 
     # RETR_LIST may return both edges of the same frame. Keep only the larger
     # contour when two boxes substantially overlap.
@@ -513,6 +521,25 @@ def detect_finished_healing_target(frame_bgr):
                     left,
                     (left + right) / 2.0,
                     (top + bottom) / 2.0,
+                )
+            )
+
+    # Some accounts show one portrait per hospital instead of a three-portrait
+    # group. Its bronze frame produces a compact, nearly square outer contour;
+    # the high contour-area threshold excludes ordinary building decorations.
+    for x, y, width, height, area in deduplicated:
+        if (
+            35 <= width <= 48
+            and 35 <= height <= 48
+            and area >= 1200.0
+        ):
+            candidates.append(
+                (
+                    4,
+                    y,
+                    x,
+                    x + width / 2.0,
+                    y + height / 2.0,
                 )
             )
 
