@@ -90,7 +90,7 @@ class HealingTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(bot.adb_client.taps, [(1070, 160), (1072, 162)])
 
-    def test_opens_healing_screen_without_troop_specific_collection_template(self):
+    def test_opening_idle_healing_screen_finishes_pending_collection(self):
         bot = self.make_bot(iter(()))
         start_image = {
             "group": "Лечение войск",
@@ -119,6 +119,22 @@ class HealingTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(bot.adb_client.taps, [(1170, 178)])
         self.assertFalse(bot._healing_settings["_collection_pending"])
+
+    def test_does_not_start_healing_while_previous_batch_is_pending(self):
+        bot = self.make_bot(iter(()))
+        bot._healing_settings["_collection_pending"] = True
+        image = {
+            "action": "heal_troops",
+            "last_used": 0.0,
+        }
+
+        result = bot._execute_action(
+            image,
+            SimpleNamespace(x=640, y=650),
+        )
+
+        self.assertFalse(result)
+        self.assertEqual(bot.adb_client.taps, [])
 
     def test_taps_healing_row_again_after_collecting_finished_batch(self):
         bot = self.make_bot(iter(()))
@@ -358,6 +374,237 @@ class HealingTests(unittest.TestCase):
             deferred,
             [("текущее лечение ещё не завершено", 2.0)],
         )
+
+    def test_collection_candidate_can_open_hospital_without_pending_batch(self):
+        import cv2
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = set()
+        bot._is_settlement_screen_visible = lambda: True
+        screen_checks = iter((True, False))
+        bot._is_main_screen_visible = lambda: next(screen_checks)
+        marker_frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            marker_frame,
+            (572, 276),
+            (614, 316),
+            (15, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            marker_frame,
+            (578, 282),
+            (608, 310),
+            (45, 55, 65),
+            thickness=-1,
+        )
+        frames = iter(
+            (
+                (marker_frame, (0, 0)),
+                (np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)),
+            )
+        )
+        bot._capture_screen_bgr = lambda force=False: next(frames)
+        bot._tap_routine_fallback = lambda *_args: True
+        bot.save_config = lambda: None
+        deferred = []
+        bot._defer_current_routine_unavailable = (
+            lambda reason, now=None, retry_delay=None: deferred.append(
+                (reason, retry_delay)
+            )
+        )
+        task = {
+            "id": "heal",
+            "settings": {
+                "collect_finished": True,
+                "collection_delay_seconds": 2,
+                "_collection_pending": False,
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertEqual(deferred, [])
+
+    def test_pending_collection_finishes_when_idle_hospital_opens(self):
+        import cv2
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = set()
+        bot.routine_healing_pan_route = ["left", "up"]
+        bot.routine_healing_replay_index = 2
+        bot.routine_healing_scan_index = 4
+        bot.routine_healing_settle_checks = 1
+        bot.routine_healing_search_started = True
+        bot.routine_healing_saved_route_rejected = True
+        bot.search_images = [
+            {
+                "enabled": True,
+                "runtime_step": "start_healing",
+            }
+        ]
+        bot._is_settlement_screen_visible = lambda: True
+        screen_checks = iter((True, False))
+        bot._is_main_screen_visible = lambda: next(screen_checks)
+        marker_frame = np.full(
+            (720, 1280, 3),
+            (70, 70, 70),
+            dtype=np.uint8,
+        )
+        cv2.rectangle(
+            marker_frame,
+            (572, 276),
+            (614, 316),
+            (15, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            marker_frame,
+            (578, 282),
+            (608, 310),
+            (45, 55, 65),
+            thickness=-1,
+        )
+        frames = iter(
+            (
+                (marker_frame, (0, 0)),
+                (np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)),
+            )
+        )
+        bot._capture_screen_bgr = lambda force=False: next(frames)
+        bot._tap_routine_fallback = lambda *_args: True
+        bot._locate_image = lambda _image: (
+            SimpleNamespace(x=1008, y=607),
+            (890, 584, 236, 47),
+            0.96,
+        )
+        statuses = []
+        bot.set_status_message = (
+            lambda message, **_kwargs: statuses.append(message)
+        )
+        saves = []
+        bot.save_config = lambda: saves.append(True)
+        deferred = []
+        bot._defer_current_routine_unavailable = (
+            lambda reason, now=None, retry_delay=None: deferred.append(
+                (reason, retry_delay)
+            )
+        )
+        task = {
+            "id": "heal",
+            "settings": {
+                "collect_finished": True,
+                "collection_delay_seconds": 1,
+                "_collection_pending": True,
+                "_pending_heal_count": 2850,
+                "_last_heal_started_at": time.time() - 120.0,
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertNotIn("_pending_heal_count", task["settings"])
+        self.assertEqual(bot.routine_healing_pan_route, [])
+        self.assertEqual(bot.routine_healing_replay_index, 0)
+        self.assertEqual(bot.routine_healing_scan_index, 0)
+        self.assertFalse(bot.routine_healing_search_started)
+        self.assertEqual(statuses, ["Вылеченные войска собраны"])
+        self.assertEqual(deferred, [])
+        self.assertEqual(saves, [True])
+
+    def test_pending_collection_reuses_remembered_hospital_target(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_healing_pan_route = ["right", "left"]
+        bot.routine_healing_replay_index = 2
+        bot.routine_healing_scan_index = 8
+        bot.routine_healing_settle_checks = 1
+        bot.routine_healing_search_started = True
+        bot.routine_healing_saved_route_rejected = True
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        taps = []
+        bot._tap_routine_fallback = (
+            lambda target, *_args: taps.append(target) or True
+        )
+        bot._healing_start_control_visible = lambda: True
+        statuses = []
+        bot.set_status_message = (
+            lambda message, **_kwargs: statuses.append(message)
+        )
+        bot.save_config = lambda: None
+        task = {
+            "id": "heal",
+            "settings": {
+                "collect_finished": True,
+                "collection_delay_seconds": 1,
+                "_collection_pending": True,
+                "_last_heal_started_at": time.time() - 10.0,
+                "_hospital_target": [620, 365],
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertEqual(taps, [(620, 365)])
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertEqual(task["settings"]["_hospital_target"], [620, 365])
+        self.assertEqual(bot.routine_healing_pan_route, [])
+        self.assertFalse(bot.routine_healing_search_started)
+        self.assertIn("Вылеченные войска собраны", statuses)
+
+    def test_shifted_map_discards_stale_hospital_target_after_two_attempts(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        taps = []
+        bot._tap_routine_fallback = (
+            lambda target, *_args: taps.append(target) or True
+        )
+        bot._healing_start_control_visible = lambda: False
+        statuses = []
+        bot.set_status_message = (
+            lambda message, **_kwargs: statuses.append(message)
+        )
+        bot.save_config = lambda: None
+        bot._defer_current_routine_unavailable = lambda *_args, **_kwargs: None
+        task = {
+            "id": "heal",
+            "settings": {
+                "collection_delay_seconds": 1,
+                "_collection_pending": True,
+                "_last_heal_started_at": time.time() - 10.0,
+                "_hospital_target": [620, 365],
+            },
+        }
+
+        first_result = bot._try_healing_visual_fallback(
+            task,
+            remembered_only=True,
+        )
+        task["settings"]["_last_saved_hospital_attempt_at"] = 0.0
+        second_result = bot._try_healing_visual_fallback(
+            task,
+            remembered_only=True,
+        )
+
+        self.assertTrue(first_result)
+        self.assertFalse(second_result)
+        self.assertEqual(taps, [(620, 365), (620, 365)])
+        self.assertNotIn("_hospital_target", task["settings"])
+        self.assertIn("Госпиталь сместился: ищу новое положение", statuses)
 
     def test_collects_finished_marker_after_restart_without_pending_state(self):
         import cv2

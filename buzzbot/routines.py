@@ -677,6 +677,19 @@ def runtime_step_is_ready(image, completed_steps):
     return all(step in completed for step in required)
 
 
+def healing_pending_allows_image(image, task):
+    """Allow collection entry but block a new treatment while one is pending."""
+    if str((task or {}).get("id") or "") != "heal":
+        return True
+    settings = (task or {}).get("settings", {})
+    if not settings.get("_collection_pending", False):
+        return True
+    return str((image or {}).get("runtime_step") or "") not in {
+        "healing_overview",
+        "start_healing",
+    }
+
+
 def setting_requirement_matches(image, settings):
     """Check a template setting, optionally allowing a safer longer duration."""
     key = str(image.get("required_setting_key") or "")

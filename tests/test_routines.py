@@ -13,6 +13,7 @@ from buzzbot.routines import (
     format_wait_duration,
     gathering_boost_active_until,
     gathering_boost_duration_hours,
+    healing_pending_allows_image,
     image_is_allowed_for_routine,
     is_task_effectively_enabled,
     next_due_task,
@@ -648,6 +649,29 @@ class RoutineTaskTests(unittest.TestCase):
         image = {"requires_runtime_steps": ["boost_category"]}
         self.assertFalse(runtime_step_is_ready(image, {"open_bag"}))
         self.assertTrue(runtime_step_is_ready(image, {"open_bag", "boost_category"}))
+
+    def test_pending_healing_allows_collection_entry_only(self):
+        task = {
+            "id": "heal",
+            "settings": {"_collection_pending": True},
+        }
+
+        for step in ("healing_overview", "start_healing"):
+            self.assertFalse(
+                healing_pending_allows_image({"runtime_step": step}, task)
+            )
+        self.assertTrue(
+            healing_pending_allows_image(
+                {"runtime_step": "open_wounded"},
+                task,
+            )
+        )
+        self.assertTrue(
+            healing_pending_allows_image(
+                {"runtime_step": "collect_finished"},
+                task,
+            )
+        )
 
     def test_runtime_step_any_mode_accepts_selected_boost(self):
         image = {

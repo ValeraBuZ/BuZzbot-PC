@@ -77,6 +77,7 @@ from buzzbot.routines import (
     format_wait_duration,
     gathering_boost_active_until,
     gathering_boost_duration_hours,
+    healing_pending_allows_image,
     healing_repeat_delay,
     image_is_allowed_for_routine,
     is_radar_task_id,
@@ -4260,7 +4261,51 @@ class AutoClicker:
             remembered,
         )
 
-    def _try_healing_visual_fallback(self, task):
+    def _finish_pending_healing_collection(self, settings, source):
+        settings["_last_collection_attempt_at"] = time.time()
+        settings["_collection_pending"] = False
+        settings.pop("_pending_heal_count", None)
+        settings.pop("_last_pending_camera_scan_at", None)
+        settings.pop("_last_saved_hospital_attempt_at", None)
+        settings["_hospital_target_failures"] = 0
+        self.routine_healing_pan_route = []
+        self.routine_healing_replay_index = 0
+        self.routine_healing_scan_index = 0
+        self.routine_healing_settle_checks = 0
+        self.routine_healing_search_started = False
+        self.routine_healing_saved_route_rejected = False
+        self.save_config()
+        self.set_status_message(
+            "Вылеченные войска собраны",
+            force=True,
+        )
+        logger.info("Finished healing collection confirmed through %s", source)
+
+    def _remember_healing_hospital_target(self, settings, target, save=True):
+        target_x, target_y = map(int, target)
+        settings["_hospital_target"] = [target_x, target_y]
+        settings["_hospital_target_failures"] = 0
+        settings.pop("_last_saved_hospital_attempt_at", None)
+        if save:
+            self.save_config()
+        logger.info(
+            "Healing hospital target remembered at (%s, %s)",
+            target_x,
+            target_y,
+        )
+
+    def _healing_start_control_visible(self):
+        for image in getattr(self, "search_images", ()):
+            if (
+                image.get("enabled", True)
+                and image.get("runtime_step") == "start_healing"
+            ):
+                location, bbox, _score = self._locate_image(image)
+                if location is not None and bbox is not None:
+                    return True
+        return False
+
+    def _try_healing_visual_fallback(self, task, remembered_only=False):
         if task.get("id") != "heal" or not self._is_main_screen_visible():
             return False
         if not self._is_settlement_screen_visible():
@@ -4289,17 +4334,18 @@ class AutoClicker:
 
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
-        if settings.get("_collection_pending", False):
-            try:
-                collection_delay = max(
-                    1.0,
-                    min(
-                        3600.0,
-                        float(settings.get("collection_delay_seconds", 2) or 2),
-                    ),
-                )
-            except (TypeError, ValueError):
-                collection_delay = 2.0
+        collection_pending = bool(settings.get("_collection_pending", False))
+        try:
+            collection_delay = max(
+                1.0,
+                min(
+                    3600.0,
+                    float(settings.get("collection_delay_seconds", 2) or 2),
+                ),
+            )
+        except (TypeError, ValueError):
+            collection_delay = 2.0
+        if collection_pending:
             last_started_at = float(
                 settings.get("_last_heal_started_at", time.time()) or time.time()
             )
@@ -4318,6 +4364,79 @@ class AutoClicker:
                     retry_delay=remaining,
                 )
                 return True
+
+        if collection_pending:
+            saved_target = settings.get("_hospital_target")
+            if (
+                isinstance(saved_target, (list, tuple))
+                and len(saved_target) == 2
+            ):
+                try:
+                    target_x = int(saved_target[0])
+                    target_y = int(saved_target[1])
+                except (TypeError, ValueError):
+                    settings.pop("_hospital_target", None)
+                else:
+                    retry_delay = max(1.0, min(5.0, collection_delay))
+                    last_attempt_at = float(
+                        settings.get("_last_saved_hospital_attempt_at", 0.0)
+                        or 0.0
+                    )
+                    now = time.time()
+                    if now - last_attempt_at < retry_delay:
+                        self._defer_current_routine_unavailable(
+                            "жду завершения лечения",
+                            now,
+                            retry_delay=retry_delay - (now - last_attempt_at),
+                        )
+                        return True
+                    if self._tap_routine_fallback(
+                        (target_x, target_y),
+                        ("healing_saved_hospital", target_x, target_y),
+                        "Лечение: собираю войска в сохранённом госпитале",
+                    ):
+                        settings["_last_saved_hospital_attempt_at"] = time.time()
+                        if self._healing_start_control_visible():
+                            self._remember_healing_hospital_target(
+                                settings,
+                                (target_x, target_y),
+                                save=False,
+                            )
+                            self._finish_pending_healing_collection(
+                                settings,
+                                "remembered hospital target",
+                            )
+                            return True
+                        failures = int(
+                            settings.get("_hospital_target_failures", 0) or 0
+                        ) + 1
+                        settings["_hospital_target_failures"] = failures
+                        self.save_config()
+                        if failures < 2:
+                            self._defer_current_routine_unavailable(
+                                "лечение ещё не завершено",
+                                time.time(),
+                                retry_delay=retry_delay,
+                            )
+                            return True
+                        logger.warning(
+                            "Remembered healing hospital target was not "
+                            "confirmed after %s attempts",
+                            failures,
+                        )
+                        settings.pop("_hospital_target", None)
+                        settings.pop("_last_saved_hospital_attempt_at", None)
+                        settings["_hospital_target_failures"] = 0
+                        self.save_config()
+                        self.set_status_message(
+                            "Госпиталь сместился: ищу новое положение",
+                            force=True,
+                        )
+                        if remembered_only:
+                            return False
+
+        if remembered_only:
+            return False
 
         collection_target = (
             detect_finished_healing_target(frame)
@@ -4341,6 +4460,23 @@ class AutoClicker:
                 return True
             if detect_finished_healing_target(frame_after) is None:
                 if not self._is_main_screen_visible():
+                    if not collection_pending:
+                        logger.info(
+                            "Healing portrait opened the hospital; continuing "
+                            "with a new treatment batch"
+                        )
+                        return True
+                    if self._healing_start_control_visible():
+                        self._remember_healing_hospital_target(
+                            settings,
+                            collection_target,
+                            save=False,
+                        )
+                        self._finish_pending_healing_collection(
+                            settings,
+                            "idle hospital screen",
+                        )
+                        return True
                     logger.info(
                         "Healing portrait opened the hospital before the batch "
                         "was ready; collection remains pending"
@@ -4352,10 +4488,15 @@ class AutoClicker:
                         retry_delay=collection_delay,
                     )
                     return True
-                settings["_collection_pending"] = False
-                settings.pop("_pending_heal_count", None)
-                settings.pop("_last_pending_camera_scan_at", None)
-                self.save_config()
+                self._remember_healing_hospital_target(
+                    settings,
+                    collection_target,
+                    save=False,
+                )
+                self._finish_pending_healing_collection(
+                    settings,
+                    f"map marker at {collection_target}",
+                )
                 self.set_status_message(
                     "Вылеченные войска собраны",
                     force=True,
@@ -5083,6 +5224,10 @@ class AutoClicker:
                             img.get("group") == current_group
                             and self._is_active(img)
                             and runtime_step_is_ready(img, self.routine_completed_steps)
+                            and healing_pending_allows_image(
+                                img,
+                                current_routine_task,
+                            )
                         )
                     ]
                     active_images.sort(key=lambda img: int(img.get("routine_priority", 100)))
@@ -5098,6 +5243,24 @@ class AutoClicker:
                     active_images = [img for img in self.search_images if self._is_active(img)]
                     logger.info(f"Обычный режим: активных областей {len(active_images)}")
                     self.set_status_message(f"Активных областей: {len(active_images)}")
+
+                if (
+                    self.routine_mode
+                    and current_routine_task
+                    and current_routine_task.get("id") == "heal"
+                    and current_routine_task.get("settings", {}).get(
+                        "_collection_pending",
+                        False,
+                    )
+                    and current_routine_task.get("settings", {}).get(
+                        "_hospital_target"
+                    )
+                    and self._try_healing_visual_fallback(
+                        current_routine_task,
+                        remembered_only=True,
+                    )
+                ):
+                    continue
 
                 if not active_images:
                     self.set_status_message("Нет активных областей", force=True)
@@ -6648,13 +6811,15 @@ class AutoClicker:
                 self._interruptible_sleep(0.35)
                 if healing_screen_is_ready():
                     settings = self._current_task_settings()
+                    self._remember_healing_hospital_target(
+                        settings,
+                        (location.x, location.y),
+                        save=not settings.get("_collection_pending", False),
+                    )
                     if settings.get("_collection_pending", False):
-                        settings["_last_collection_attempt_at"] = time.time()
-                        settings["_collection_pending"] = False
-                        settings.pop("_last_pending_camera_scan_at", None)
-                        self.save_config()
-                        logger.info(
-                            "Healing collection linked to the previous configured batch"
+                        self._finish_pending_healing_collection(
+                            settings,
+                            "hospital entrance",
                         )
                     return True
 
@@ -6676,10 +6841,15 @@ class AutoClicker:
                         self._interruptible_sleep(0.35)
                         if healing_screen_is_ready():
                             settings = self._current_task_settings()
-                            settings["_last_collection_attempt_at"] = time.time()
-                            settings["_collection_pending"] = False
-                            settings.pop("_last_pending_camera_scan_at", None)
-                            self.save_config()
+                            self._remember_healing_hospital_target(
+                                settings,
+                                (retry_location.x, retry_location.y),
+                                save=False,
+                            )
+                            self._finish_pending_healing_collection(
+                                settings,
+                                "hospital overview",
+                            )
                             logger.info(
                                 "Finished healing was collected through the hospital overview"
                             )
@@ -6696,6 +6866,12 @@ class AutoClicker:
                 if attempt:
                     current_location, current_bbox, _score = self._locate_image(img_config)
                     if current_location is None or current_bbox is None:
+                        healing_settings = self._current_task_settings()
+                        if healing_settings.get("_collection_pending", False):
+                            self._finish_pending_healing_collection(
+                                healing_settings,
+                                "template disappearance before retry",
+                            )
                         self.set_status_message("Вылеченные войска собраны", force=True)
                         logger.info("Finished healing marker disappeared after collection")
                         return True
@@ -6729,6 +6905,12 @@ class AutoClicker:
                     self._interruptible_sleep(0.35)
                     location_after, bbox_after, _score = self._locate_image(img_config)
                     if location_after is None or bbox_after is None:
+                        healing_settings = self._current_task_settings()
+                        if healing_settings.get("_collection_pending", False):
+                            self._finish_pending_healing_collection(
+                                healing_settings,
+                                f"template tap {attempt + 1}",
+                            )
                         self.set_status_message("Вылеченные войска собраны", force=True)
                         logger.info(
                             "Finished healing marker disappeared after attempt %s",
@@ -6745,7 +6927,18 @@ class AutoClicker:
             return False
 
         if action == "heal_troops":
-            troop_count = max(1, int(self._current_task_settings().get("troop_count", 2500)))
+            healing_settings = self._current_task_settings()
+            if healing_settings.get("_collection_pending", False):
+                logger.warning(
+                    "Healing start blocked while the previous batch is pending"
+                )
+                self.set_status_message(
+                    "Лечение не запущено: предыдущая партия ещё не собрана",
+                    force=True,
+                )
+                img_config["last_used"] = time.time()
+                return False
+            troop_count = max(1, int(healing_settings.get("troop_count", 2500)))
             frame, _origin = self._capture_screen_bgr(force=True)
             if not self._configure_healing_troop_count(troop_count, frame):
                 img_config["last_used"] = time.time()
@@ -6793,6 +6986,8 @@ class AutoClicker:
                     settings["_pending_heal_count"] = troop_count
                     settings["_last_heal_started_at"] = time.time()
                     settings["_last_pending_camera_scan_at"] = time.time()
+                    settings["_hospital_target_failures"] = 0
+                    settings.pop("_last_saved_hospital_attempt_at", None)
                     self.save_config()
                     self.set_status_message(f"Лечение запущено, лимит {troop_count}", force=True)
                     logger.info("Healing started with configured limit %s", troop_count)

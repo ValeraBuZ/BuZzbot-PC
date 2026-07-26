@@ -296,7 +296,7 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertTrue(219 <= target[0] <= 221)
         self.assertTrue(166 <= target[1] <= 168)
 
-    def test_detects_single_bronze_finished_healing_marker(self):
+    def test_rejects_single_dark_wounded_troop_marker(self):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
         cv2.rectangle(
             frame,
@@ -309,11 +309,11 @@ class DynamicGameControlTests(unittest.TestCase):
             frame,
             (725, 136),
             (766, 177),
-            (35, 80, 145),
+            (45, 95, 130),
             thickness=3,
         )
 
-        self.assertEqual(detect_finished_healing_target(frame), (746, 157))
+        self.assertIsNone(detect_finished_healing_target(frame))
 
     def test_detects_single_red_finished_healing_marker_without_purple(self):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
@@ -361,7 +361,7 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(detect_finished_healing_target(frame), (596, 294))
 
-    def test_detects_bronze_troop_portrait_core_without_red_frame(self):
+    def test_rejects_bronze_wounded_troop_portrait_core(self):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
         cv2.rectangle(
             frame,
@@ -378,7 +378,7 @@ class DynamicGameControlTests(unittest.TestCase):
             thickness=-1,
         )
 
-        self.assertEqual(detect_finished_healing_target(frame), (279, 255))
+        self.assertIsNone(detect_finished_healing_target(frame))
 
     def test_finished_healing_target_rejects_oil_factory_palette(self):
         frame = np.full((720, 1280, 3), (45, 65, 75), dtype=np.uint8)

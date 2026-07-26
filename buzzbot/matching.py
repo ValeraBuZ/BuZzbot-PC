@@ -399,7 +399,7 @@ def healing_selection_is_empty(frame_bgr):
 
 
 def detect_finished_healing_target(frame_bgr):
-    """Find a troop or medic collection marker above a finished hospital."""
+    """Find a verified red or medic marker above a finished hospital."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
@@ -426,7 +426,13 @@ def detect_finished_healing_target(frame_bgr):
             >= 0.06
         )
 
-    def is_finished_single_portrait(left, top, right, bottom):
+    def is_finished_single_portrait(
+        left,
+        top,
+        right,
+        bottom,
+        require_medic=False,
+    ):
         padding = 2
         left = max(0, left - padding)
         top = max(0, top - padding)
@@ -462,15 +468,12 @@ def detect_finished_healing_target(frame_bgr):
             and white_ratio >= 0.12
             and bronze_ratio >= 0.20
         )
+        if require_medic:
+            return medic_collection_marker
         return (
             red_ratio >= 0.25
             and white_ratio <= 0.10
-        ) or medic_collection_marker or has_troop_portrait(
-            left,
-            top,
-            right,
-            bottom,
-        )
+        ) or medic_collection_marker
 
     red_mask = cv2.inRange(
         hsv,
@@ -487,15 +490,12 @@ def detect_finished_healing_target(frame_bgr):
         np.array([8, 60, 60], dtype=np.uint8),
         np.array([25, 255, 255], dtype=np.uint8),
     )
-
     # Finished-healing portraits appear over shelter buildings. Excluding the
     # HUD keeps red notification badges and bottom navigation out of the scan.
+    # Only red frames may seed a cluster: adjacent bronze roof details stay
+    # visible after collection and otherwise cause repeated hospital clicks.
     portrait_boxes = []
-    bronze_core_boxes = []
-    for marker_mask, collect_bronze_cores in (
-        (red_mask, False),
-        (bronze_mask, True),
-    ):
+    for marker_mask in (red_mask,):
         marker_mask[:120, :] = 0
         marker_mask[520:, :] = 0
         # The persistent quest panel occupies the left edge and contains bronze
@@ -511,13 +511,6 @@ def detect_finished_healing_target(frame_bgr):
         for contour in contours:
             x, y, width, height = cv2.boundingRect(contour)
             area = float(cv2.contourArea(contour))
-            if (
-                collect_bronze_cores
-                and 20 <= width <= 25
-                and 29 <= height <= 32
-                and 450.0 <= area <= 650.0
-            ):
-                bronze_core_boxes.append((x, y, width, height, area))
             if (
                 18 <= width <= 48
                 and 30 <= height <= 48
@@ -551,6 +544,33 @@ def detect_finished_healing_target(frame_bgr):
                 break
         if not duplicate:
             deduplicated.append(candidate)
+
+    # The real medic portrait has a bronze outer frame. Keep bronze boxes only
+    # for the stricter single-portrait signature below, never for clustering.
+    single_portrait_boxes = [
+        (box, False)
+        for box in deduplicated
+    ]
+    bronze_mask[:120, :] = 0
+    bronze_mask[520:, :] = 0
+    bronze_mask[:, :230] = 0
+    bronze_mask[:, 1100:] = 0
+    contours, _hierarchy = cv2.findContours(
+        bronze_mask,
+        cv2.RETR_LIST,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    for contour in contours:
+        x, y, width, height = cv2.boundingRect(contour)
+        area = float(cv2.contourArea(contour))
+        if (
+            18 <= width <= 48
+            and 30 <= height <= 48
+            and area >= 80.0
+        ):
+            single_portrait_boxes.append(
+                ((x, y, width, height, area), True)
+            )
 
     # Portrait frames in one collection marker touch or nearly touch and share
     # a baseline. Requiring a cluster rejects isolated red game controls.
@@ -606,30 +626,23 @@ def detect_finished_healing_target(frame_bgr):
                 )
             )
 
-    # The outer frame color depends on the healed troop type. The compact
-    # bronze portrait core remains stable when red framing is absent.
-    for x, y, width, height, _area in bronze_core_boxes:
-        if not has_troop_portrait(x, y, x + width, y + height):
-            continue
-        candidates.append(
-            (
-                5,
-                y,
-                x,
-                x + width / 2.0,
-                y + height / 2.0,
-            )
-        )
-
-    # Some accounts show one troop or medic portrait per hospital instead of a
-    # three-portrait group. Its bronze frame produces a compact square contour;
-    # the color signature excludes ordinary building decorations.
-    for x, y, width, height, area in deduplicated:
+    # A lone dark troop portrait means that wounded troops are available. Only
+    # a red or white-red medic signature is safe to treat as a collection icon.
+    for (
+        (x, y, width, height, area),
+        require_medic,
+    ) in single_portrait_boxes:
         if (
             35 <= width <= 48
             and 35 <= height <= 48
             and area >= 1100.0
-            and is_finished_single_portrait(x, y, x + width, y + height)
+            and is_finished_single_portrait(
+                x,
+                y,
+                x + width,
+                y + height,
+                require_medic=require_medic,
+            )
         ):
             candidates.append(
                 (
