@@ -399,7 +399,7 @@ def healing_selection_is_empty(frame_bgr):
 
 
 def detect_finished_healing_target(frame_bgr):
-    """Find a red or bronze troop portrait marker above a finished hospital."""
+    """Find a troop or medic collection marker above a finished hospital."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
@@ -444,17 +444,33 @@ def detect_finished_healing_target(frame_bgr):
             (portrait[:, :, 1] <= 55)
             & (portrait[:, :, 2] >= 150)
         )
+        bronze_pixels = (
+            (portrait[:, :, 0] >= 8)
+            & (portrait[:, :, 0] <= 25)
+            & (portrait[:, :, 1] >= 60)
+            & (portrait[:, :, 2] >= 60)
+        )
         red_ratio = float(np.count_nonzero(red_pixels)) / float(red_pixels.size)
         white_ratio = float(np.count_nonzero(white_pixels)) / float(
             white_pixels.size
         )
-        # A collected hospital replaces the dark troop portrait with a large
-        # white medic symbol. Do not mistake that wounded-troop marker for a
-        # second finished batch.
+        bronze_ratio = float(np.count_nonzero(bronze_pixels)) / float(
+            bronze_pixels.size
+        )
+        medic_collection_marker = (
+            red_ratio >= 0.12
+            and white_ratio >= 0.12
+            and bronze_ratio >= 0.20
+        )
         return (
             red_ratio >= 0.25
             and white_ratio <= 0.10
-        ) or has_troop_portrait(left, top, right, bottom)
+        ) or medic_collection_marker or has_troop_portrait(
+            left,
+            top,
+            right,
+            bottom,
+        )
 
     red_mask = cv2.inRange(
         hsv,
@@ -605,14 +621,14 @@ def detect_finished_healing_target(frame_bgr):
             )
         )
 
-    # Some accounts show one portrait per hospital instead of a three-portrait
-    # group. Its bronze frame produces a compact, nearly square outer contour;
-    # the high contour-area threshold excludes ordinary building decorations.
+    # Some accounts show one troop or medic portrait per hospital instead of a
+    # three-portrait group. Its bronze frame produces a compact square contour;
+    # the color signature excludes ordinary building decorations.
     for x, y, width, height, area in deduplicated:
         if (
             35 <= width <= 48
             and 35 <= height <= 48
-            and area >= 1200.0
+            and area >= 1100.0
             and is_finished_single_portrait(x, y, x + width, y + height)
         ):
             candidates.append(
