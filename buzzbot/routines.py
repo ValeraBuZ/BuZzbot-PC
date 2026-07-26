@@ -1003,6 +1003,7 @@ def upgrade_resource_runtime_metadata(images, tasks):
                 image["next_template_uid"] = world_search_uid
                 image["delay"] = 0.8
                 image["settlement_screen_marker"] = True
+                image["search_region"] = [0, 560, 150, 160]
             if step_id == "gather":
                 image["expected_result_level_setting"] = "resource_level"
                 image["result_level_template_uids"] = {

@@ -4243,6 +4243,23 @@ class AutoClicker:
     def _try_healing_visual_fallback(self, task):
         if task.get("id") != "heal" or not self._is_main_screen_visible():
             return False
+        if not self._is_settlement_screen_visible():
+            self.set_status_message(
+                "Лечение: возвращаюсь с карты мира в убежище",
+                force=True,
+            )
+            if not self._switch_to_settlement_screen():
+                logger.warning(
+                    "Healing search paused because the settlement screen "
+                    "could not be confirmed"
+                )
+                return False
+            self.routine_healing_pan_route = []
+            self.routine_healing_replay_index = 0
+            self.routine_healing_scan_index = 0
+            self.routine_healing_search_started = False
+            logger.info("Healing search returned from the world map to the settlement")
+            return True
         try:
             frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:

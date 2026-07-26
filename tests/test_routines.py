@@ -700,6 +700,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(upgrade_resource_runtime_metadata(images, tasks), 4)
         self.assertEqual(images[0]["action"], "open_world_search")
         self.assertEqual(images[0]["runtime_step"], "world_search")
+        self.assertEqual(images[0]["search_region"], [0, 560, 150, 160])
         self.assertEqual(images[1]["requires_runtime_steps"], ["world_search"])
         self.assertEqual(images[2]["requires_runtime_steps"], ["world_search"])
         self.assertTrue(images[1]["allow_runtime_resume"])

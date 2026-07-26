@@ -172,6 +172,7 @@ class HealingTests(unittest.TestCase):
         bot.routine_healing_search_started = False
         bot.routine_last_action_time = 0.0
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((1080, 1920, 3), dtype=np.uint8),
             (0, 0),
@@ -202,12 +203,39 @@ class HealingTests(unittest.TestCase):
 
         self.assertFalse(bot._try_healing_visual_fallback({"id": "heal"}))
 
+    def test_returns_to_settlement_before_searching_for_hospital(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_healing_pan_route = ["left", "up"]
+        bot.routine_healing_replay_index = 2
+        bot.routine_healing_scan_index = 7
+        bot.routine_healing_search_started = True
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: False
+        switched = []
+        bot._switch_to_settlement_screen = lambda: switched.append(True) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        bot._capture_screen_bgr = lambda force=False: self.fail(
+            "camera search started before the settlement was restored"
+        )
+
+        result = bot._try_healing_visual_fallback(
+            {"id": "heal", "settings": {"_collection_pending": True}}
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(switched, [True])
+        self.assertEqual(bot.routine_healing_pan_route, [])
+        self.assertEqual(bot.routine_healing_replay_index, 0)
+        self.assertEqual(bot.routine_healing_scan_index, 0)
+        self.assertFalse(bot.routine_healing_search_started)
+
     def test_pending_healing_throttles_camera_scan_after_recent_check(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeAdbClient()
         bot.routine_completed_steps = set()
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((720, 1280, 3), dtype=np.uint8),
             (0, 0),
@@ -237,6 +265,7 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.routine_completed_steps = set()
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         marker_frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
         for left in (238, 262, 286):
             import cv2
@@ -285,6 +314,7 @@ class HealingTests(unittest.TestCase):
         bot.blocked_coords = {}
         bot.stop_event = threading.Event()
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         marker_frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
         for left in (238, 262, 286):
             import cv2
@@ -338,6 +368,7 @@ class HealingTests(unittest.TestCase):
         bot.routine_idle_confirmation_count = 3
         bot.click_count = 0
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((1080, 1920, 3), dtype=np.uint8),
             (0, 0),
@@ -380,6 +411,7 @@ class HealingTests(unittest.TestCase):
         bot.routine_idle_confirmation_count = 0
         bot.click_count = 0
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((720, 1280, 3), dtype=np.uint8),
             (0, 0),
@@ -423,6 +455,7 @@ class HealingTests(unittest.TestCase):
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((720, 1280, 3), dtype=np.uint8),
             (0, 0),
