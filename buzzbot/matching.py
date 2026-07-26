@@ -426,6 +426,36 @@ def detect_finished_healing_target(frame_bgr):
             >= 0.06
         )
 
+    def is_finished_single_portrait(left, top, right, bottom):
+        padding = 2
+        left = max(0, left - padding)
+        top = max(0, top - padding)
+        right = min(hsv.shape[1], right + padding)
+        bottom = min(hsv.shape[0], bottom + padding)
+        portrait = hsv[top:bottom, left:right]
+        if portrait.size == 0:
+            return False
+        red_pixels = (
+            ((portrait[:, :, 0] <= 12) | (portrait[:, :, 0] >= 170))
+            & (portrait[:, :, 1] >= 80)
+            & (portrait[:, :, 2] >= 70)
+        )
+        white_pixels = (
+            (portrait[:, :, 1] <= 55)
+            & (portrait[:, :, 2] >= 150)
+        )
+        red_ratio = float(np.count_nonzero(red_pixels)) / float(red_pixels.size)
+        white_ratio = float(np.count_nonzero(white_pixels)) / float(
+            white_pixels.size
+        )
+        # A collected hospital replaces the dark troop portrait with a large
+        # white medic symbol. Do not mistake that wounded-troop marker for a
+        # second finished batch.
+        return (
+            red_ratio >= 0.25
+            and white_ratio <= 0.10
+        ) or has_troop_portrait(left, top, right, bottom)
+
     red_mask = cv2.inRange(
         hsv,
         np.array([0, 80, 70], dtype=np.uint8),
@@ -583,7 +613,7 @@ def detect_finished_healing_target(frame_bgr):
             35 <= width <= 48
             and 35 <= height <= 48
             and area >= 1200.0
-            and has_troop_portrait(x, y, x + width, y + height)
+            and is_finished_single_portrait(x, y, x + width, y + height)
         ):
             candidates.append(
                 (

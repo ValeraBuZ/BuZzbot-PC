@@ -315,6 +315,52 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(detect_finished_healing_target(frame), (746, 157))
 
+    def test_detects_single_red_finished_healing_marker_without_purple(self):
+        frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (572, 276),
+            (614, 316),
+            (15, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            frame,
+            (578, 282),
+            (608, 310),
+            (45, 55, 65),
+            thickness=-1,
+        )
+
+        self.assertEqual(detect_finished_healing_target(frame), (594, 296))
+
+    def test_finished_healing_target_rejects_white_medic_marker(self):
+        frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (574, 272),
+            (616, 314),
+            (35, 80, 145),
+            thickness=-1,
+        )
+        cv2.circle(frame, (595, 293), 16, (225, 225, 225), thickness=-1)
+        cv2.rectangle(
+            frame,
+            (592, 278),
+            (598, 308),
+            (20, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            frame,
+            (583, 290),
+            (607, 296),
+            (20, 25, 220),
+            thickness=-1,
+        )
+
+        self.assertIsNone(detect_finished_healing_target(frame))
+
     def test_detects_bronze_troop_portrait_core_without_red_frame(self):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
         cv2.rectangle(

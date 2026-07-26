@@ -709,6 +709,7 @@ class AutoClicker:
         self.routine_healing_pan_route = []
         self.routine_healing_replay_index = 0
         self.routine_healing_scan_index = 0
+        self.routine_healing_settle_checks = 0
         self.routine_healing_overlay_recovery_done = False
         self.routine_healing_saved_route_rejected = False
         self.routine_healing_search_started = False
@@ -3353,6 +3354,7 @@ class AutoClicker:
         self.routine_healing_pan_route = []
         self.routine_healing_replay_index = 0
         self.routine_healing_scan_index = 0
+        self.routine_healing_settle_checks = 0
         self.routine_healing_overlay_recovery_done = False
         self.routine_healing_saved_route_rejected = False
         self.routine_healing_search_started = False
@@ -4238,8 +4240,15 @@ class AutoClicker:
                 self.save_config()
             return
         routes = settings.setdefault("_camera_routes", {})
+        if settings.get("_camera_route_version") != 2:
+            routes.clear()
+            settings["_camera_route_version"] = 2
+            changed = True
         route_key = self._healing_camera_route_key()
-        remembered = route[-16:]
+        # Keep the corner-anchoring moves at the start. Saving only the tail
+        # makes the route relative to the previous camera position and can
+        # strand the next run in an empty part of the shelter.
+        remembered = route[:96]
         if routes.get(route_key) != remembered:
             routes[route_key] = remembered
             changed = True
@@ -4268,6 +4277,7 @@ class AutoClicker:
             self.routine_healing_pan_route = []
             self.routine_healing_replay_index = 0
             self.routine_healing_scan_index = 0
+            self.routine_healing_settle_checks = 0
             self.routine_healing_search_started = False
             logger.info("Healing search returned from the world map to the settlement")
             return True
@@ -4311,10 +4321,7 @@ class AutoClicker:
 
         collection_target = (
             detect_finished_healing_target(frame)
-            if (
-                settings.get("collect_finished", True)
-                and settings.get("_collection_pending", False)
-            )
+            if settings.get("collect_finished", True)
             else None
         )
         if collection_target is not None:
@@ -4335,8 +4342,14 @@ class AutoClicker:
             if detect_finished_healing_target(frame_after) is None:
                 if not self._is_main_screen_visible():
                     logger.info(
-                        "Healing portrait opened the hospital; collection "
-                        "confirmation remains pending"
+                        "Healing portrait opened the hospital before the batch "
+                        "was ready; collection remains pending"
+                    )
+                    self.save_config()
+                    self._defer_current_routine_unavailable(
+                        "текущее лечение ещё не завершено",
+                        time.time(),
+                        retry_delay=collection_delay,
                     )
                     return True
                 settings["_collection_pending"] = False
@@ -4403,7 +4416,11 @@ class AutoClicker:
             return True
 
         route_key = self._healing_camera_route_key()
-        saved_routes = settings.get("_camera_routes", {})
+        saved_routes = settings.setdefault("_camera_routes", {})
+        if settings.get("_camera_route_version") != 2:
+            saved_routes.clear()
+            settings["_camera_route_version"] = 2
+            self.save_config()
         saved_route = list(saved_routes.get(route_key, ()))
         replay_index = self.routine_healing_replay_index
         if replay_index < len(saved_route):
@@ -4426,10 +4443,12 @@ class AutoClicker:
                     "Healing camera route rejected after replay for %s",
                     route_key,
                 )
-            # Reach one map corner, then cover the shelter in horizontal rows.
-            # The sequence is finite so a missing hospital cannot trap the bot.
+            # First probe both sides of the current view. This recovers quickly
+            # when the hospital is just outside the viewport after a collection.
+            # Then reach one map corner and cover the shelter in horizontal rows.
             scan_pattern = (
-                ("left",) * 5
+                ("right", "left")
+                + ("left",) * 5
                 + ("up",) * 4
                 + ("right",) * 9
                 + ("down",) * 2
@@ -4438,9 +4457,29 @@ class AutoClicker:
                 + ("right",) * 9
                 + ("down",) * 2
                 + ("left",) * 9
+                + ("right",)
             )
             scan_index = self.routine_healing_scan_index
             if scan_index >= len(scan_pattern):
+                settle_checks = getattr(
+                    self,
+                    "routine_healing_settle_checks",
+                    0,
+                )
+                if settle_checks < 2:
+                    self.routine_healing_settle_checks = settle_checks + 1
+                    self.set_status_message(
+                        "Лечение: жду загрузку значков госпиталя",
+                        force=True,
+                    )
+                    self._invalidate_capture()
+                    self._interruptible_sleep(1.5)
+                    logger.info(
+                        "Healing camera scan finished; waiting for hospital "
+                        "markers to render (%s/2)",
+                        self.routine_healing_settle_checks,
+                    )
+                    return True
                 if settings.get("_collection_pending", False):
                     settings["_last_pending_camera_scan_at"] = time.time()
                     self.save_config()

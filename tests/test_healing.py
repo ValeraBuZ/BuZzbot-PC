@@ -302,7 +302,66 @@ class HealingTests(unittest.TestCase):
         self.assertLessEqual(deferred[0][1], 30.0)
         self.assertEqual(bot.adb_client.taps, [])
 
-    def test_does_not_collect_generic_marker_without_pending_state(self):
+    def test_early_collection_marker_keeps_batch_pending(self):
+        import cv2
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = set()
+        bot._is_settlement_screen_visible = lambda: True
+        screen_checks = iter((True, False))
+        bot._is_main_screen_visible = lambda: next(screen_checks)
+        marker_frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            marker_frame,
+            (572, 276),
+            (614, 316),
+            (15, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            marker_frame,
+            (578, 282),
+            (608, 310),
+            (45, 55, 65),
+            thickness=-1,
+        )
+        frames = iter(
+            (
+                (marker_frame, (0, 0)),
+                (np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)),
+            )
+        )
+        bot._capture_screen_bgr = lambda force=False: next(frames)
+        bot._tap_routine_fallback = lambda *_args: True
+        bot.save_config = lambda: None
+        deferred = []
+        bot._defer_current_routine_unavailable = (
+            lambda reason, now=None, retry_delay=None: deferred.append(
+                (reason, retry_delay)
+            )
+        )
+        task = {
+            "id": "heal",
+            "settings": {
+                "collect_finished": True,
+                "collection_delay_seconds": 2,
+                "_collection_pending": True,
+                "_last_heal_started_at": time.time() - 10.0,
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertTrue(task["settings"]["_collection_pending"])
+        self.assertEqual(
+            deferred,
+            [("текущее лечение ещё не завершено", 2.0)],
+        )
+
+    def test_collects_finished_marker_after_restart_without_pending_state(self):
+        import cv2
+
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeAdbClient()
@@ -315,17 +374,21 @@ class HealingTests(unittest.TestCase):
         bot.stop_event = threading.Event()
         bot._is_main_screen_visible = lambda: True
         bot._is_settlement_screen_visible = lambda: True
-        marker_frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
-        for left in (238, 262, 286):
-            import cv2
-
-            cv2.rectangle(
-                marker_frame,
-                (left, 192),
-                (left + 23, 231),
-                (15, 25, 220),
-                thickness=3,
-            )
+        marker_frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            marker_frame,
+            (572, 276),
+            (614, 316),
+            (15, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            marker_frame,
+            (578, 282),
+            (608, 310),
+            (45, 55, 65),
+            thickness=-1,
+        )
         frames = iter(
             (
                 (marker_frame, (0, 0)),
@@ -333,6 +396,10 @@ class HealingTests(unittest.TestCase):
             )
         )
         bot._capture_screen_bgr = lambda force=False: next(frames)
+        taps = []
+        bot._tap_routine_fallback = (
+            lambda target, *_args: taps.append(target) or True
+        )
         bot._invalidate_capture = lambda: None
         bot._interruptible_sleep = lambda _seconds: None
         bot.set_status_message = lambda *_args, **_kwargs: None
@@ -349,9 +416,9 @@ class HealingTests(unittest.TestCase):
         result = bot._try_healing_visual_fallback(task)
 
         self.assertTrue(result)
-        self.assertEqual(bot.adb_client.taps, [])
+        self.assertEqual(taps, [(594, 296)])
         self.assertFalse(task["settings"]["_collection_pending"])
-        self.assertEqual(saves, [])
+        self.assertEqual(saves, [True])
 
     def test_replays_saved_healing_camera_route(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -379,6 +446,7 @@ class HealingTests(unittest.TestCase):
         task = {
             "id": "heal",
             "settings": {
+                "_camera_route_version": 2,
                 "_camera_routes": {
                     "emulator-5554:main": ["left"],
                 }
@@ -424,6 +492,7 @@ class HealingTests(unittest.TestCase):
         task = {
             "id": "heal",
             "settings": {
+                "_camera_route_version": 2,
                 "_camera_routes": {
                     "emulator-5554:main": ["left"],
                 }
@@ -439,7 +508,7 @@ class HealingTests(unittest.TestCase):
         )
         self.assertEqual(
             bot.adb_client.swipes,
-            [(980, 420, 360, 420, 400)],
+            [(360, 420, 980, 420, 400)],
         )
         self.assertEqual(saves, [True])
 
@@ -449,9 +518,10 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "main"
         bot.routine_completed_steps = {"healing_overview"}
-        bot.routine_healing_pan_route = ["left"] * 51
+        bot.routine_healing_pan_route = ["left"] * 54
         bot.routine_healing_replay_index = 0
-        bot.routine_healing_scan_index = 51
+        bot.routine_healing_scan_index = 54
+        bot.routine_healing_settle_checks = 2
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True
         bot._is_main_screen_visible = lambda: True
@@ -464,7 +534,10 @@ class HealingTests(unittest.TestCase):
         bot._defer_current_routine_unavailable = (
             lambda reason, now=None: deferred.append(reason)
         )
-        task = {"id": "heal", "settings": {}}
+        task = {
+            "id": "heal",
+            "settings": {"_camera_route_version": 2},
+        }
 
         result = bot._try_healing_visual_fallback(task)
 
@@ -475,12 +548,53 @@ class HealingTests(unittest.TestCase):
         )
         self.assertEqual(bot.adb_client.swipes, [])
 
+    def test_waits_for_final_healing_markers_before_deferring(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient()
+        bot.current_account_id = "main"
+        bot.routine_completed_steps = {"healing_overview"}
+        bot.routine_healing_pan_route = ["left"] * 54
+        bot.routine_healing_replay_index = 0
+        bot.routine_healing_scan_index = 54
+        bot.routine_healing_settle_checks = 0
+        bot.routine_healing_saved_route_rejected = False
+        bot.routine_healing_search_started = True
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: True
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        invalidations = []
+        sleeps = []
+        deferred = []
+        bot._invalidate_capture = lambda: invalidations.append(True)
+        bot._interruptible_sleep = lambda seconds: sleeps.append(seconds)
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        bot._defer_current_routine_unavailable = (
+            lambda reason, now=None: deferred.append(reason)
+        )
+        task = {
+            "id": "heal",
+            "settings": {"_camera_route_version": 2},
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertEqual(bot.routine_healing_settle_checks, 1)
+        self.assertEqual(invalidations, [True])
+        self.assertEqual(sleeps, [1.5])
+        self.assertEqual(deferred, [])
+
     def test_remembers_successful_healing_camera_route_per_account(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "farm"
-        bot.routine_healing_pan_route = ["left", "up"]
+        full_route = ["left"] * 5 + ["up"] * 4 + ["right"] * 12
+        bot.routine_healing_pan_route = full_route
         settings = {}
         bot._current_task_settings = lambda: settings
         saves = []
@@ -490,8 +604,9 @@ class HealingTests(unittest.TestCase):
 
         self.assertEqual(
             settings["_camera_routes"]["emulator-5554:farm"],
-            ["left", "up"],
+            full_route,
         )
+        self.assertEqual(settings["_camera_route_version"], 2)
         self.assertEqual(saves, [True])
 
 
