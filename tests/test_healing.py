@@ -230,6 +230,58 @@ class HealingTests(unittest.TestCase):
         self.assertEqual(deferred, ["текущее лечение ещё не завершено"])
         self.assertEqual(bot.adb_client.swipes, [])
 
+    def test_pending_healing_collects_generic_portrait_marker(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient()
+        bot.routine_completed_steps = set()
+        bot.routine_current_had_action = False
+        bot.routine_last_action_time = 0.0
+        bot.routine_idle_confirmation_count = 0
+        bot.click_count = 0
+        bot.blocked_coords = {}
+        bot.stop_event = threading.Event()
+        bot._is_main_screen_visible = lambda: True
+        marker_frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
+        for left in (238, 262, 286):
+            import cv2
+
+            cv2.rectangle(
+                marker_frame,
+                (left, 192),
+                (left + 23, 231),
+                (15, 25, 220),
+                thickness=3,
+            )
+        frames = iter(
+            (
+                (marker_frame, (0, 0)),
+                (np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)),
+            )
+        )
+        bot._capture_screen_bgr = lambda force=False: next(frames)
+        bot._invalidate_capture = lambda: None
+        bot._interruptible_sleep = lambda _seconds: None
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        saves = []
+        bot.save_config = lambda: saves.append(True)
+        task = {
+            "id": "heal",
+            "settings": {
+                "_collection_pending": True,
+                "_pending_heal_count": 2500,
+                "_last_heal_started_at": time.time(),
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertEqual(bot.adb_client.taps, [(274, 212)])
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertNotIn("_pending_heal_count", task["settings"])
+        self.assertEqual(saves, [True])
+
     def test_replays_saved_healing_camera_route(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"

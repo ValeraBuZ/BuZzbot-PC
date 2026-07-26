@@ -54,6 +54,7 @@ from buzzbot.matching import (
     detect_alliance_marked_project_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
+    detect_finished_healing_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
@@ -94,6 +95,7 @@ from buzzbot.routines import (
     resource_search_retry_due,
     setting_requirement_matches,
     training_queue_match_is_safe,
+    unavailable_retry_delay,
     routine_home_recovery_due,
     routine_idle_screen_recovery_due,
     routine_missing_followup_is_unavailable,
@@ -4250,6 +4252,44 @@ class AutoClicker:
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
         if settings.get("_collection_pending", False):
+            collection_target = detect_finished_healing_target(frame)
+            if collection_target is not None:
+                if not self._tap_routine_fallback(
+                    collection_target,
+                    ("healing_collect_visual", *collection_target),
+                    "Лечение: собираю готовых бойцов",
+                ):
+                    return False
+                settings["_last_collection_attempt_at"] = time.time()
+                try:
+                    frame_after, _origin = self._capture_screen_bgr(force=True)
+                except Exception:
+                    logger.exception(
+                        "Healing fallback could not verify the collection marker"
+                    )
+                    return True
+                if detect_finished_healing_target(frame_after) is None:
+                    settings["_collection_pending"] = False
+                    settings.pop("_pending_heal_count", None)
+                    self.save_config()
+                    self.set_status_message(
+                        "Вылеченные войска собраны",
+                        force=True,
+                    )
+                    logger.info(
+                        "Finished healing collected through generic portrait "
+                        "marker at (%s, %s)",
+                        *collection_target,
+                    )
+                else:
+                    self.save_config()
+                    logger.warning(
+                        "Finished healing marker remained after generic "
+                        "collection click at (%s, %s)",
+                        *collection_target,
+                    )
+                return True
+
             last_started_at = float(
                 settings.get("_last_heal_started_at", time.time()) or time.time()
             )
@@ -4530,7 +4570,7 @@ class AutoClicker:
             "max_queue_checks": "все очереди производства заняты",
             "max_lab_checks": "все очереди исследований заняты",
         }.get(reason, reason)
-        retry_delay = max(60.0, no_action_retry_delay(task))
+        retry_delay = unavailable_retry_delay(task)
         self.routine_next_run[task["id"]] = now + retry_delay
         logger.info(
             "Routine %s is temporarily unavailable (%s); retrying in %.0f seconds",
@@ -6572,7 +6612,7 @@ class AutoClicker:
             return False
 
         if action == "heal_troops":
-            troop_count = max(1, int(self._current_task_settings().get("troop_count", 10000)))
+            troop_count = max(1, int(self._current_task_settings().get("troop_count", 2500)))
             frame, _origin = self._capture_screen_bgr(force=True)
             if not self._configure_healing_troop_count(troop_count, frame):
                 img_config["last_used"] = time.time()

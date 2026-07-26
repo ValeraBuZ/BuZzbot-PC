@@ -10,6 +10,7 @@ from buzzbot.matching import (
     detect_alliance_marked_project_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
+    detect_finished_healing_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
@@ -230,6 +231,56 @@ class DynamicGameControlTests(unittest.TestCase):
         enabled_button = frame.copy()
         enabled_button[592:642, 900:1155] = (30, 180, 240)
         self.assertFalse(healing_selection_is_empty(enabled_button))
+
+    def test_detects_finished_healing_portrait_cluster(self):
+        frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
+        for left in (238, 262, 286):
+            cv2.rectangle(
+                frame,
+                (left, 192),
+                (left + 23, 231),
+                (15, 25, 220),
+                thickness=3,
+            )
+        cv2.rectangle(
+            frame,
+            (608, 244),
+            (635, 275),
+            (15, 25, 220),
+            thickness=3,
+        )
+
+        self.assertEqual(detect_finished_healing_target(frame), (274, 212))
+
+    def test_finished_healing_target_rejects_isolated_red_controls(self):
+        frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (608, 244),
+            (635, 283),
+            (15, 25, 220),
+            thickness=3,
+        )
+        cv2.circle(frame, (700, 200), 10, (15, 25, 220), thickness=-1)
+
+        self.assertIsNone(detect_finished_healing_target(frame))
+
+    def test_finished_healing_target_scales_to_device_frame(self):
+        frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
+        for left in (405, 429, 453):
+            cv2.rectangle(
+                frame,
+                (left, 314),
+                (left + 23, 353),
+                (15, 25, 220),
+                thickness=3,
+            )
+        scaled = cv2.resize(frame, (640, 360), interpolation=cv2.INTER_AREA)
+
+        target = detect_finished_healing_target(scaled)
+        self.assertIsNotNone(target)
+        self.assertTrue(219 <= target[0] <= 221)
+        self.assertTrue(166 <= target[1] <= 168)
 
 
 if __name__ == "__main__":

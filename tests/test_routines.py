@@ -38,6 +38,7 @@ from buzzbot.routines import (
     runtime_step_is_ready,
     task_setting_specs,
     training_queue_match_is_safe,
+    unavailable_retry_delay,
     upgrade_prize_hunt_metadata,
     upgrade_radar_runtime_metadata,
     upgrade_repeatable_claim_metadata,
@@ -462,6 +463,21 @@ class RoutineTaskTests(unittest.TestCase):
         )
         self.assertEqual(no_action_retry_delay({"interval_minutes": 2.0}), 120.0)
         self.assertEqual(no_action_retry_delay({"interval_minutes": 60.0}), 300.0)
+
+    def test_pending_healing_collection_retries_without_a_minute_delay(self):
+        pending_heal = {
+            "id": "heal",
+            "interval_minutes": 0.1,
+            "settings": {"_collection_pending": True},
+        }
+        ordinary_heal = {
+            "id": "heal",
+            "interval_minutes": 0.1,
+            "settings": {"_collection_pending": False},
+        }
+
+        self.assertEqual(unavailable_retry_delay(pending_heal), 6.0)
+        self.assertEqual(unavailable_retry_delay(ordinary_heal), 60.0)
 
     def test_home_recovery_only_runs_before_the_first_march_action(self):
         task = {"uses_march": True, "timeout_seconds": 1800.0}

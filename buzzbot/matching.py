@@ -398,6 +398,137 @@ def healing_selection_is_empty(frame_bgr):
     )
 
 
+def detect_finished_healing_target(frame_bgr):
+    """Find the red-framed troop portrait cluster above a finished hospital."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    red_mask = cv2.inRange(
+        hsv,
+        np.array([0, 80, 70], dtype=np.uint8),
+        np.array([12, 255, 255], dtype=np.uint8),
+    )
+    red_mask |= cv2.inRange(
+        hsv,
+        np.array([170, 80, 70], dtype=np.uint8),
+        np.array([179, 255, 255], dtype=np.uint8),
+    )
+
+    # Finished-healing portraits appear over shelter buildings. Excluding the
+    # HUD keeps red notification badges and bottom navigation out of the scan.
+    red_mask[:140, :] = 0
+    red_mask[500:, :] = 0
+    red_mask[:, :160] = 0
+    red_mask[:, 1080:] = 0
+
+    portrait_boxes = []
+    contours, _hierarchy = cv2.findContours(
+        red_mask,
+        cv2.RETR_LIST,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    for contour in contours:
+        x, y, width, height = cv2.boundingRect(contour)
+        area = float(cv2.contourArea(contour))
+        if (
+            18 <= width <= 46
+            and 32 <= height <= 46
+            and area >= 80.0
+        ):
+            portrait_boxes.append((x, y, width, height, area))
+
+    # RETR_LIST may return both edges of the same frame. Keep only the larger
+    # contour when two boxes substantially overlap.
+    deduplicated = []
+    for candidate in sorted(portrait_boxes, key=lambda box: box[4], reverse=True):
+        x, y, width, height, _area = candidate
+        candidate_area = width * height
+        duplicate = False
+        for kept in deduplicated:
+            kept_x, kept_y, kept_width, kept_height, _kept_area = kept
+            intersection_width = max(
+                0,
+                min(x + width, kept_x + kept_width) - max(x, kept_x),
+            )
+            intersection_height = max(
+                0,
+                min(y + height, kept_y + kept_height) - max(y, kept_y),
+            )
+            intersection = intersection_width * intersection_height
+            if intersection >= 0.65 * min(
+                candidate_area,
+                kept_width * kept_height,
+            ):
+                duplicate = True
+                break
+        if not duplicate:
+            deduplicated.append(candidate)
+
+    # Portrait frames in one collection marker touch or nearly touch and share
+    # a baseline. Requiring a cluster rejects isolated red game controls.
+    clusters = []
+    remaining = set(range(len(deduplicated)))
+    while remaining:
+        component = {remaining.pop()}
+        changed = True
+        while changed:
+            changed = False
+            for index in list(remaining):
+                x, y, width, height, _area = deduplicated[index]
+                center_y = y + height / 2.0
+                for member in component:
+                    other_x, other_y, other_width, other_height, _other_area = (
+                        deduplicated[member]
+                    )
+                    other_center_y = other_y + other_height / 2.0
+                    horizontal_gap = max(
+                        0,
+                        max(x, other_x)
+                        - min(x + width, other_x + other_width),
+                    )
+                    if (
+                        abs(center_y - other_center_y) <= 8.0
+                        and horizontal_gap <= 12
+                    ):
+                        component.add(index)
+                        remaining.remove(index)
+                        changed = True
+                        break
+        if len(component) >= 2:
+            clusters.append([deduplicated[index] for index in component])
+
+    candidates = []
+    for cluster in clusters:
+        left = min(box[0] for box in cluster)
+        top = min(box[1] for box in cluster)
+        right = max(box[0] + box[2] for box in cluster)
+        bottom = max(box[1] + box[3] for box in cluster)
+        if 40 <= right - left <= 150 and 30 <= bottom - top <= 55:
+            candidates.append(
+                (
+                    len(cluster),
+                    top,
+                    left,
+                    (left + right) / 2.0,
+                    (top + bottom) / 2.0,
+                )
+            )
+
+    if not candidates:
+        return None
+
+    _count, _top, _left, target_x, target_y = min(
+        candidates,
+        key=lambda item: (-item[0], item[1], item[2]),
+    )
+    return (
+        int(round(target_x * scale_x)),
+        int(round(target_y * scale_y)),
+    )
+
+
 def healing_number_editor_is_open(frame_bgr):
     """Detect the Android numeric editor shown after tapping a troop amount."""
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)

@@ -399,7 +399,7 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_uid": "",
         "empty_home_is_success": True,
         "settings": {
-            "troop_count": 10000,
+            "troop_count": 2500,
             "collect_finished": True,
             "repeat": True,
         },
@@ -756,6 +756,17 @@ def no_action_retry_delay(task):
     if task.get("id") == "heal":
         return max(5.0, min(10.0, interval_seconds))
     return max(30.0, min(300.0, interval_seconds))
+
+
+def unavailable_retry_delay(task):
+    """Keep finished-healing collection responsive without rushing other tasks."""
+    settings = task.get("settings", {})
+    minimum = (
+        5.0
+        if task.get("id") == "heal" and settings.get("_collection_pending", False)
+        else 60.0
+    )
+    return max(minimum, no_action_retry_delay(task))
 
 
 def format_wait_duration(seconds, language="ru"):

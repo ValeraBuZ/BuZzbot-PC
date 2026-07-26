@@ -88,6 +88,13 @@ class HealingWorkflowTests(unittest.TestCase):
         self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
         self.assertEqual(bot.adb_client.taps[0], (1195, 468))
 
+    def test_configures_2500_as_four_equal_safe_quotas(self):
+        bot, frame = self.make_bot()
+
+        self.assertTrue(bot._configure_healing_troop_count(2500, frame))
+        self.assertEqual(bot.adb_client.inputs, ["625", "625", "625", "625"])
+        self.assertEqual(bot.adb_client.unsafe_ok_taps, 0)
+
     def test_limit_is_redistributed_when_only_one_troop_row_is_available(self):
         bot, frame = self.make_bot(available_rows=1)
 
