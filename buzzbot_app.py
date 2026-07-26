@@ -4311,7 +4311,10 @@ class AutoClicker:
 
         collection_target = (
             detect_finished_healing_target(frame)
-            if settings.get("collect_finished", True)
+            if (
+                settings.get("collect_finished", True)
+                and settings.get("_collection_pending", False)
+            )
             else None
         )
         if collection_target is not None:
@@ -4396,9 +4399,7 @@ class AutoClicker:
                 "Лечение: ищу госпиталь или завершённую партию на карте убежища",
                 force=True,
             )
-            logger.info(
-                "Healing camera search started with the collection marker active"
-            )
+            logger.info("Healing camera search started")
             return True
 
         route_key = self._healing_camera_route_key()

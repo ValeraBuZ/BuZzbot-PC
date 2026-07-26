@@ -405,6 +405,27 @@ def detect_finished_healing_target(frame_bgr):
         return None
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    def has_troop_portrait(left, top, right, bottom):
+        padding = 8
+        left = max(0, left - padding)
+        top = max(0, top - padding)
+        right = min(hsv.shape[1], right + padding)
+        bottom = min(hsv.shape[0], bottom + padding)
+        portrait = hsv[top:bottom, left:right]
+        if portrait.size == 0:
+            return False
+        cool_pixels = (
+            (portrait[:, :, 0] >= 95)
+            & (portrait[:, :, 0] <= 169)
+            & (portrait[:, :, 1] >= 45)
+            & (portrait[:, :, 2] >= 35)
+        )
+        return (
+            float(np.count_nonzero(cool_pixels)) / float(cool_pixels.size)
+            >= 0.06
+        )
+
     red_mask = cv2.inRange(
         hsv,
         np.array([0, 80, 70], dtype=np.uint8),
@@ -524,7 +545,11 @@ def detect_finished_healing_target(frame_bgr):
         top = min(box[1] for box in cluster)
         right = max(box[0] + box[2] for box in cluster)
         bottom = max(box[1] + box[3] for box in cluster)
-        if 40 <= right - left <= 150 and 30 <= bottom - top <= 55:
+        if (
+            40 <= right - left <= 150
+            and 30 <= bottom - top <= 55
+            and has_troop_portrait(left, top, right, bottom)
+        ):
             candidates.append(
                 (
                     len(cluster),
@@ -538,6 +563,8 @@ def detect_finished_healing_target(frame_bgr):
     # The outer frame color depends on the healed troop type. The compact
     # bronze portrait core remains stable when red framing is absent.
     for x, y, width, height, _area in bronze_core_boxes:
+        if not has_troop_portrait(x, y, x + width, y + height):
+            continue
         candidates.append(
             (
                 5,
@@ -556,6 +583,7 @@ def detect_finished_healing_target(frame_bgr):
             35 <= width <= 48
             and 35 <= height <= 48
             and area >= 1200.0
+            and has_troop_portrait(x, y, x + width, y + height)
         ):
             candidates.append(
                 (

@@ -237,6 +237,13 @@ class DynamicGameControlTests(unittest.TestCase):
         for left in (238, 262, 286):
             cv2.rectangle(
                 frame,
+                (left + 3, 195),
+                (left + 20, 228),
+                (110, 35, 90),
+                thickness=-1,
+            )
+            cv2.rectangle(
+                frame,
                 (left, 192),
                 (left + 23, 231),
                 (15, 25, 220),
@@ -270,6 +277,13 @@ class DynamicGameControlTests(unittest.TestCase):
         for left in (405, 429, 453):
             cv2.rectangle(
                 frame,
+                (left + 3, 317),
+                (left + 20, 350),
+                (110, 35, 90),
+                thickness=-1,
+            )
+            cv2.rectangle(
+                frame,
                 (left, 314),
                 (left + 23, 353),
                 (15, 25, 220),
@@ -286,6 +300,13 @@ class DynamicGameControlTests(unittest.TestCase):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
         cv2.rectangle(
             frame,
+            (728, 139),
+            (763, 174),
+            (110, 35, 90),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            frame,
             (725, 136),
             (766, 177),
             (35, 80, 145),
@@ -298,6 +319,13 @@ class DynamicGameControlTests(unittest.TestCase):
         frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
         cv2.rectangle(
             frame,
+            (258, 230),
+            (299, 279),
+            (110, 35, 90),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            frame,
             (268, 240),
             (289, 269),
             (35, 80, 145),
@@ -305,6 +333,26 @@ class DynamicGameControlTests(unittest.TestCase):
         )
 
         self.assertEqual(detect_finished_healing_target(frame), (279, 255))
+
+    def test_finished_healing_target_rejects_oil_factory_palette(self):
+        frame = np.full((720, 1280, 3), (45, 65, 75), dtype=np.uint8)
+        for left in (238, 262, 286):
+            cv2.rectangle(
+                frame,
+                (left, 120),
+                (left + 23, 159),
+                (15, 25, 220),
+                thickness=3,
+            )
+            cv2.rectangle(
+                frame,
+                (left + 4, 124),
+                (left + 19, 155),
+                (35, 80, 145),
+                thickness=-1,
+            )
+
+        self.assertIsNone(detect_finished_healing_target(frame))
 
 
 if __name__ == "__main__":
