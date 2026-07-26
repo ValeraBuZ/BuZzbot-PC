@@ -423,16 +423,25 @@ def healing_troop_form_is_visible(frame_bgr):
         )
         return float(np.count_nonzero(yellow)) / float(yellow.size)
 
-    # The large red quick-heal case and the round red hospital-capacity icon
-    # are stable parts of this screen. Requiring both avoids treating shelter
-    # buildings or other dark panels as the troop form.
+    # The illustration on the left changes with the wounded troop type. Some
+    # variants have no large red quick-heal case, so also recognize the stable
+    # dark header and gold auto-fill strip that frame every troop form.
     quick_heal_case = hsv[140:380, 230:630]
     hospital_capacity = hsv[515:630, 220:330]
     troop_rows = hsv[115:500, 650:1150]
     ordinary_heal = hsv[592:642, 900:1155]
+    form_header = hsv[48:96, 110:1170]
+    auto_fill_bar = hsv[658:705, 575:1160]
     dark_rows = troop_rows[:, :, 2] <= 90
     dark_rows_ratio = (
         float(np.count_nonzero(dark_rows)) / float(dark_rows.size)
+    )
+    dark_header_ratio = float(
+        np.count_nonzero(form_header[:, :, 2] <= 90)
+    ) / float(form_header.shape[0] * form_header.shape[1])
+    stable_form_chrome = (
+        dark_header_ratio >= 0.75
+        and yellow_ratio(auto_fill_bar) >= 0.45
     )
     colored_heal = (
         (ordinary_heal[:, :, 1] >= 45)
@@ -443,7 +452,10 @@ def healing_troop_form_is_visible(frame_bgr):
     )
 
     return (
-        red_ratio(quick_heal_case) >= 0.18
+        (
+            red_ratio(quick_heal_case) >= 0.18
+            or stable_form_chrome
+        )
         and dark_rows_ratio >= 0.60
         and (
             red_ratio(hospital_capacity) >= 0.16

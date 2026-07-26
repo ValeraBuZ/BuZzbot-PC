@@ -263,6 +263,22 @@ class DynamicGameControlTests(unittest.TestCase):
         )
         self.assertTrue(healing_troop_form_is_visible(empty_after_collection))
 
+        alternate_troop = np.full(
+            (720, 1280, 3),
+            (35, 45, 55),
+            dtype=np.uint8,
+        )
+        cv2.circle(
+            alternate_troop,
+            (275, 570),
+            52,
+            (30, 180, 240),
+            thickness=-1,
+        )
+        alternate_troop[658:705, 575:1160] = (30, 180, 240)
+        alternate_troop[592:642, 900:1155] = (70, 70, 70)
+        self.assertTrue(healing_troop_form_is_visible(alternate_troop))
+
         selected = frame.copy()
         cv2.circle(
             selected,

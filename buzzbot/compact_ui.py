@@ -1069,6 +1069,8 @@ def build_compact_ui(root, bot):
     pause_button.pack(side=tk.LEFT, padx=5)
     stop_button = action_button(action_panel, "СТОП", bot.stop, colors["surface_alt"], colors["red"], "#C98E87")
     stop_button.pack(side=tk.LEFT, padx=5)
+    root.bind("<F5>", lambda _event: bot.start_routines())
+    root.bind("<F6>", lambda _event: bot.stop())
 
     fox_path = _resource_path("buzzbot", "assets", "fox.png")
     if fox_path.is_file():
