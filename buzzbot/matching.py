@@ -398,6 +398,40 @@ def healing_selection_is_empty(frame_bgr):
     )
 
 
+def healing_troop_form_is_visible(frame_bgr):
+    """Detect the wounded-troop form even while its Heal button is disabled."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    def red_ratio(region):
+        red = (
+            ((region[:, :, 0] <= 12) | (region[:, :, 0] >= 170))
+            & (region[:, :, 1] >= 80)
+            & (region[:, :, 2] >= 80)
+        )
+        return float(np.count_nonzero(red)) / float(red.size)
+
+    # The large red quick-heal case and the round red hospital-capacity icon
+    # are stable parts of this screen. Requiring both avoids treating shelter
+    # buildings or other dark panels as the troop form.
+    quick_heal_case = hsv[140:380, 230:630]
+    hospital_capacity = hsv[515:630, 220:330]
+    troop_rows = hsv[115:500, 650:1150]
+    dark_rows = troop_rows[:, :, 2] <= 90
+    dark_rows_ratio = (
+        float(np.count_nonzero(dark_rows)) / float(dark_rows.size)
+    )
+
+    return (
+        red_ratio(quick_heal_case) >= 0.18
+        and red_ratio(hospital_capacity) >= 0.16
+        and dark_rows_ratio >= 0.60
+    )
+
+
 def detect_finished_healing_target(frame_bgr):
     """Find a verified red or medic marker above a finished hospital."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

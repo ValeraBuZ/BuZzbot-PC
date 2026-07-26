@@ -4,6 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import cv2
 import numpy as np
 
 from buzzbot_app import AutoClicker
@@ -25,6 +26,28 @@ class FakeAdbClient:
 
 
 class HealingTests(unittest.TestCase):
+    @staticmethod
+    def healing_form(selected=False):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (230, 140),
+            (630, 380),
+            (20, 30, 220),
+            thickness=-1,
+        )
+        cv2.circle(
+            frame,
+            (275, 570),
+            52,
+            (20, 30, 220),
+            thickness=-1,
+        )
+        frame[592:642, 900:1155] = (
+            (30, 180, 240) if selected else (70, 70, 70)
+        )
+        return frame
+
     def make_bot(self, locate_results):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
@@ -136,6 +159,114 @@ class HealingTests(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(bot.adb_client.taps, [])
 
+    def test_idle_troop_form_finishes_stale_pending_collection(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_healing_pan_route = ["left"]
+        bot.routine_healing_replay_index = 1
+        bot.routine_healing_scan_index = 3
+        bot.routine_healing_settle_checks = 1
+        bot.routine_healing_search_started = True
+        bot.routine_healing_saved_route_rejected = True
+        bot._capture_screen_bgr = lambda force=False: (
+            self.healing_form(selected=False),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: self.fail(
+            "The already-open hospital form must be handled before main-screen checks"
+        )
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        bot.save_config = lambda: None
+        task = {
+            "id": "heal",
+            "group": "Лечение войск",
+            "settings": {
+                "_collection_pending": True,
+                "_pending_heal_count": 3050,
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertNotIn("_pending_heal_count", task["settings"])
+        self.assertEqual(bot.routine_healing_pan_route, [])
+        self.assertFalse(bot.routine_healing_search_started)
+
+    def test_open_idle_troop_form_starts_healing_without_button_template(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.search_images = [
+            {
+                "enabled": True,
+                "action": "heal_troops",
+                "group": "Лечение войск",
+                "runtime_step": "start_healing",
+                "path": "heal.png",
+            }
+        ]
+        bot.stats = {}
+        bot.click_count = 0
+        bot.routine_current_had_action = False
+        bot.routine_last_action_time = 0.0
+        bot.routine_idle_confirmation_count = 2
+        bot.routine_completed_steps = set()
+        actions = []
+        bot._execute_action = (
+            lambda image, location: actions.append(
+                (image["action"], location.x, location.y)
+            )
+            or True
+        )
+        task = {
+            "id": "heal",
+            "group": "Лечение войск",
+            "settings": {"_collection_pending": False},
+        }
+
+        result = bot._try_healing_troop_form(
+            task,
+            self.healing_form(selected=False),
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(actions, [("heal_troops", 1028, 617)])
+        self.assertEqual(bot.stats, {"heal.png": 1})
+        self.assertEqual(bot.click_count, 1)
+        self.assertIn("start_healing", bot.routine_completed_steps)
+
+    def test_healing_uses_fixed_right_hand_standard_button(self):
+        bot = self.make_bot(iter(((None, None, 0.0),)))
+        bot._healing_settings = {
+            "_collection_pending": False,
+            "troop_count": 3050,
+        }
+        bot._configure_healing_troop_count = lambda count, frame: (
+            count == 3050 and frame.shape == (720, 1280, 3)
+        )
+        frames = iter(
+            (
+                (self.healing_form(selected=False), (0, 0)),
+                (self.healing_form(selected=True), (0, 0)),
+                (np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)),
+            )
+        )
+        bot._capture_screen_bgr = lambda force=False: next(frames)
+        image = {
+            "action": "heal_troops",
+            "delay": 0.8,
+            "last_used": 0.0,
+        }
+
+        result = bot._execute_action(
+            image,
+            SimpleNamespace(x=760, y=617),
+        )
+
+        self.assertTrue(result)
+        self.assertEqual(bot.adb_client.taps, [(1028, 617)])
+        self.assertTrue(bot._healing_settings["_collection_pending"])
+        self.assertEqual(bot._healing_settings["_pending_heal_count"], 3050)
+
     def test_taps_healing_row_again_after_collecting_finished_batch(self):
         bot = self.make_bot(iter(()))
         start_image = {
@@ -216,6 +347,10 @@ class HealingTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         bot.routine_completed_steps = set()
         bot._is_main_screen_visible = lambda: False
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
 
         self.assertFalse(bot._try_healing_visual_fallback({"id": "heal"}))
 
@@ -230,8 +365,9 @@ class HealingTests(unittest.TestCase):
         switched = []
         bot._switch_to_settlement_screen = lambda: switched.append(True) or True
         bot.set_status_message = lambda *_args, **_kwargs: None
-        bot._capture_screen_bgr = lambda force=False: self.fail(
-            "camera search started before the settlement was restored"
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
         )
 
         result = bot._try_healing_visual_fallback(

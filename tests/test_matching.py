@@ -20,6 +20,7 @@ from buzzbot.matching import (
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
     healing_selection_is_empty,
+    healing_troop_form_is_visible,
     imread_unicode,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
@@ -231,6 +232,36 @@ class DynamicGameControlTests(unittest.TestCase):
         enabled_button = frame.copy()
         enabled_button[592:642, 900:1155] = (30, 180, 240)
         self.assertFalse(healing_selection_is_empty(enabled_button))
+
+    def test_detects_healing_form_with_disabled_heal_button(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (230, 140),
+            (630, 380),
+            (20, 30, 220),
+            thickness=-1,
+        )
+        cv2.circle(
+            frame,
+            (275, 570),
+            52,
+            (20, 30, 220),
+            thickness=-1,
+        )
+        frame[592:642, 900:1155] = (70, 70, 70)
+
+        self.assertTrue(healing_troop_form_is_visible(frame))
+
+        unrelated = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(
+            unrelated,
+            (230, 140),
+            (630, 380),
+            (20, 30, 220),
+            thickness=-1,
+        )
+        self.assertFalse(healing_troop_form_is_visible(unrelated))
 
     def test_detects_finished_healing_portrait_cluster(self):
         frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)

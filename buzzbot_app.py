@@ -64,6 +64,7 @@ from buzzbot.matching import (
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
     healing_selection_is_empty,
+    healing_troop_form_is_visible,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
 )
@@ -4305,8 +4306,84 @@ class AutoClicker:
                     return True
         return False
 
+    def _try_healing_troop_form(self, task, frame):
+        if not healing_troop_form_is_visible(frame):
+            return False
+
+        settings = task.setdefault("settings", {})
+        if settings.get("_collection_pending", False):
+            if healing_selection_is_empty(frame):
+                self._finish_pending_healing_collection(
+                    settings,
+                    "idle hospital troop form",
+                )
+            else:
+                try:
+                    retry_delay = float(
+                        settings.get("collection_delay_seconds", 2) or 2
+                    )
+                except (TypeError, ValueError):
+                    retry_delay = 2.0
+                retry_delay = max(1.0, min(5.0, retry_delay))
+                self._defer_current_routine_unavailable(
+                    "текущее лечение ещё не завершено",
+                    time.time(),
+                    retry_delay=retry_delay,
+                )
+            return True
+
+        start_image = next(
+            (
+                image
+                for image in getattr(self, "search_images", ())
+                if image.get("enabled", True)
+                and image.get("action") == "heal_troops"
+                and image.get("group") == task.get("group")
+            ),
+            None,
+        )
+        if start_image is None:
+            logger.warning("Healing troop form is open but its action is missing")
+            return False
+
+        scale_x = frame.shape[1] / 1280.0
+        scale_y = frame.shape[0] / 720.0
+        ordinary_heal = pyautogui.Point(
+            int(round(1028 * scale_x)),
+            int(round(617 * scale_y)),
+        )
+        if self._execute_action(start_image, ordinary_heal) is False:
+            return False
+
+        image_path = start_image.get("path")
+        if image_path:
+            self.stats[image_path] = self.stats.get(image_path, 0) + 1
+        self.click_count += 1
+        self.routine_current_had_action = True
+        self.routine_last_action_time = time.time()
+        self.routine_idle_confirmation_count = 0
+        self.routine_completed_steps.update(
+            completed_runtime_steps_for_image(start_image)
+        )
+        logger.info(
+            "Healing troop form started directly; completed steps=%s",
+            sorted(self.routine_completed_steps),
+        )
+        return True
+
     def _try_healing_visual_fallback(self, task, remembered_only=False):
-        if task.get("id") != "heal" or not self._is_main_screen_visible():
+        if task.get("id") != "heal":
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Healing fallback could not capture the screen")
+            return False
+
+        if healing_troop_form_is_visible(frame):
+            return self._try_healing_troop_form(task, frame)
+
+        if not self._is_main_screen_visible():
             return False
         if not self._is_settlement_screen_visible():
             self.set_status_message(
@@ -4326,11 +4403,6 @@ class AutoClicker:
             self.routine_healing_search_started = False
             logger.info("Healing search returned from the world map to the settlement")
             return True
-        try:
-            frame, _origin = self._capture_screen_bgr(force=True)
-        except Exception:
-            logger.exception("Healing fallback could not capture the main screen")
-            return False
 
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
@@ -4396,6 +4468,32 @@ class AutoClicker:
                         "Лечение: собираю войска в сохранённом госпитале",
                     ):
                         settings["_last_saved_hospital_attempt_at"] = time.time()
+                        opened_frame = None
+                        try:
+                            opened_frame, _origin = self._capture_screen_bgr(
+                                force=True
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Healing saved target could not verify the "
+                                "hospital troop form"
+                            )
+                        if (
+                            opened_frame is not None
+                            and healing_troop_form_is_visible(opened_frame)
+                        ):
+                            form_is_empty = healing_selection_is_empty(
+                                opened_frame
+                            )
+                            self._remember_healing_hospital_target(
+                                settings,
+                                (target_x, target_y),
+                                save=not form_is_empty,
+                            )
+                            return self._try_healing_troop_form(
+                                task,
+                                opened_frame,
+                            )
                         if self._healing_start_control_visible():
                             self._remember_healing_hospital_target(
                                 settings,
@@ -4459,6 +4557,14 @@ class AutoClicker:
                 )
                 return True
             if detect_finished_healing_target(frame_after) is None:
+                if healing_troop_form_is_visible(frame_after):
+                    form_is_empty = healing_selection_is_empty(frame_after)
+                    self._remember_healing_hospital_target(
+                        settings,
+                        collection_target,
+                        save=not form_is_empty,
+                    )
+                    return self._try_healing_troop_form(task, frame_after)
                 if not self._is_main_screen_visible():
                     if not collection_pending:
                         logger.info(
@@ -6784,6 +6890,15 @@ class AutoClicker:
                 img_config["last_used"] = time.time()
 
             def healing_screen_is_ready():
+                try:
+                    screen_frame, _origin = self._capture_screen_bgr(force=True)
+                except Exception:
+                    logger.exception(
+                        "Healing hospital form confirmation failed"
+                    )
+                else:
+                    if healing_troop_form_is_visible(screen_frame):
+                        return True
                 if start_image is None:
                     return False
                 start_location, start_bbox, _score = self._locate_image(start_image)
@@ -6944,43 +7059,50 @@ class AutoClicker:
                 img_config["last_used"] = time.time()
                 return False
 
-            # Re-find the button after all editor dialogs have closed. The old
-            # template center can become stale while the hospital footer moves.
+            # Do not re-use a template center here: the similarly worded
+            # instant-heal button is directly to the left. Once the troop form
+            # and bounded selection are confirmed, only the stable right-hand
+            # ordinary Heal button is safe.
             self._invalidate_capture()
-            fresh_location, fresh_bbox, _score = self._locate_image(img_config)
-            if fresh_location is None or fresh_bbox is None:
-                logger.warning("Healing start button disappeared before confirmation")
+            final_frame, _origin = self._capture_screen_bgr(force=True)
+            if not healing_troop_form_is_visible(final_frame):
+                logger.warning("Healing troop form disappeared before confirmation")
                 self.set_status_message(
-                    "Лечение не запущено: кнопка «Лечить» после ввода не найдена",
+                    "Лечение не запущено: форма госпиталя после ввода не найдена",
                     force=True,
                 )
                 img_config["last_used"] = time.time()
                 return False
-            is_valid, reject_reason = self._validate_detected_match(img_config, fresh_bbox)
-            if not is_valid:
-                logger.warning("Healing start button rejected by %s", reject_reason)
+            if healing_selection_is_empty(final_frame):
+                logger.warning("Healing troop selection became empty before start")
                 self.set_status_message(
-                    "Лечение не запущено: кнопка «Лечить» не подтверждена",
+                    "Лечение не запущено: введённое количество не сохранилось",
                     force=True,
                 )
                 img_config["last_used"] = time.time()
                 return False
 
+            scale_x = final_frame.shape[1] / 1280.0
+            scale_y = final_frame.shape[0] / 720.0
+            heal_x = int(round(1028 * scale_x))
+            heal_y = int(round(617 * scale_y))
             if self.uses_adb:
-                self.adb_client.tap(
-                    int(round(fresh_location.x)),
-                    int(round(fresh_location.y)),
-                )
+                self.adb_client.tap(heal_x, heal_y)
             else:
-                pyautogui.click(fresh_location.x, fresh_location.y)
+                pyautogui.click(heal_x, heal_y)
             self._invalidate_capture()
             img_config["last_used"] = time.time()
             self._interruptible_sleep(max(0.8, float(img_config.get("delay", self.sleep_found))))
 
             deadline = time.monotonic() + 6.0
             while time.monotonic() < deadline and not self.stop_event.is_set():
+                frame_after, _origin = self._capture_screen_bgr(force=True)
                 location_after, bbox_after, _score = self._locate_image(img_config)
-                if location_after is None or bbox_after is None:
+                if (
+                    not healing_troop_form_is_visible(frame_after)
+                    or location_after is None
+                    or bbox_after is None
+                ):
                     settings = self._current_task_settings()
                     settings["_collection_pending"] = True
                     settings["_pending_heal_count"] = troop_count
