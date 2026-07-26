@@ -4317,6 +4317,16 @@ class AutoClicker:
                     settings,
                     "idle hospital troop form",
                 )
+                return True
+            elif self._healing_start_control_visible():
+                # The game can auto-select a small wounded batch as soon as an
+                # idle hospital form opens. A visible ordinary Heal button
+                # proves the previous batch is no longer running, so clear the
+                # stale pending state and configure the requested amount below.
+                self._finish_pending_healing_collection(
+                    settings,
+                    "idle auto-filled hospital troop form",
+                )
             else:
                 try:
                     retry_delay = float(
@@ -4330,7 +4340,7 @@ class AutoClicker:
                     time.time(),
                     retry_delay=retry_delay,
                 )
-            return True
+                return True
 
         start_image = next(
             (

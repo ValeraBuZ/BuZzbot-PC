@@ -234,6 +234,57 @@ class HealingTests(unittest.TestCase):
         self.assertEqual(bot.click_count, 1)
         self.assertIn("start_healing", bot.routine_completed_steps)
 
+    def test_pending_auto_filled_idle_form_clears_stale_batch_and_enters_amount(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_healing_pan_route = ["left"]
+        bot.routine_healing_replay_index = 1
+        bot.routine_healing_scan_index = 3
+        bot.routine_healing_settle_checks = 1
+        bot.routine_healing_search_started = True
+        bot.routine_healing_saved_route_rejected = True
+        start_image = {
+            "enabled": True,
+            "action": "heal_troops",
+            "group": "Р›РµС‡РµРЅРёРµ РІРѕР№СЃРє",
+            "runtime_step": "start_healing",
+            "path": "heal.png",
+        }
+        bot.search_images = [start_image]
+        bot.stats = {}
+        bot.click_count = 0
+        bot.routine_current_had_action = False
+        bot.routine_last_action_time = 0.0
+        bot.routine_idle_confirmation_count = 2
+        bot.routine_completed_steps = set()
+        bot._healing_start_control_visible = lambda: True
+        bot.save_config = lambda: None
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        actions = []
+        bot._execute_action = (
+            lambda image, location: actions.append(
+                (image["action"], location.x, location.y)
+            )
+            or True
+        )
+        task = {
+            "id": "heal",
+            "group": "Р›РµС‡РµРЅРёРµ РІРѕР№СЃРє",
+            "settings": {
+                "_collection_pending": True,
+                "_pending_heal_count": 3050,
+            },
+        }
+
+        result = bot._try_healing_troop_form(
+            task,
+            self.healing_form(selected=True),
+        )
+
+        self.assertTrue(result)
+        self.assertFalse(task["settings"]["_collection_pending"])
+        self.assertNotIn("_pending_heal_count", task["settings"])
+        self.assertEqual(actions, [("heal_troops", 1028, 617)])
+
     def test_healing_uses_fixed_right_hand_standard_button(self):
         bot = self.make_bot(iter(((None, None, 0.0),)))
         bot._healing_settings = {
