@@ -414,6 +414,15 @@ def healing_troop_form_is_visible(frame_bgr):
         )
         return float(np.count_nonzero(red)) / float(red.size)
 
+    def yellow_ratio(region):
+        yellow = (
+            (region[:, :, 0] >= 12)
+            & (region[:, :, 0] <= 38)
+            & (region[:, :, 1] >= 70)
+            & (region[:, :, 2] >= 80)
+        )
+        return float(np.count_nonzero(yellow)) / float(yellow.size)
+
     # The large red quick-heal case and the round red hospital-capacity icon
     # are stable parts of this screen. Requiring both avoids treating shelter
     # buildings or other dark panels as the troop form.
@@ -438,6 +447,7 @@ def healing_troop_form_is_visible(frame_bgr):
         and dark_rows_ratio >= 0.60
         and (
             red_ratio(hospital_capacity) >= 0.16
+            or yellow_ratio(hospital_capacity) >= 0.12
             or colored_heal_ratio >= 0.30
         )
     )
