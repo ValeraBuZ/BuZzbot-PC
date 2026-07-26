@@ -230,7 +230,7 @@ class HealingTests(unittest.TestCase):
         self.assertEqual(deferred, ["текущее лечение ещё не завершено"])
         self.assertEqual(bot.adb_client.swipes, [])
 
-    def test_pending_healing_collects_generic_portrait_marker(self):
+    def test_collects_generic_portrait_marker_without_pending_state(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeAdbClient()
@@ -268,9 +268,8 @@ class HealingTests(unittest.TestCase):
         task = {
             "id": "heal",
             "settings": {
-                "_collection_pending": True,
-                "_pending_heal_count": 2500,
-                "_last_heal_started_at": time.time(),
+                "collect_finished": True,
+                "_collection_pending": False,
             },
         }
 
@@ -279,7 +278,6 @@ class HealingTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(bot.adb_client.taps, [(274, 212)])
         self.assertFalse(task["settings"]["_collection_pending"])
-        self.assertNotIn("_pending_heal_count", task["settings"])
         self.assertEqual(saves, [True])
 
     def test_replays_saved_healing_camera_route(self):

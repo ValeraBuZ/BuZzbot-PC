@@ -4251,45 +4251,49 @@ class AutoClicker:
 
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
-        if settings.get("_collection_pending", False):
-            collection_target = detect_finished_healing_target(frame)
-            if collection_target is not None:
-                if not self._tap_routine_fallback(
-                    collection_target,
-                    ("healing_collect_visual", *collection_target),
-                    "Лечение: собираю готовых бойцов",
-                ):
-                    return False
-                settings["_last_collection_attempt_at"] = time.time()
-                try:
-                    frame_after, _origin = self._capture_screen_bgr(force=True)
-                except Exception:
-                    logger.exception(
-                        "Healing fallback could not verify the collection marker"
-                    )
-                    return True
-                if detect_finished_healing_target(frame_after) is None:
-                    settings["_collection_pending"] = False
-                    settings.pop("_pending_heal_count", None)
-                    self.save_config()
-                    self.set_status_message(
-                        "Вылеченные войска собраны",
-                        force=True,
-                    )
-                    logger.info(
-                        "Finished healing collected through generic portrait "
-                        "marker at (%s, %s)",
-                        *collection_target,
-                    )
-                else:
-                    self.save_config()
-                    logger.warning(
-                        "Finished healing marker remained after generic "
-                        "collection click at (%s, %s)",
-                        *collection_target,
-                    )
+        collection_target = (
+            detect_finished_healing_target(frame)
+            if settings.get("collect_finished", True)
+            else None
+        )
+        if collection_target is not None:
+            if not self._tap_routine_fallback(
+                collection_target,
+                ("healing_collect_visual", *collection_target),
+                "Лечение: собираю готовых бойцов",
+            ):
+                return False
+            settings["_last_collection_attempt_at"] = time.time()
+            try:
+                frame_after, _origin = self._capture_screen_bgr(force=True)
+            except Exception:
+                logger.exception(
+                    "Healing fallback could not verify the collection marker"
+                )
                 return True
+            if detect_finished_healing_target(frame_after) is None:
+                settings["_collection_pending"] = False
+                settings.pop("_pending_heal_count", None)
+                self.save_config()
+                self.set_status_message(
+                    "Вылеченные войска собраны",
+                    force=True,
+                )
+                logger.info(
+                    "Finished healing collected through generic portrait "
+                    "marker at (%s, %s)",
+                    *collection_target,
+                )
+            else:
+                self.save_config()
+                logger.warning(
+                    "Finished healing marker remained after generic "
+                    "collection click at (%s, %s)",
+                    *collection_target,
+                )
+            return True
 
+        if settings.get("_collection_pending", False):
             last_started_at = float(
                 settings.get("_last_heal_started_at", time.time()) or time.time()
             )
