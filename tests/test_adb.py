@@ -116,6 +116,22 @@ class AdbClientTests(unittest.TestCase):
             ["adb.exe", "-s", "emulator-5556", "shell", "input", "keyevent", "67"],
         )
 
+    def test_reads_focused_android_edit_text_value(self):
+        client = self.make_client(lambda *_args, **_kwargs: FakeResult())
+        client.ui_xml = lambda: (
+            "<hierarchy><node class='android.widget.EditText' focused='true' "
+            "text='2850'/><node class='android.widget.Button' focused='false' "
+            "text='OK'/></hierarchy>"
+        )
+
+        self.assertEqual(client.focused_edit_text_value(), "2850")
+
+    def test_missing_focused_android_edit_text_returns_none(self):
+        client = self.make_client(lambda *_args, **_kwargs: FakeResult())
+        client.ui_xml = lambda: "<hierarchy><node class='android.widget.EditText' focused='false' text='10'/></hierarchy>"
+
+        self.assertIsNone(client.focused_edit_text_value())
+
     @patch("buzzbot.adb.subprocess.Popen")
     def test_private_text_is_sent_through_stdin_not_command_line(self, popen):
         process = popen.return_value

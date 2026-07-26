@@ -368,6 +368,36 @@ def healing_auto_fill_is_checked(frame_bgr):
     return float(np.count_nonzero(bright_mark)) / float(bright_mark.size) >= 0.08
 
 
+def healing_selection_is_empty(frame_bgr):
+    """Confirm that the hospital's global clear button removed every troop."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    sliders = hsv[145:465, 760:1010]
+    green_fill = (
+        (sliders[:, :, 0] >= 35)
+        & (sliders[:, :, 0] <= 90)
+        & (sliders[:, :, 1] >= 80)
+        & (sliders[:, :, 2] >= 80)
+    )
+    if float(np.count_nonzero(green_fill)) / float(green_fill.size) > 0.005:
+        return False
+
+    # A zero selection also disables the normal Heal button. Requiring both
+    # signals prevents a transient or partially rendered slider from passing.
+    heal_button = hsv[592:642, 900:1155]
+    colored_button = (
+        (heal_button[:, :, 1] >= 45)
+        & (heal_button[:, :, 2] >= 90)
+    )
+    return (
+        float(np.count_nonzero(colored_button)) / float(colored_button.size)
+        <= 0.08
+    )
+
+
 def healing_number_editor_is_open(frame_bgr):
     """Detect the Android numeric editor shown after tapping a troop amount."""
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)

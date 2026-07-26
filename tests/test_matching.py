@@ -18,6 +18,7 @@ from buzzbot.matching import (
     detect_radar_world_action_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
+    healing_selection_is_empty,
     imread_unicode,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
@@ -216,6 +217,19 @@ class DynamicGameControlTests(unittest.TestCase):
 
         frame[616:720, :] = (250, 250, 250)
         self.assertTrue(healing_number_editor_is_open(frame))
+
+    def test_confirms_empty_healing_selection_only_with_disabled_button(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        frame[592:642, 900:1155] = (70, 70, 70)
+        self.assertTrue(healing_selection_is_empty(frame))
+
+        selected = frame.copy()
+        selected[160:185, 765:1010] = (35, 180, 55)
+        self.assertFalse(healing_selection_is_empty(selected))
+
+        enabled_button = frame.copy()
+        enabled_button[592:642, 900:1155] = (30, 180, 240)
+        self.assertFalse(healing_selection_is_empty(enabled_button))
 
 
 if __name__ == "__main__":

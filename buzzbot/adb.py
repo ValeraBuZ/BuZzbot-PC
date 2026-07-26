@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import cv2
@@ -169,6 +170,20 @@ class AdbClient:
             ["shell", "input", "keyevent", "KEYCODE_MOVE_END", *("KEYCODE_DEL",) * count],
             timeout=10,
         )
+
+    def focused_edit_text_value(self):
+        """Read the focused Android EditText value for input verification."""
+        try:
+            root = ET.fromstring(self.ui_xml())
+        except (AdbError, ET.ParseError, TypeError, ValueError):
+            return None
+        for node in root.iter("node"):
+            if (
+                node.attrib.get("class") == "android.widget.EditText"
+                and node.attrib.get("focused") == "true"
+            ):
+                return str(node.attrib.get("text", ""))
+        return None
 
     def current_foreground_package(self):
         """Return the package owning the focused Android window, if available."""

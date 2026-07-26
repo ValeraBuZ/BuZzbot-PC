@@ -62,6 +62,7 @@ from buzzbot.matching import (
     detect_radar_world_action_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
+    healing_selection_is_empty,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
 )
@@ -5662,6 +5663,7 @@ class AutoClicker:
         scale_x = frame.shape[1] / 1280.0
         scale_y = frame.shape[0] / 720.0
         auto_x, auto_y = int(round(810 * scale_x)), int(round(678 * scale_y))
+        clear_x, clear_y = int(round(1195 * scale_x)), int(round(468 * scale_y))
         field_x = int(round(1085 * scale_x))
         ok_x, ok_y = int(round(1198 * scale_x)), int(round(669 * scale_y))
         row_positions = (173, 263, 353, 443)
@@ -5686,6 +5688,26 @@ class AutoClicker:
                     force=True,
                 )
                 return False
+
+        # The game can preselect every wounded troop even with auto-fill
+        # disabled. Always use its global down-arrow clear control before
+        # editing individual rows. Without this step, hidden rows can retain
+        # hundreds of thousands of troops and make the final Heal tap unsafe.
+        if self.uses_adb:
+            self.adb_client.tap(clear_x, clear_y)
+        else:
+            pyautogui.click(clear_x, clear_y)
+        self._invalidate_capture()
+        self._interruptible_sleep(0.45)
+        frame, _origin = self._capture_screen_bgr(force=True)
+        if not healing_selection_is_empty(frame):
+            logger.error("Healing global troop reset was not confirmed")
+            self.set_status_message(
+                "Лечение не запущено: общий сброс войск не подтверждён",
+                force=True,
+            )
+            return False
+        logger.info("Healing global troop selection cleared safely")
 
         def configure_row(row_index, row_y, quota):
             if self.stop_event.is_set() or self.stop_hotkey_pressed:
@@ -5723,6 +5745,23 @@ class AutoClicker:
                     force=True,
                 )
                 return False
+
+            if self.uses_adb:
+                entered_value = self.adb_client.focused_edit_text_value()
+                if entered_value != str(quota):
+                    logger.error(
+                        "Healing row %s input mismatch: expected %s, found %r",
+                        row_index,
+                        quota,
+                        entered_value,
+                    )
+                    self.adb_client.keyevent(4)
+                    self._invalidate_capture()
+                    self.set_status_message(
+                        f"Лечение не запущено: в строке {row_index} введено неверное количество",
+                        force=True,
+                    )
+                    return False
 
             # This coordinate is safe only after the white Android editor has
             # been positively detected. It is the editor's OK button, not a
@@ -5787,6 +5826,15 @@ class AutoClicker:
                         force=True,
                     )
                     return False
+
+        final_frame, _origin = self._capture_screen_bgr(force=True)
+        if healing_auto_fill_is_checked(final_frame):
+            logger.error("Healing auto-fill became enabled after troop configuration")
+            self.set_status_message(
+                "Лечение не запущено: авто-пополнение снова включилось",
+                force=True,
+            )
+            return False
         return True
 
     def _execute_action(self, img_config, location):
