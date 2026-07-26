@@ -424,7 +424,11 @@ def detect_finished_healing_target(frame_bgr):
     # Finished-healing portraits appear over shelter buildings. Excluding the
     # HUD keeps red notification badges and bottom navigation out of the scan.
     portrait_boxes = []
-    for marker_mask in (red_mask, bronze_mask):
+    bronze_core_boxes = []
+    for marker_mask, collect_bronze_cores in (
+        (red_mask, False),
+        (bronze_mask, True),
+    ):
         marker_mask[:120, :] = 0
         marker_mask[520:, :] = 0
         # The persistent quest panel occupies the left edge and contains bronze
@@ -440,6 +444,13 @@ def detect_finished_healing_target(frame_bgr):
         for contour in contours:
             x, y, width, height = cv2.boundingRect(contour)
             area = float(cv2.contourArea(contour))
+            if (
+                collect_bronze_cores
+                and 20 <= width <= 25
+                and 29 <= height <= 32
+                and 450.0 <= area <= 650.0
+            ):
+                bronze_core_boxes.append((x, y, width, height, area))
             if (
                 18 <= width <= 48
                 and 30 <= height <= 48
@@ -523,6 +534,19 @@ def detect_finished_healing_target(frame_bgr):
                     (top + bottom) / 2.0,
                 )
             )
+
+    # The outer frame color depends on the healed troop type. The compact
+    # bronze portrait core remains stable when red framing is absent.
+    for x, y, width, height, _area in bronze_core_boxes:
+        candidates.append(
+            (
+                5,
+                y,
+                x,
+                x + width / 2.0,
+                y + height / 2.0,
+            )
+        )
 
     # Some accounts show one portrait per hospital instead of a three-portrait
     # group. Its bronze frame produces a compact, nearly square outer contour;

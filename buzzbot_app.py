@@ -4272,8 +4272,15 @@ class AutoClicker:
                 )
                 return True
             if detect_finished_healing_target(frame_after) is None:
+                if not self._is_main_screen_visible():
+                    logger.info(
+                        "Healing portrait opened the hospital; collection "
+                        "confirmation remains pending"
+                    )
+                    return True
                 settings["_collection_pending"] = False
                 settings.pop("_pending_heal_count", None)
+                settings.pop("_last_pending_camera_scan_at", None)
                 self.save_config()
                 self.set_status_message(
                     "Вылеченные войска собраны",
@@ -4297,20 +4304,32 @@ class AutoClicker:
             last_started_at = float(
                 settings.get("_last_heal_started_at", time.time()) or time.time()
             )
-            if time.time() - last_started_at < 12 * 3600.0:
-                logger.info(
-                    "Healing batch is still pending; waiting for the fixed "
-                    "collection marker instead of moving the camera"
+            now = time.time()
+            if now - last_started_at < 12 * 3600.0:
+                last_scan_at = float(
+                    settings.get("_last_pending_camera_scan_at", 0.0) or 0.0
                 )
-                self._defer_current_routine_unavailable(
-                    "текущее лечение ещё не завершено",
-                    time.time(),
-                )
-                return True
-            settings["_collection_pending"] = False
-            settings.pop("_pending_heal_count", None)
-            self.save_config()
-            logger.info("Stale healing collection state was cleared")
+                if now - last_scan_at >= 60.0:
+                    logger.info(
+                        "Healing batch is pending and no marker is visible; "
+                        "searching the remembered hospital route"
+                    )
+                else:
+                    logger.info(
+                        "Healing batch is still pending; waiting for the fixed "
+                        "collection marker before the next camera scan"
+                    )
+                    self._defer_current_routine_unavailable(
+                        "текущее лечение ещё не завершено",
+                        now,
+                    )
+                    return True
+            else:
+                settings["_collection_pending"] = False
+                settings.pop("_pending_heal_count", None)
+                settings.pop("_last_pending_camera_scan_at", None)
+                self.save_config()
+                logger.info("Stale healing collection state was cleared")
 
         if not getattr(self, "routine_healing_search_started", False):
             self.routine_healing_search_started = True
@@ -4363,6 +4382,9 @@ class AutoClicker:
             )
             scan_index = self.routine_healing_scan_index
             if scan_index >= len(scan_pattern):
+                if settings.get("_collection_pending", False):
+                    settings["_last_pending_camera_scan_at"] = time.time()
+                    self.save_config()
                 logger.warning(
                     "Healing hospital was not found after %s camera moves",
                     len(self.routine_healing_pan_route),
@@ -6521,6 +6543,7 @@ class AutoClicker:
                     if settings.get("_collection_pending", False):
                         settings["_last_collection_attempt_at"] = time.time()
                         settings["_collection_pending"] = False
+                        settings.pop("_last_pending_camera_scan_at", None)
                         self.save_config()
                         logger.info(
                             "Healing collection linked to the previous configured batch"
@@ -6547,6 +6570,7 @@ class AutoClicker:
                             settings = self._current_task_settings()
                             settings["_last_collection_attempt_at"] = time.time()
                             settings["_collection_pending"] = False
+                            settings.pop("_last_pending_camera_scan_at", None)
                             self.save_config()
                             logger.info(
                                 "Finished healing was collected through the hospital overview"
@@ -6660,6 +6684,7 @@ class AutoClicker:
                     settings["_collection_pending"] = True
                     settings["_pending_heal_count"] = troop_count
                     settings["_last_heal_started_at"] = time.time()
+                    settings["_last_pending_camera_scan_at"] = time.time()
                     self.save_config()
                     self.set_status_message(f"Лечение запущено, лимит {troop_count}", force=True)
                     logger.info("Healing started with configured limit %s", troop_count)

@@ -202,7 +202,7 @@ class HealingTests(unittest.TestCase):
 
         self.assertFalse(bot._try_healing_visual_fallback({"id": "heal"}))
 
-    def test_pending_healing_waits_for_collection_marker_without_panning(self):
+    def test_pending_healing_throttles_camera_scan_after_recent_check(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = FakeAdbClient()
@@ -221,6 +221,7 @@ class HealingTests(unittest.TestCase):
             "settings": {
                 "_collection_pending": True,
                 "_last_heal_started_at": time.time(),
+                "_last_pending_camera_scan_at": time.time(),
             },
         }
 

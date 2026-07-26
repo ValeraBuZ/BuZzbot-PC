@@ -294,6 +294,18 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(detect_finished_healing_target(frame), (746, 157))
 
+    def test_detects_bronze_troop_portrait_core_without_red_frame(self):
+        frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (268, 240),
+            (289, 269),
+            (35, 80, 145),
+            thickness=-1,
+        )
+
+        self.assertEqual(detect_finished_healing_target(frame), (279, 255))
+
 
 if __name__ == "__main__":
     unittest.main()
