@@ -22,6 +22,7 @@ from buzzbot.matching import (
     healing_selection_is_empty,
     healing_troop_form_is_visible,
     imread_unicode,
+    radar_category_has_notification,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
 )
@@ -181,6 +182,17 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertTrue(radar_marker_has_notification(frame, marker_bbox))
         self.assertFalse(radar_marker_has_notification(frame, (480, 170, 90, 100)))
+
+    def test_detects_radar_category_notification_for_matching_task(self):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.circle(frame, (1249, 141), 8, (10, 20, 200), thickness=-1)
+
+        self.assertTrue(radar_category_has_notification(frame, "radar_quick"))
+        self.assertFalse(radar_category_has_notification(frame, "radar_marches"))
+        self.assertFalse(radar_category_has_notification(frame, "radar_rewards"))
+
+        cv2.circle(frame, (1249, 246), 8, (10, 20, 200), thickness=-1)
+        self.assertTrue(radar_category_has_notification(frame, "radar_marches"))
 
     def test_detects_enabled_radar_card_and_world_buttons(self):
         frame = np.full((720, 1280, 3), (45, 55, 65), dtype=np.uint8)

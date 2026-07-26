@@ -65,6 +65,7 @@ from buzzbot.matching import (
     healing_number_editor_is_open,
     healing_selection_is_empty,
     healing_troop_form_is_visible,
+    radar_category_has_notification,
     radar_marker_has_notification,
     zombie_camp_checkbox_is_checked,
 )
@@ -3444,6 +3445,10 @@ class AutoClicker:
                     if (
                         radar_marker_requires_notification(image, task.get("id"))
                         and not radar_marker_has_notification(frame, blocker_bbox)
+                        and not radar_category_has_notification(
+                            frame,
+                            task.get("id"),
+                        )
                     ):
                         logger.info(
                             "Idle completion ignores radar-like shape without notification: %s",
@@ -5527,7 +5532,13 @@ class AutoClicker:
                                     )
                                 ):
                                     radar_frame, _radar_origin = self._capture_screen_bgr()
-                                    if not radar_marker_has_notification(radar_frame, bbox):
+                                    if (
+                                        not radar_marker_has_notification(radar_frame, bbox)
+                                        and not radar_category_has_notification(
+                                            radar_frame,
+                                            current_routine_task.get("id"),
+                                        )
+                                    ):
                                         logger.info(
                                             "Radar marker rejected without notification dot: %s @ %s",
                                             img_config.get("description"),

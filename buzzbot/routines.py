@@ -847,6 +847,9 @@ def routine_home_recovery_due(task, had_action, attempted, idle_seconds):
     recovery_delay = min(12.0, timeout)
     can_recover = bool(task.get("uses_march", False)) or task.get("id") in {
         "heal",
+        "radar_rewards",
+        "radar_quick",
+        "radar_marches",
         "research",
         "train_infantry",
         "train_riders",

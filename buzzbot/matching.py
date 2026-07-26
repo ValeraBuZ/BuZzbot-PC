@@ -289,6 +289,44 @@ def radar_marker_has_notification(frame_bgr, bbox, padding=24):
     )
 
 
+def radar_category_has_notification(frame_bgr, task_id):
+    """Detect the red badge on the quick or march radar category button."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    task_regions = {
+        "radar_quick": (1180, 100, 1280, 205),
+        "radar_marches": (1180, 205, 1280, 315),
+    }
+    region = task_regions.get(str(task_id or ""))
+    if region is None:
+        return False
+
+    left, top, right, bottom = region
+    blue, green, red = cv2.split(frame[top:bottom, left:right])
+    blue = blue.astype(np.float32)
+    green = green.astype(np.float32)
+    red = red.astype(np.float32)
+    mask = (
+        (red > 120)
+        & (red > 2.0 * (green + 1.0))
+        & (red > 2.0 * (blue + 1.0))
+    ).astype(np.uint8) * 255
+
+    component_count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(mask)
+    for index in range(1, component_count):
+        _x, _y, width, height, area = map(int, stats[index])
+        if (
+            80 <= area <= 360
+            and 10 <= width <= 24
+            and 10 <= height <= 24
+            and 0.65 <= width / float(height) <= 1.5
+        ):
+            return True
+    return False
+
+
 def detect_radar_card_action_target(frame_bgr):
     """Return the center of an enabled yellow action button on a radar card."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

@@ -520,6 +520,18 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertFalse(
             routine_home_recovery_due({"uses_march": False}, False, False, 20.0)
         )
+        self.assertTrue(
+            routine_home_recovery_due(
+                {
+                    "id": "radar_quick",
+                    "uses_march": False,
+                    "timeout_seconds": 12.0,
+                },
+                False,
+                False,
+                12.0,
+            )
+        )
         self.assertFalse(
             routine_home_recovery_due(
                 {
