@@ -272,7 +272,7 @@ class DynamicGameControlTests(unittest.TestCase):
             alternate_troop,
             (275, 570),
             52,
-            (30, 180, 240),
+            (40, 150, 40),
             thickness=-1,
         )
         alternate_troop[658:705, 575:1160] = (30, 180, 240)

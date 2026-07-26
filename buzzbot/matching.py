@@ -461,6 +461,7 @@ def healing_troop_form_is_visible(frame_bgr):
             red_ratio(hospital_capacity) >= 0.16
             or yellow_ratio(hospital_capacity) >= 0.12
             or colored_heal_ratio >= 0.30
+            or stable_form_chrome
         )
     )
 
