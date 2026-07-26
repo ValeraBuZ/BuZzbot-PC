@@ -220,7 +220,7 @@ class HealingTests(unittest.TestCase):
             "id": "heal",
             "settings": {
                 "_collection_pending": True,
-                "_last_heal_started_at": time.time(),
+                "_last_heal_started_at": time.time() - 3.0,
                 "_last_pending_camera_scan_at": time.time(),
             },
         }
@@ -230,6 +230,48 @@ class HealingTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(deferred, ["текущее лечение ещё не завершено"])
         self.assertEqual(bot.adb_client.swipes, [])
+
+    def test_pending_healing_waits_for_configured_collection_delay(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient()
+        bot.routine_completed_steps = set()
+        bot._is_main_screen_visible = lambda: True
+        marker_frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
+        for left in (238, 262, 286):
+            import cv2
+
+            cv2.rectangle(
+                marker_frame,
+                (left, 192),
+                (left + 23, 231),
+                (15, 25, 220),
+                thickness=3,
+            )
+        bot._capture_screen_bgr = lambda force=False: (marker_frame, (0, 0))
+        deferred = []
+        bot._defer_current_routine_unavailable = (
+            lambda reason, now=None, retry_delay=None: deferred.append(
+                (reason, retry_delay)
+            )
+        )
+        task = {
+            "id": "heal",
+            "settings": {
+                "collect_finished": True,
+                "collection_delay_seconds": 30,
+                "_collection_pending": True,
+                "_last_heal_started_at": time.time(),
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertEqual(deferred[0][0], "сбор вылеченных через 30 сек")
+        self.assertGreater(deferred[0][1], 29.0)
+        self.assertLessEqual(deferred[0][1], 30.0)
+        self.assertEqual(bot.adb_client.taps, [])
 
     def test_collects_generic_portrait_marker_without_pending_state(self):
         bot = AutoClicker.__new__(AutoClicker)

@@ -4251,6 +4251,36 @@ class AutoClicker:
 
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
+        if settings.get("_collection_pending", False):
+            try:
+                collection_delay = max(
+                    1.0,
+                    min(
+                        3600.0,
+                        float(settings.get("collection_delay_seconds", 2) or 2),
+                    ),
+                )
+            except (TypeError, ValueError):
+                collection_delay = 2.0
+            last_started_at = float(
+                settings.get("_last_heal_started_at", time.time()) or time.time()
+            )
+            now = time.time()
+            remaining = collection_delay - (now - last_started_at)
+            if remaining > 0:
+                remaining_seconds = max(1, int(remaining + 0.999))
+                logger.info(
+                    "Healing collection is waiting for the configured delay: "
+                    "%s seconds remaining",
+                    remaining_seconds,
+                )
+                self._defer_current_routine_unavailable(
+                    f"сбор вылеченных через {remaining_seconds} сек",
+                    now,
+                    retry_delay=remaining,
+                )
+                return True
+
         collection_target = (
             detect_finished_healing_target(frame)
             if settings.get("collect_finished", True)
@@ -4583,7 +4613,12 @@ class AutoClicker:
         self.routine_idle_recovery_attempted = False
         self.save_config()
 
-    def _defer_current_routine_unavailable(self, reason, now=None):
+    def _defer_current_routine_unavailable(
+        self,
+        reason,
+        now=None,
+        retry_delay=None,
+    ):
         now = time.time() if now is None else float(now)
         task = self.get_routine_task(self.current_routine_task_id)
         if not task:
@@ -4596,7 +4631,11 @@ class AutoClicker:
             "max_queue_checks": "все очереди производства заняты",
             "max_lab_checks": "все очереди исследований заняты",
         }.get(reason, reason)
-        retry_delay = unavailable_retry_delay(task)
+        retry_delay = (
+            unavailable_retry_delay(task)
+            if retry_delay is None
+            else max(1.0, float(retry_delay))
+        )
         self.routine_next_run[task["id"]] = now + retry_delay
         logger.info(
             "Routine %s is temporarily unavailable (%s); retrying in %.0f seconds",
@@ -4610,7 +4649,8 @@ class AutoClicker:
                 require_settlement=routine_requires_settlement(task),
             )
         self.set_status_message(
-            f"{self.get_routine_task_name(task)}: {display_reason}. Повтор через {int(retry_delay)} сек",
+            f"{self.get_routine_task_name(task)}: {display_reason}. "
+            f"Повтор через {max(1, int(retry_delay + 0.999))} сек",
             force=True,
         )
         self.routine_last_outcome = {

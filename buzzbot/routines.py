@@ -400,6 +400,7 @@ DEFAULT_ROUTINE_TASKS = (
         "empty_home_is_success": True,
         "settings": {
             "troop_count": 2500,
+            "collection_delay_seconds": 2,
             "collect_finished": True,
             "repeat": True,
         },
@@ -595,6 +596,13 @@ TASK_SETTING_SPECS = {
     ),
     "heal": (
         {"key": "troop_count", "label": "Количество войск", "kind": "int", "min": 1, "max": 1000000},
+        {
+            "key": "collection_delay_seconds",
+            "label": "Проверять сбор через, сек",
+            "kind": "int",
+            "min": 1,
+            "max": 3600,
+        },
         {"key": "collect_finished", "label": "Собирать вылеченных", "kind": "bool"},
         {"key": "repeat", "label": "Повторять лечение", "kind": "bool"},
     ),
@@ -754,19 +762,29 @@ def no_action_retry_delay(task):
     """Use a bounded retry delay when a task timed out without any action."""
     interval_seconds = float(task.get("interval_minutes", 1.0)) * 60.0
     if task.get("id") == "heal":
+        settings = task.get("settings", {})
+        if settings.get("_collection_pending", False):
+            return healing_collection_delay(task)
         return max(5.0, min(10.0, interval_seconds))
     return max(30.0, min(300.0, interval_seconds))
+
+
+def healing_collection_delay(task):
+    """Return the per-account delay before checking a started healing batch."""
+    settings = task.get("settings", {})
+    try:
+        delay = float(settings.get("collection_delay_seconds", 2) or 2)
+    except (TypeError, ValueError):
+        delay = 2.0
+    return max(1.0, min(3600.0, delay))
 
 
 def unavailable_retry_delay(task):
     """Keep finished-healing collection responsive without rushing other tasks."""
     settings = task.get("settings", {})
-    minimum = (
-        5.0
-        if task.get("id") == "heal" and settings.get("_collection_pending", False)
-        else 60.0
-    )
-    return max(minimum, no_action_retry_delay(task))
+    if task.get("id") == "heal" and settings.get("_collection_pending", False):
+        return healing_collection_delay(task)
+    return max(60.0, no_action_retry_delay(task))
 
 
 def format_wait_duration(seconds, language="ru"):

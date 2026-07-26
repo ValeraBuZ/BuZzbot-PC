@@ -110,6 +110,11 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(by_id["processing_factory"]["interval_minutes"], 180.0)
         self.assertTrue(by_id["processing_factory"]["complete_when_idle"])
         self.assertTrue(by_id["processing_contest"]["complete_when_idle"])
+        self.assertEqual(by_id["heal"]["settings"]["collection_delay_seconds"], 2)
+        heal_setting_keys = {
+            spec["key"] for spec in task_setting_specs("heal")
+        }
+        self.assertIn("collection_delay_seconds", heal_setting_keys)
         self.assertEqual(by_id["collective_mind"]["settings"]["level"], 6)
         collective_level = next(
             spec for spec in task_setting_specs("collective_mind") if spec["key"] == "level"
@@ -468,7 +473,10 @@ class RoutineTaskTests(unittest.TestCase):
         pending_heal = {
             "id": "heal",
             "interval_minutes": 0.1,
-            "settings": {"_collection_pending": True},
+            "settings": {
+                "_collection_pending": True,
+                "collection_delay_seconds": 2,
+            },
         }
         ordinary_heal = {
             "id": "heal",
@@ -476,8 +484,19 @@ class RoutineTaskTests(unittest.TestCase):
             "settings": {"_collection_pending": False},
         }
 
-        self.assertEqual(unavailable_retry_delay(pending_heal), 6.0)
+        self.assertEqual(unavailable_retry_delay(pending_heal), 2.0)
         self.assertEqual(unavailable_retry_delay(ordinary_heal), 60.0)
+
+    def test_legacy_healing_profile_receives_collection_delay(self):
+        healing = next(
+            task
+            for task in normalize_routine_tasks(
+                [{"id": "heal", "settings": {"troop_count": 2500}}]
+            )
+            if task["id"] == "heal"
+        )
+
+        self.assertEqual(healing["settings"]["collection_delay_seconds"], 2)
 
     def test_home_recovery_only_runs_before_the_first_march_action(self):
         task = {"uses_march": True, "timeout_seconds": 1800.0}
