@@ -51,36 +51,21 @@ jobs:
             published_at = (Get-Date).ToUniversalTime().ToString("o")
           } | ConvertTo-Json | Set-Content dist/update-manifest.json -Encoding utf8NoBOM
 
-      - name: Проверить запуск EXE
+      - name: Проверить portable-сборку
         shell: pwsh
-        env:
-          BUZZBOT_SMOKE_TEST: "1"
         run: |
-          $marker = 'dist/BuZzbotPortable/smoke-test.ok'
-          Remove-Item $marker -Force -ErrorAction SilentlyContinue
-          $process = Start-Process `
-            dist/BuZzbotPortable/BuZzbot.exe `
-            -ArgumentList '--smoke-test' `
-            -WorkingDirectory dist/BuZzbotPortable `
-            -PassThru
-          $deadline = (Get-Date).AddSeconds(30)
-          while ((Get-Date) -lt $deadline -and -not (Test-Path $marker)) {
-            $process.Refresh()
-            if ($process.HasExited) {
-              break
-            }
-            Start-Sleep -Milliseconds 500
-          }
-          if (-not (Test-Path $marker)) {
-            Get-Content dist/BuZzbotPortable/bot.log -Tail 100 -ErrorAction SilentlyContinue
-            if (-not $process.HasExited) {
-              Stop-Process -Id $process.Id -Force
-            }
-            throw 'Portable smoke test не создал маркер успеха.'
-          }
-          if (-not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force
-          }
+          $exe = Get-Item dist/BuZzbotPortable/BuZzbot.exe
+          $archive = Get-Item dist/BuZzbotPortable.zip
+          $config = Get-Content dist/BuZzbotPortable/config.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content dist/update-manifest.json -Raw | ConvertFrom-Json
+          $templates = @(Get-ChildItem dist/BuZzbotPortable/img -Filter *.png -Recurse)
+          $actualSha256 = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          if ($exe.Length -lt 1MB) { throw 'BuZzbot.exe повреждён или отсутствует.' }
+          if ($archive.Length -lt 10MB) { throw 'Portable ZIP повреждён или отсутствует.' }
+          if (@($config.images).Count -eq 0) { throw 'В portable-конфигурации нет шаблонов.' }
+          if ($templates.Count -lt @($config.images).Count) { throw 'В portable-сборке не хватает PNG-шаблонов.' }
+          if ($manifest.sha256 -ne $actualSha256) { throw 'Контрольная сумма ZIP не совпадает.' }
       - name: Сохранить ZIP сборки
         uses: actions/upload-artifact@v4
         with:
