@@ -251,6 +251,139 @@ class ZombieSearchTests(unittest.TestCase):
             [(900, 640), (968, 348), (1057, 97), (950, 643)],
         )
 
+    def test_march_auto_skips_exhausted_50_and_uses_100_stamina(self):
+        bot = self.make_bot()
+        bot.cycle_mode = False
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
+        cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
+        cv2.rectangle(frame, (868, 326), (1068, 370), (85, 85, 85), thickness=-1)
+        for x1, y1, x2, y2 in (
+            (868, 433, 1068, 477),
+            (868, 539, 1068, 581),
+        ):
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 180, 255), thickness=-1)
+        cv2.rectangle(frame, (210, 285), (305, 385), (20, 180, 40), thickness=-1)
+        empty_frame = np.zeros_like(frame)
+        bot._capture_screen_bgr = lambda force=False: (
+            (frame if len(bot.adb_client.taps) < 3 else empty_frame),
+            (0, 0),
+        )
+        locate_results = iter(
+            (
+                (SimpleNamespace(x=950, y=643), (839, 620, 223, 47), 0.99),
+                (None, None, 0.0),
+            )
+        )
+        bot._locate_image = lambda _image: next(locate_results)
+        bot._current_task_settings = lambda: {
+            "use_stamina_items": True,
+            "stamina_item_amount": "auto",
+        }
+        image = {
+            "description": "Send squad to zombie",
+            "action": "click",
+            "click_offset": (0, 0),
+            "numbers": [],
+            "click_sequence": [],
+            "delay": 0.0,
+            "last_used": 0.0,
+            "confirm_disappears": True,
+        }
+
+        result = bot._execute_action(image, SimpleNamespace(x=900, y=640))
+
+        self.assertTrue(result)
+        self.assertEqual(
+            bot.adb_client.taps,
+            [(900, 640), (968, 454), (1057, 97), (950, 643)],
+        )
+
+    def test_stamina_failure_is_not_reported_as_no_available_squad(self):
+        bot = self.make_bot()
+        bot.cycle_mode = False
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
+        cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
+        cv2.rectangle(frame, (868, 326), (1068, 370), (0, 180, 255), thickness=-1)
+        cv2.rectangle(frame, (210, 285), (305, 385), (20, 180, 40), thickness=-1)
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+        bot._current_task_settings = lambda: {
+            "use_stamina_items": False,
+            "stamina_item_amount": "auto",
+        }
+        image = {
+            "description": "Send squad to zombie",
+            "action": "click",
+            "click_offset": (0, 0),
+            "numbers": [],
+            "click_sequence": [],
+            "delay": 0.0,
+            "last_used": 0.0,
+            "confirm_disappears": True,
+        }
+
+        result = bot._execute_action(image, SimpleNamespace(x=900, y=640))
+
+        self.assertFalse(result)
+        self.assertEqual(bot.routine_action_failure_reason, "stamina")
+
+    def test_march_repeats_50_stamina_until_attack_is_funded(self):
+        bot = self.make_bot()
+        bot.cycle_mode = False
+        stamina_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(stamina_frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
+        cv2.rectangle(stamina_frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
+        cv2.rectangle(stamina_frame, (868, 326), (1068, 370), (0, 180, 255), thickness=-1)
+        cv2.rectangle(stamina_frame, (210, 285), (305, 385), (20, 180, 40), thickness=-1)
+        empty_frame = np.zeros_like(stamina_frame)
+
+        def capture(force=False):
+            return (
+                stamina_frame if len(bot.adb_client.taps) in {1, 2, 4, 5} else empty_frame,
+                (0, 0),
+            )
+
+        bot._capture_screen_bgr = capture
+        locate_results = iter(
+            (
+                (SimpleNamespace(x=950, y=643), (839, 620, 223, 47), 0.99),
+                (SimpleNamespace(x=950, y=643), (839, 620, 223, 47), 0.99),
+                (None, None, 0.0),
+            )
+        )
+        bot._locate_image = lambda _image: next(locate_results)
+        bot._current_task_settings = lambda: {
+            "use_stamina_items": True,
+            "stamina_item_amount": "auto",
+        }
+        image = {
+            "description": "Send squad to zombie",
+            "action": "click",
+            "click_offset": (0, 0),
+            "numbers": [],
+            "click_sequence": [],
+            "delay": 0.0,
+            "last_used": 0.0,
+            "confirm_disappears": True,
+        }
+
+        result = bot._execute_action(image, SimpleNamespace(x=900, y=640))
+
+        self.assertTrue(result)
+        self.assertEqual(
+            bot.adb_client.taps,
+            [
+                (900, 640),
+                (968, 348),
+                (1057, 97),
+                (950, 643),
+                (968, 348),
+                (1057, 97),
+                (950, 643),
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

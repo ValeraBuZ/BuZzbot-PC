@@ -50,6 +50,12 @@ from buzzbot.ldplayer import (
     tcp_serial_for_index,
 )
 from buzzbot.logging_utils import configure_logging, install_exception_logging
+from buzzbot.multi_emulator import (
+    prepare_worker_config,
+    runtime_dir_for_instance,
+    worker_launch_command,
+    write_worker_command,
+)
 from buzzbot.matching import (
     TemplateCache,
     detect_alliance_marked_project_target,
@@ -137,9 +143,11 @@ from buzzbot.updater import UpdateError, download_and_stage_update, launch_stage
 from buzzbot.version import APP_VERSION
 
 APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
+RUNTIME_DIR = Path(os.environ.get("BUZZBOT_RUNTIME_DIR", APP_DIR)).expanduser().resolve()
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 IMG_DIR = APP_DIR / "img"
-CONFIG_FILE = APP_DIR / "config.json"
-CONFIG_BACKUP_DIR = APP_DIR / "backups" / "config"
+CONFIG_FILE = RUNTIME_DIR / "config.json"
+CONFIG_BACKUP_DIR = RUNTIME_DIR / "backups" / "config"
 TRASH_DIR = IMG_DIR / "_trash"
 SYSTEM_TEMPLATE_GROUP = "Системные окна"
 ACCOUNT_SWITCH_TEMPLATE_GROUP = "Переключение аккаунта"
@@ -156,7 +164,7 @@ WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collect
 # transient false 0/5; every visible positive count remains authoritative.
 MARCH_OBSERVER_GRACE_SECONDS = 8.0
 
-logger = configure_logging(APP_DIR / "bot.log")
+logger = configure_logging(RUNTIME_DIR / "bot.log")
 
 
 class _WindowsPoint(ctypes.Structure):
@@ -722,6 +730,10 @@ class AutoClicker:
     def __init__(self, root=None):
         self.root = root
         self.app_version = APP_VERSION
+        self.is_multi_worker = should_run_multi_worker()
+        self.multi_emulator_workers = {}
+        self.multi_emulator_command_sequence = 0
+        self.multi_emulator_total = 1
         self.search_images = []
         self.groups = {}
         self.group_schedules = {}
@@ -760,6 +772,7 @@ class AutoClicker:
         self.routine_completed_steps = set()
         self.routine_last_outcome = {}
         self.routine_action_completes_task = False
+        self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
         self.routine_login_restart_count = 0
@@ -3554,6 +3567,7 @@ class AutoClicker:
         self.routine_completed_steps = set()
         self.routine_last_outcome = {}
         self.routine_action_completes_task = False
+        self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
         self.routine_login_restart_count = 0
@@ -3889,6 +3903,7 @@ class AutoClicker:
         self.routine_current_action_count = 0
         self.routine_action_counts = {}
         self.routine_completed_steps = set()
+        self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
         self.routine_login_restart_count = 0
@@ -5229,6 +5244,7 @@ class AutoClicker:
         self.routine_current_action_count = 0
         self.routine_action_counts = {}
         self.routine_completed_steps = set()
+        self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
         self.routine_idle_guard_visible = False
@@ -5285,6 +5301,182 @@ class AutoClicker:
         if current_account:
             self.account_session_deadline = time.time() + float(current_account.get("session_minutes", 30.0)) * 60.0
         return self.start()
+
+    def _running_emulator_targets(self):
+        """Return every running LDPlayer that currently answers through ADB."""
+        _ldconsole, instances = self._ldplayer_instances()
+        running = [item for item in instances if item.running]
+        if not running:
+            return []
+        probe = AdbClient(self.adb_path or None, "")
+        try:
+            devices = set(probe.list_devices())
+        except AdbError as exc:
+            logger.warning("Не удалось получить устройства для общего запуска: %s", exc)
+            devices = set()
+
+        targets = []
+        for instance in running:
+            candidates = [
+                instance.adb_serial,
+                tcp_serial_for_index(instance.index),
+                bridged_adb_serial_for_index(instance.index),
+            ]
+            serial = next((item for item in candidates if item and item in devices), None)
+            if serial is None:
+                for candidate in candidates[1:]:
+                    if not candidate:
+                        continue
+                    try:
+                        probe.connect(candidate)
+                        devices = set(probe.list_devices())
+                    except AdbError:
+                        continue
+                    if candidate in devices:
+                        serial = candidate
+                        break
+            if serial and AdbClient(self.adb_path or None, serial).is_responsive():
+                targets.append((instance, serial))
+            else:
+                logger.warning(
+                    "LDPlayer %s «%s» пропущен: ADB недоступен",
+                    instance.index,
+                    instance.name,
+                )
+        return targets
+
+    def _write_multi_command(self, command):
+        self.multi_emulator_command_sequence += 1
+        for worker in self.multi_emulator_workers.values():
+            try:
+                write_worker_command(
+                    worker["runtime_dir"],
+                    command,
+                    self.multi_emulator_command_sequence,
+                )
+            except OSError:
+                logger.exception("Не удалось передать команду скрытому исполнителю")
+
+    def _stop_multi_workers(self):
+        if not self.multi_emulator_workers:
+            self.multi_emulator_total = 1
+            return
+        self._write_multi_command("stop")
+        workers = list(self.multi_emulator_workers.values())
+        self.multi_emulator_workers = {}
+        self.multi_emulator_total = 1
+        for worker in workers:
+            process = worker["process"]
+            try:
+                process.wait(timeout=2.5)
+            except subprocess.TimeoutExpired:
+                process.terminate()
+                try:
+                    process.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+    def start_all_emulators(self):
+        if self.is_multi_worker:
+            return self.start_routines()
+        if self.is_running:
+            return True
+
+        targets = self._running_emulator_targets()
+        if not targets:
+            self.set_status_message("Нет доступных по ADB запущенных LDPlayer", force=True)
+            self._show_notification('error', 'error', message="Нет доступных по ADB запущенных LDPlayer")
+            return False
+
+        current = self.get_current_account() or {}
+        preferred_index = int(current.get("ldplayer_index", -1))
+        primary = next((target for target in targets if target[0].index == preferred_index), targets[0])
+        self._adopt_adb_serial(primary[1], primary[0].index)
+        self.player_index = primary[0].index
+        self.player_name = primary[0].name
+        self.player_width = primary[0].width or self.player_width
+        self.player_height = primary[0].height or self.player_height
+
+        self.save_config()
+        source = json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig"))
+        self._stop_multi_workers()
+        for instance, serial in targets:
+            if instance.index == primary[0].index:
+                continue
+            runtime_dir = runtime_dir_for_instance(APP_DIR, instance.index)
+            runtime_dir.mkdir(parents=True, exist_ok=True)
+            worker_config = prepare_worker_config(
+                source,
+                serial=serial,
+                index=instance.index,
+                name=instance.name,
+                width=instance.width,
+                height=instance.height,
+            )
+            save_json_with_backup(
+                runtime_dir / "config.json",
+                worker_config,
+                backup_dir=runtime_dir / "backups" / "config",
+                keep_backups=3,
+            )
+            control_path = runtime_dir / "control.json"
+            try:
+                control_path.unlink()
+            except FileNotFoundError:
+                pass
+            env = os.environ.copy()
+            env["BUZZBOT_RUNTIME_DIR"] = str(runtime_dir)
+            command = worker_launch_command(Path(__file__).resolve())
+            kwargs = {
+                "cwd": str(APP_DIR),
+                "env": env,
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+            }
+            if os.name == "nt":
+                kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            process = subprocess.Popen(command, **kwargs)
+            self.multi_emulator_workers[instance.index] = {
+                "process": process,
+                "runtime_dir": runtime_dir,
+                "name": instance.name,
+                "serial": serial,
+            }
+            logger.info(
+                "Скрытый исполнитель запущен: LDPlayer %s «%s» | %s | PID %s",
+                instance.index,
+                instance.name,
+                serial,
+                process.pid,
+            )
+
+        started = self.start_routines()
+        if not started:
+            self._stop_multi_workers()
+            return False
+        self.multi_emulator_total = 1 + len(self.multi_emulator_workers)
+        names = ", ".join(instance.name for instance, _serial in targets)
+        self.set_status_message(
+            f"Работают {self.multi_emulator_total} эмулятора: {names}",
+            force=True,
+        )
+        return True
+
+    def toggle_pause_all_emulators(self):
+        if self.is_multi_worker:
+            return self.toggle_pause()
+        command = "resume" if self.is_paused else "pause"
+        changed = self.toggle_pause()
+        if changed:
+            self._write_multi_command(command)
+        return changed
+
+    def stop_all_emulators(self):
+        if self.is_multi_worker:
+            self.stop()
+            return
+        self.stop()
+        self._stop_multi_workers()
 
     def start_task_only(self, task_id):
         task = self.get_routine_task(task_id)
@@ -5383,7 +5575,7 @@ class AutoClicker:
         self.pause_started_at = None
         self.routine_only_task_id = None
         self.account_switch_task = None
-        if self.root:
+        if self.root and not self.is_multi_worker:
             self.root.deiconify()
         logger.info("Бот остановлен")
         self.set_status_message(self.tr('state_stopped'), force=True)
@@ -5393,7 +5585,7 @@ class AutoClicker:
             return False
         self._set_state(BotState.PAUSED)
         self.pause_started_at = time.time()
-        if self.root:
+        if self.root and not self.is_multi_worker:
             self.root.deiconify()
         logger.info("Бот поставлен на паузу")
         self.set_status_message(self.tr('state_paused'), force=True)
@@ -5429,7 +5621,10 @@ class AutoClicker:
         return self.pause()
 
     def _show_notification(self, title_key, message_key, type="info", **kwargs):
-        if not self.root:
+        if not self.root or self.is_multi_worker:
+            if self.is_multi_worker:
+                message = kwargs.get("message") or self.tr(message_key, **kwargs)
+                logger.warning("Скрытый исполнитель: %s", message)
             return
         self.gui_queue.put((self._show_notification_dialog, (title_key, message_key, kwargs), {}))
 
@@ -5829,6 +6024,14 @@ class AutoClicker:
                                         "Действие не подтверждено экраном: %s",
                                         img_config.get("description"),
                                     )
+                                    if self.routine_action_failure_reason == "stamina":
+                                        self._defer_current_routine_unavailable(
+                                            "не хватает выносливости или закончились предметы",
+                                            time.time(),
+                                            retry_delay=60.0,
+                                        )
+                                        refresh_after_action = True
+                                        break
                                     continue
                                 self.stats[img_config["path"]] = self.stats.get(img_config["path"], 0) + 1
                                 self.click_count += 1
@@ -6533,6 +6736,7 @@ class AutoClicker:
         return True
 
     def _execute_action(self, img_config, location):
+        self.routine_action_failure_reason = ""
         x, y = location.x, location.y
         offset = img_config.get("click_offset", (0, 0))
         display = self.get_display_profile() if self.uses_adb else make_display_profile(1280, 720)
@@ -7721,20 +7925,52 @@ class AutoClicker:
 
         if img_config.get("confirm_disappears", False):
             stamina_frame, stamina_origin = self._capture_screen_bgr(force=True)
-            if stamina_dialog_is_visible(stamina_frame):
-                settings = self._current_task_settings()
+            settings = self._current_task_settings()
+            configured_amount = str(settings.get("stamina_item_amount", "auto") or "auto")
+            refill_attempts = 0
+            max_refill_attempts = 8
+            while stamina_dialog_is_visible(stamina_frame):
                 if not bool(settings.get("use_stamina_items", True)):
+                    self.routine_action_failure_reason = "stamina"
                     logger.warning("Недостаточно выносливости; автоматическое пополнение отключено")
                     self.set_status_message(
                         "Недостаточно выносливости: автопополнение отключено",
                         force=True,
                     )
                     return False
+                if refill_attempts >= max_refill_attempts:
+                    self.routine_action_failure_reason = "stamina"
+                    logger.warning(
+                        "Пополнение выносливости остановлено после %s безопасных попыток",
+                        max_refill_attempts,
+                    )
+                    self.set_status_message(
+                        "Лимит автопополнения выносливости достигнут: повторю позже",
+                        force=True,
+                    )
+                    return False
 
-                configured_amount = str(settings.get("stamina_item_amount", "auto") or "auto")
-                refill_amount = 50 if configured_amount == "auto" else int(configured_amount)
-                stamina_target = detect_stamina_refill_target(stamina_frame, refill_amount)
-                if refill_amount == 1000:
+                refill_amount = None
+                stamina_target = None
+                if configured_amount == "auto":
+                    for candidate_amount in (50, 100, 500):
+                        candidate_target = detect_stamina_refill_target(
+                            stamina_frame,
+                            candidate_amount,
+                        )
+                        if candidate_target is not None:
+                            refill_amount = candidate_amount
+                            stamina_target = candidate_target
+                            break
+                else:
+                    refill_amount = int(configured_amount)
+                    stamina_target = detect_stamina_refill_target(
+                        stamina_frame,
+                        refill_amount,
+                    )
+
+                if (configured_amount == "auto" and stamina_target is None) or refill_amount == 1000:
+                    refill_amount = 1000
                     frame_height, frame_width = stamina_frame.shape[:2]
                     swipe_x = int(round(650 * frame_width / 1280.0))
                     swipe_from_y = int(round(600 * frame_height / 720.0))
@@ -7757,6 +7993,7 @@ class AutoClicker:
                     stamina_target = detect_lowest_stamina_refill_target(stamina_frame)
 
                 if stamina_target is None:
+                    self.routine_action_failure_reason = "stamina"
                     logger.warning("Предмет выносливости +%s не найден", refill_amount)
                     self.set_status_message(
                         f"Предмет выносливости +{refill_amount} не найден",
@@ -7764,12 +8001,15 @@ class AutoClicker:
                     )
                     return False
 
+                refill_attempts += 1
                 refill_x, refill_y = stamina_target
                 logger.info(
-                    "Недостаточно выносливости: использую предмет +%s в (%s, %s)",
+                    "Недостаточно выносливости: использую предмет +%s в (%s, %s), попытка %s/%s",
                     refill_amount,
                     refill_x,
                     refill_y,
+                    refill_attempts,
+                    max_refill_attempts,
                 )
                 self.set_status_message(
                     f"Недостаточно выносливости: использую предмет +{refill_amount}",
@@ -7814,6 +8054,7 @@ class AutoClicker:
                     self._interruptible_sleep(0.25)
 
                 if retry_location is None:
+                    self.routine_action_failure_reason = "stamina"
                     img_config["last_used"] = 0
                     logger.warning("Экран отряда не восстановился после пополнения выносливости")
                     self.set_status_message(
@@ -7835,21 +8076,51 @@ class AutoClicker:
                 self._invalidate_capture()
                 self._interruptible_sleep(0.8)
 
+                confirmation_deadline = time.monotonic() + 6.0
+                stamina_required_again = False
+                while time.monotonic() < confirmation_deadline and not self.stop_event.is_set():
+                    self._interruptible_sleep(0.5)
+                    confirmation_frame, confirmation_origin = self._capture_screen_bgr(force=True)
+                    if stamina_dialog_is_visible(confirmation_frame):
+                        stamina_frame = confirmation_frame
+                        stamina_origin = confirmation_origin
+                        stamina_required_again = True
+                        logger.info(
+                            "Одного предмета +%s недостаточно; продолжаю безопасное пополнение",
+                            refill_amount,
+                        )
+                        break
+                    location_after, bbox_after, _score = self._locate_image(img_config)
+                    if not location_after or not bbox_after:
+                        logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
+                        return True
+                if stamina_required_again:
+                    continue
+                if self.stop_event.is_set():
+                    return False
+                self.routine_action_failure_reason = "stamina"
+                logger.warning("Отправка не подтверждена после пополнения выносливости")
+                self.set_status_message(
+                    "Отправка после пополнения не подтверждена: повторю позже",
+                    force=True,
+                )
+                return False
+
             deadline = time.monotonic() + 6.0
             while time.monotonic() < deadline and not self.stop_event.is_set():
                 self._interruptible_sleep(0.5)
-                confirmation_frame, _confirmation_origin = self._capture_screen_bgr(force=True)
-                if stamina_dialog_is_visible(confirmation_frame):
-                    logger.warning("Отправка всё ещё требует выносливость после выбранного предмета")
-                    self.set_status_message(
-                        "Выносливости всё ещё недостаточно: поход не засчитан",
-                        force=True,
-                    )
-                    return False
                 location_after, bbox_after, _score = self._locate_image(img_config)
                 if not location_after or not bbox_after:
                     logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
                     return True
+                confirmation_frame, _confirmation_origin = self._capture_screen_bgr(force=True)
+                if stamina_dialog_is_visible(confirmation_frame):
+                    self.routine_action_failure_reason = "stamina"
+                    self.set_status_message(
+                        "Недостаточно выносливости: повторю попытку позже",
+                        force=True,
+                    )
+                    return False
             self.set_status_message(
                 "Отправка похода не подтверждена: отряд остался на экране",
                 force=True,
@@ -10702,8 +10973,8 @@ def change_language(root, bot, new_lang):
 
 
 def on_closing(root, bot):
-    if bot.is_running:
-        bot.stop()
+    if bot.is_running or bot.multi_emulator_workers:
+        bot.stop_all_emulators()
     bot.stop_remote_control()
     bot.stop_schedule_thread()
     root.destroy()
@@ -10712,6 +10983,16 @@ def on_closing(root, bot):
 def should_autostart_routines(argv=None):
     args = sys.argv[1:] if argv is None else argv
     return any(str(arg).strip().lower() == "--autostart" for arg in args)
+
+
+def should_autostart_all_emulators(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    return any(str(arg).strip().lower() == "--autostart-all" for arg in args)
+
+
+def should_run_multi_worker(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    return any(str(arg).strip().lower() == "--worker" for arg in args)
 
 
 def should_run_smoke_test(argv=None):
@@ -10761,12 +11042,22 @@ def main():
         return
     enable_windows_high_dpi()
     root = tk.Tk()
+    is_multi_worker = should_run_multi_worker()
+    if is_multi_worker:
+        root.withdraw()
     try:
         root.tk.call("tk", "scaling", root.winfo_fpixels("1i") / 72.0)
     except tk.TclError:
         pass
     install_exception_logging(logger, root)
-    logger.info("Запуск BuZzbot %s | frozen=%s | app_dir=%s", APP_VERSION, bool(getattr(sys, 'frozen', False)), APP_DIR)
+    logger.info(
+        "Запуск BuZzbot %s | frozen=%s | app_dir=%s | runtime_dir=%s | worker=%s",
+        APP_VERSION,
+        bool(getattr(sys, 'frozen', False)),
+        APP_DIR,
+        RUNTIME_DIR,
+        is_multi_worker,
+    )
     root.geometry("1000x1000")
     root.update_idletasks()
     x = (root.winfo_screenwidth() - 1000) // 2
@@ -10780,7 +11071,7 @@ def main():
     def hotkey_stop(event=None):
         if bot.is_running:
             bot.stop_hotkey_pressed = True
-            bot.stop()
+            bot.stop_all_emulators()
     root.bind('<Control-0>', hotkey_stop)
 
     def hotkey_pause(event=None):
@@ -10828,7 +11119,39 @@ def main():
 
     build_compact_ui(root, bot)
 
-    if should_autostart_routines():
+    if is_multi_worker:
+        root.withdraw()
+        control_path = RUNTIME_DIR / "control.json"
+        last_control_sequence = {"value": -1}
+
+        def poll_parent_command():
+            try:
+                payload = json.loads(control_path.read_text(encoding="utf-8"))
+                sequence = int(payload.get("sequence", -1))
+                command = str(payload.get("command") or "").strip().lower()
+            except (FileNotFoundError, OSError, ValueError, TypeError, json.JSONDecodeError):
+                sequence = -1
+                command = ""
+            if sequence > last_control_sequence["value"]:
+                last_control_sequence["value"] = sequence
+                if command == "pause":
+                    bot.pause()
+                elif command == "resume":
+                    bot.resume()
+                elif command == "stop":
+                    if bot.is_running:
+                        bot.stop()
+                    bot.stop_schedule_thread()
+                    root.after(100, root.destroy)
+                    return
+            root.after(400, poll_parent_command)
+
+        root.after(400, poll_parent_command)
+
+    if should_autostart_all_emulators() and not is_multi_worker:
+        logger.info("Autostart-all requested: starting selected tasks on every LDPlayer")
+        root.after(1500, bot.start_all_emulators)
+    elif should_autostart_routines():
         logger.info("Autostart requested: starting selected routine tasks")
         root.after(1500, bot.start_routines)
 

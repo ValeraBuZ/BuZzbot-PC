@@ -82,6 +82,13 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertEqual(detect_stamina_refill_target(frame, 100), (968, 454))
         self.assertEqual(detect_stamina_refill_target(frame, 500), (968, 559))
 
+    def test_skips_exhausted_stamina_item_button(self):
+        frame = self.stamina_dialog_frame()
+        cv2.rectangle(frame, (850, 324), (1090, 372), (85, 85, 85), thickness=-1)
+
+        self.assertIsNone(detect_stamina_refill_target(frame, 50))
+        self.assertEqual(detect_stamina_refill_target(frame, 100), (968, 454))
+
     def test_detects_lowest_visible_button_after_1000_scroll(self):
         frame = self.stamina_dialog_frame()
         cv2.rectangle(frame, (868, 600), (1068, 638), (0, 180, 255), thickness=-1)

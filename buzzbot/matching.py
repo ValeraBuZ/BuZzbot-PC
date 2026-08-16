@@ -64,6 +64,16 @@ def detect_stamina_refill_target(frame_bgr, amount=50):
         center_y = centers[int(amount)]
     except (KeyError, TypeError, ValueError):
         return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    button_roi = hsv[center_y - 24:center_y + 24, 850:1090]
+    enabled_mask = cv2.inRange(
+        button_roi,
+        np.array([10, 100, 120], dtype=np.uint8),
+        np.array([35, 255, 255], dtype=np.uint8),
+    )
+    if button_roi.size == 0 or float(np.mean(enabled_mask > 0)) < 0.15:
+        return None
     return int(round(968 * scale_x)), int(round(center_y * scale_y))
 
 

@@ -1063,14 +1063,14 @@ def build_compact_ui(root, bot):
             cursor="hand2",
         )
 
-    start_button = action_button(action_panel, "СТАРТ", bot.start_routines, colors["green"], "#102019")
+    start_button = action_button(action_panel, "СТАРТ НА ВСЕХ", bot.start_all_emulators, colors["green"], "#102019")
     start_button.pack(side=tk.LEFT, padx=5)
-    pause_button = action_button(action_panel, "ПАУЗА", bot.toggle_pause, "#B9CED8", "#674411")
+    pause_button = action_button(action_panel, "ПАУЗА", bot.toggle_pause_all_emulators, "#B9CED8", "#674411")
     pause_button.pack(side=tk.LEFT, padx=5)
-    stop_button = action_button(action_panel, "СТОП", bot.stop, colors["surface_alt"], colors["red"], "#C98E87")
+    stop_button = action_button(action_panel, "СТОП ВСЕ", bot.stop_all_emulators, colors["surface_alt"], colors["red"], "#C98E87")
     stop_button.pack(side=tk.LEFT, padx=5)
-    root.bind("<F5>", lambda _event: bot.start_routines())
-    root.bind("<F6>", lambda _event: bot.stop())
+    root.bind("<F5>", lambda _event: bot.start_all_emulators())
+    root.bind("<F6>", lambda _event: bot.stop_all_emulators())
 
     fox_path = _resource_path("buzzbot", "assets", "fox.png")
     if fox_path.is_file():
@@ -1779,7 +1779,8 @@ def build_compact_ui(root, bot):
                 run_summary_title.set("Автоматический цикл на паузе")
             else:
                 live_badge.configure(text="В РАБОТЕ", bg=colors["green_dark"], fg="#CDE2D3")
-                run_summary_title.set("Автоматический цикл работает")
+                emulator_count = max(1, int(getattr(bot, "multi_emulator_total", 1)))
+                run_summary_title.set(f"Автоматический цикл работает · {emulator_count} эмулятора")
         else:
             ready_state = tk.DISABLED if check_busy["value"] else tk.NORMAL
             start_button.configure(state=ready_state)
