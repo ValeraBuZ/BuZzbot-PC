@@ -586,6 +586,14 @@ DAILY_TASK_STEPS = {
             False,
         ),
         (
+            "select_project_gathering_elite",
+            "Проверить проект: сбор элиты",
+            "alliance_technology_now.png",
+            (248, 198, 338, 293),
+            (0, 0),
+            False,
+        ),
+        (
             "donate_resources",
             "Пожертвовать за обычные ресурсы",
             "alliance_donation_candidate.png",

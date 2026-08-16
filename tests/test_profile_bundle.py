@@ -118,6 +118,9 @@ class ProfileBundleTests(unittest.TestCase):
         marked_project_uid = str(
             uuid.uuid5(namespace, "alliance_donations:select_marked_project")
         )
+        gathering_elite_uid = str(
+            uuid.uuid5(namespace, "alliance_donations:select_project_gathering_elite")
+        )
         select_alliance_uid = str(uuid.uuid5(namespace, "mail_rewards:select_alliance"))
         select_reports_uid = str(uuid.uuid5(namespace, "mail_rewards:select_reports"))
         claim_main_uid = str(uuid.uuid5(namespace, "completed_tasks:claim_main"))
@@ -139,6 +142,10 @@ class ProfileBundleTests(unittest.TestCase):
         self.assertEqual(
             images[marked_project_uid]["action"],
             "alliance_marked_project",
+        )
+        self.assertEqual(
+            images[gathering_elite_uid]["description"],
+            "Проверить проект: сбор элиты",
         )
         self.assertEqual(
             images[select_alliance_uid]["requires_runtime_steps"],

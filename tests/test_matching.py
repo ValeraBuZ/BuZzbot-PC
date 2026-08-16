@@ -17,6 +17,8 @@ from buzzbot.matching import (
     detect_radar_card_action_target,
     detect_radar_notification_targets,
     detect_radar_world_action_target,
+    detect_lowest_stamina_refill_target,
+    detect_stamina_refill_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
     healing_selection_is_empty,
@@ -24,6 +26,7 @@ from buzzbot.matching import (
     imread_unicode,
     radar_category_has_notification,
     radar_marker_has_notification,
+    stamina_dialog_is_visible,
     zombie_camp_checkbox_is_checked,
 )
 
@@ -50,6 +53,54 @@ class UnicodeImageReadTests(unittest.TestCase):
 
 
 class DynamicGameControlTests(unittest.TestCase):
+    @staticmethod
+    def stamina_dialog_frame(width=1280, height=720):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
+        cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
+        for x1, y1, x2, y2 in (
+            (868, 326, 1068, 370),
+            (868, 433, 1068, 477),
+            (868, 539, 1068, 581),
+        ):
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 180, 255), thickness=-1)
+        cv2.rectangle(frame, (210, 285), (305, 385), (20, 180, 40), thickness=-1)
+        if (width, height) != (1280, 720):
+            frame = cv2.resize(frame, (width, height))
+        return frame
+
+    def test_detects_safe_50_stamina_item(self):
+        self.assertTrue(stamina_dialog_is_visible(self.stamina_dialog_frame()))
+        self.assertEqual(
+            detect_stamina_refill_target(self.stamina_dialog_frame()),
+            (968, 348),
+        )
+
+    def test_detects_100_and_500_stamina_items(self):
+        frame = self.stamina_dialog_frame()
+
+        self.assertEqual(detect_stamina_refill_target(frame, 100), (968, 454))
+        self.assertEqual(detect_stamina_refill_target(frame, 500), (968, 559))
+
+    def test_detects_lowest_visible_button_after_1000_scroll(self):
+        frame = self.stamina_dialog_frame()
+        cv2.rectangle(frame, (868, 600), (1068, 638), (0, 180, 255), thickness=-1)
+
+        self.assertEqual(detect_lowest_stamina_refill_target(frame), (968, 620))
+
+    def test_scales_stamina_item_target(self):
+        self.assertEqual(
+            detect_stamina_refill_target(self.stamina_dialog_frame(640, 360)),
+            (484, 174),
+        )
+
+    def test_rejects_single_generic_gold_button(self):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (868, 326), (1068, 370), (0, 180, 255), thickness=-1)
+
+        self.assertIsNone(detect_stamina_refill_target(frame))
+        self.assertFalse(stamina_dialog_is_visible(frame))
+
     def test_detects_expired_login_ok_button_only(self):
         frame = np.full((720, 1280, 3), (55, 70, 90), dtype=np.uint8)
         cv2.rectangle(frame, (320, 165), (960, 575), (120, 135, 150), thickness=-1)

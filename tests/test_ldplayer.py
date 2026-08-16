@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from buzzbot.ldplayer import (
     adb_debug_enabled,
+    bridged_adb_serial_for_index,
     enable_adb_debug,
     index_from_serial,
     launch_instance,
@@ -44,6 +45,20 @@ class LDPlayerTests(unittest.TestCase):
             self.assertTrue(adb_debug_enabled(ldconsole, 3))
             self.assertTrue(config_path.with_suffix(".config.buzzbot.bak").is_file())
             self.assertFalse(enable_adb_debug(ldconsole, 3))
+
+    def test_bridged_adb_serial_uses_latest_runtime_address(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log_path = Path(temp_dir) / "leidian5_vbox.log"
+            log_path.write_text(
+                "initADB\t(1714):emulator adbmode: 1, 192.168.0.41\n"
+                "initADB\t(1714):emulator adbmode: 1, 192.168.0.53\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                bridged_adb_serial_for_index(5, temp_dir),
+                "192.168.0.53:5555",
+            )
 
     @patch("buzzbot.ldplayer._run_ldconsole")
     def test_launch_instance_uses_hidden_ldconsole_command(self, run_ldconsole):

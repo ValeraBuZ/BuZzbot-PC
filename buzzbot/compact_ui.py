@@ -1113,6 +1113,19 @@ def build_compact_ui(root, bot):
     ).pack(side=tk.LEFT, padx=16, pady=(8, 0))
     tk.Button(
         heading,
+        text="Снять все",
+        command=lambda: [bot.clear_routine_selection(), refresh_task_state()],
+        bg=colors["paper"],
+        fg=colors["muted"],
+        activebackground=colors["paper"],
+        activeforeground=colors["red"],
+        relief=tk.FLAT,
+        bd=0,
+        font=("Bahnschrift", 8),
+        cursor="hand2",
+    ).pack(side=tk.RIGHT, padx=(12, 0), pady=(8, 0))
+    tk.Button(
+        heading,
         text="Настроить шаблоны",
         command=lambda: run_root_callback("open_area_manager", lambda: bot.select_area(root)),
         bg=colors["paper"],

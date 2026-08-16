@@ -1,0 +1,77 @@
+import unittest
+
+import cv2
+import numpy as np
+
+from buzzbot_app import AutoClicker
+
+
+class MarchCountingTests(unittest.TestCase):
+    def make_bot(self, deadlines=(), observed=None):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_march_deadlines = list(deadlines)
+        bot.routine_max_marches = 5
+        bot.routine_confirmed_march_floor = 0
+        bot.routine_display_active_marches = 0
+        bot.routine_march_observer_grace_until = 0.0
+        bot._ensure_routine_march_context = lambda: False
+        bot._detect_observed_marches = lambda: observed
+        bot.save_config = lambda: None
+        return bot
+
+    def test_updated_game_counter_is_not_counted_twice(self):
+        bot = self.make_bot(observed=1)
+
+        self.assertTrue(bot._register_routine_march({"march_duration_minutes": 10}, now=100.0))
+
+        self.assertEqual(len(bot.routine_march_deadlines), 1)
+        self.assertEqual(bot.routine_confirmed_march_floor, 1)
+
+    def test_returned_squad_reduces_local_count_after_send(self):
+        bot = self.make_bot(deadlines=(1000.0, 1000.0, 1000.0), observed=1)
+
+        self.assertTrue(bot._register_routine_march({"march_duration_minutes": 10}, now=100.0))
+
+        self.assertEqual(len(bot.routine_march_deadlines), 1)
+        self.assertEqual(bot.routine_confirmed_march_floor, 1)
+
+    def test_local_count_advances_when_game_counter_is_unavailable(self):
+        bot = self.make_bot(deadlines=(1000.0,), observed=None)
+
+        self.assertTrue(bot._register_routine_march({"march_duration_minutes": 10}, now=100.0))
+
+        self.assertEqual(len(bot.routine_march_deadlines), 2)
+        self.assertEqual(bot.routine_confirmed_march_floor, 2)
+
+    def test_observed_preexisting_marches_are_adopted_after_send(self):
+        bot = self.make_bot(observed=4)
+
+        self.assertTrue(bot._register_routine_march({"march_duration_minutes": 10}, now=100.0))
+
+        self.assertEqual(len(bot.routine_march_deadlines), 4)
+        self.assertEqual(bot.routine_confirmed_march_floor, 4)
+
+    def test_world_map_without_deployment_panel_means_zero_marches(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.search_images = [{
+            "path": "observer.png",
+            "observer_only": True,
+            "march_count": 1,
+            "observer_confidence": 0.70,
+        }]
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        template = np.tile(np.arange(80, dtype=np.uint8), (38, 1))
+
+        class Cache:
+            def get_gray(self, _path):
+                return template
+
+        bot.template_cache = Cache()
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+        bot._world_map_visible_in_frame = lambda _frame: True
+
+        self.assertEqual(bot._detect_observed_marches(), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

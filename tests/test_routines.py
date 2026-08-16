@@ -387,7 +387,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertFalse(task["enabled"])
         self.assertTrue(task["settings"]["avoid_gems"])
         self.assertEqual(task["settings"]["max_donations"], 100)
-        self.assertEqual(task["settings"]["max_project_checks"], 5)
+        self.assertEqual(task["settings"]["max_project_checks"], 6)
         self.assertEqual(task["interval_minutes"], 20.0)
         self.assertEqual(task["timeout_seconds"], 30.0)
         self.assertEqual(task["completion_runtime_step"], "all_projects_checked")
@@ -439,7 +439,7 @@ class RoutineTaskTests(unittest.TestCase):
             [vip_claim_uid, vip_dismiss_uid, vip_receive_uid],
         )
         self.assertEqual(donation_task["settings"]["max_donations"], 100)
-        self.assertEqual(donation_task["settings"]["max_project_checks"], 5)
+        self.assertEqual(donation_task["settings"]["max_project_checks"], 6)
         self.assertGreaterEqual(donation_task["timeout_seconds"], 30.0)
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")
 
@@ -455,6 +455,16 @@ class RoutineTaskTests(unittest.TestCase):
         }
 
         self.assertEqual(next_run_after_finish(task, 100.0), 101.0)
+
+    def test_zombie_hunt_repeats_quickly_to_fill_free_marches(self):
+        task = next(task for task in default_routine_tasks() if task["id"] == "zombie_hunt")
+
+        self.assertEqual(task["interval_minutes"], 0.1)
+        self.assertEqual(next_run_after_finish(task, 100.0), 106.0)
+
+        migrated = normalize_routine_tasks([{"id": "zombie_hunt", "interval_minutes": 1.0}])
+        migrated_task = next(task for task in migrated if task["id"] == "zombie_hunt")
+        self.assertEqual(migrated_task["interval_minutes"], 0.1)
 
     def test_next_fixed_utc_run_uses_noon_and_midnight(self):
         before_noon = datetime(2026, 7, 15, 11, 59, tzinfo=timezone.utc).timestamp()
@@ -557,6 +567,15 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertFalse(routine_idle_screen_recovery_due(task, True, True, False, 60.0))
         self.assertFalse(routine_idle_screen_recovery_due(task, True, False, True, 60.0))
 
+    def test_radar_idle_screen_recovery_uses_one_card_timeout(self):
+        task = {
+            "id": "radar_quick",
+            "complete_when_idle": True,
+            "timeout_seconds": 12.0,
+        }
+        self.assertFalse(routine_idle_screen_recovery_due(task, True, False, False, 11.9))
+        self.assertTrue(routine_idle_screen_recovery_due(task, True, False, False, 12.0))
+
     def test_processing_contest_defers_when_event_entry_is_absent(self):
         task = {"id": "processing_contest", "timeout_seconds": 25.0}
         self.assertFalse(
@@ -615,7 +634,7 @@ class RoutineTaskTests(unittest.TestCase):
         )
 
     def test_confirmed_march_is_kept_while_observer_catches_up(self):
-        self.assertEqual(effective_active_marches(0, 1, 1, 100.0, 220.0), 1)
+        self.assertEqual(effective_active_marches(1, 1, 1, 100.0, 220.0), 1)
         self.assertEqual(effective_active_marches(4, 1, 5, 100.0, 220.0), 5)
         self.assertEqual(effective_active_marches(0, 1, 1, 221.0, 220.0), 0)
         self.assertEqual(effective_active_marches(None, 2, 4, 100.0, 220.0), 2)
@@ -630,6 +649,15 @@ class RoutineTaskTests(unittest.TestCase):
             reconcile_march_deadlines(deadlines, 4, 180.0, 190.0),
             deadlines,
         )
+
+    def test_visible_zero_marches_clears_reservations_during_grace(self):
+        deadlines = [500.0, 600.0, 700.0]
+
+        self.assertEqual(
+            reconcile_march_deadlines(deadlines, 0, 180.0, 300.0),
+            [],
+        )
+        self.assertEqual(effective_active_marches(0, 3, 3, 180.0, 300.0), 0)
 
     def test_missing_march_button_defers_after_squad_screen_grace(self):
         task = {"uses_march": True}
@@ -813,14 +841,14 @@ class RoutineTaskTests(unittest.TestCase):
         task["settings"]["in_progress_retry_minutes"] = "invalid"
         self.assertEqual(next_run_after_radar_pass(task, now, True), now + 300.0)
 
-    def test_radar_rewards_do_not_require_a_new_task_notification(self):
+    def test_radar_markers_do_not_use_the_pass_shop_notification(self):
         reward_marker = {"requires_radar_notification": False}
         quick_marker = {"requires_radar_notification": True}
 
         self.assertFalse(radar_marker_requires_notification(reward_marker, "radar_rewards"))
-        self.assertTrue(radar_marker_requires_notification(quick_marker, "radar_quick"))
+        self.assertFalse(radar_marker_requires_notification(quick_marker, "radar_quick"))
         self.assertFalse(radar_marker_requires_notification({}, "radar_rewards"))
-        self.assertTrue(radar_marker_requires_notification({}, "radar_marches"))
+        self.assertFalse(radar_marker_requires_notification({}, "radar_marches"))
 
     def test_healing_training_and_hunts_are_upgraded_to_strict_sequences(self):
         import uuid
@@ -1128,7 +1156,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(zombie["settings"]["fallback_levels"], 3)
         self.assertEqual(zombie["march_completion_runtime_step"], "march")
         self.assertEqual(zombie_fallback_levels({"fallback_levels": -10}), 0)
-        self.assertEqual(zombie_fallback_levels({"fallback_levels": 99}), 3)
+        self.assertEqual(zombie_fallback_levels({"fallback_levels": 99}), 10)
 
         migrated = normalize_routine_tasks(
             [{
@@ -1203,7 +1231,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(marker["confidence"], 0.68)
         self.assertEqual(marker["orb_match_threshold"], 3)
         self.assertEqual(marker["block_seconds"], 8.0)
-        self.assertTrue(marker["requires_radar_notification"])
+        self.assertFalse(marker["requires_radar_notification"])
         self.assertTrue(march["confirms_radar_marker"])
         self.assertEqual(march["runtime_step"], "radar_march")
         self.assertEqual(images[5]["requires_runtime_steps"], ["radar_forward"])
@@ -1212,7 +1240,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertNotIn("completes_routine", images[6])
         self.assertEqual(
             images[6]["requires_runtime_steps"],
-            ["radar_action", "radar_march", "radar_forward"],
+            ["radar_action", "radar_march"],
         )
         self.assertEqual(images[2]["action"], "radar_defer_in_progress")
         self.assertEqual(tasks[0]["settings"]["in_progress_retry_minutes"], 5)

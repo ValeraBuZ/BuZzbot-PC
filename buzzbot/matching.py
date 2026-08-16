@@ -24,6 +24,79 @@ def _reference_frame(frame_bgr):
     return resized, width / REFERENCE_WIDTH, height / REFERENCE_HEIGHT
 
 
+def stamina_dialog_is_visible(frame_bgr):
+    """Return whether the insufficient-stamina item dialog is visible."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    def color_ratio(box, lower, upper):
+        x1, y1, x2, y2 = box
+        roi = hsv[y1:y2, x1:x2]
+        if roi.size == 0:
+            return 0.0
+        mask = cv2.inRange(
+            roi,
+            np.array(lower, dtype=np.uint8),
+            np.array(upper, dtype=np.uint8),
+        )
+        return float(np.mean(mask > 0))
+
+    if color_ratio((1030, 74, 1085, 120), (8, 70, 90), (40, 255, 255)) < 0.15:
+        return False
+    if color_ratio((210, 160, 305, 245), (35, 80, 60), (95, 255, 255)) < 0.10:
+        return False
+    if color_ratio((840, 290, 1090, 610), (10, 100, 120), (35, 255, 255)) < 0.10:
+        return False
+    return True
+
+
+def detect_stamina_refill_target(frame_bgr, amount=50):
+    """Return the visible stamina item button for +50, +100, or +500."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not stamina_dialog_is_visible(frame_bgr):
+        return None
+
+    centers = {50: 348, 100: 454, 500: 559}
+    try:
+        center_y = centers[int(amount)]
+    except (KeyError, TypeError, ValueError):
+        return None
+    return int(round(968 * scale_x)), int(round(center_y * scale_y))
+
+
+def detect_lowest_stamina_refill_target(frame_bgr):
+    """Find the lowest visible gold item button after scrolling to +1000."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not stamina_dialog_is_visible(frame_bgr):
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(
+        hsv,
+        np.array([10, 100, 120], dtype=np.uint8),
+        np.array([35, 255, 255], dtype=np.uint8),
+    )
+    mask[:280, :] = 0
+    mask[640:, :] = 0
+    mask[:, :830] = 0
+    mask[:, 1100:] = 0
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 9), dtype=np.uint8))
+
+    candidates = []
+    contours, _hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for contour in contours:
+        x, y, width, height = cv2.boundingRect(contour)
+        if 150 <= width <= 240 and 28 <= height <= 60:
+            candidates.append((y + height / 2.0, x + width / 2.0))
+    if not candidates:
+        return None
+    center_y, center_x = max(candidates)
+    return int(round(center_x * scale_x)), int(round(center_y * scale_y))
+
+
 def detect_blank_webview_close_target(frame_bgr):
     """Find the close button on the blank Google/IGG login webview."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

@@ -273,7 +273,7 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_runtime_step": "all_projects_checked",
         "settings": {
             "max_donations": 100,
-            "max_project_checks": 5,
+            "max_project_checks": 6,
             "avoid_gems": True,
         },
     },
@@ -488,14 +488,17 @@ DEFAULT_ROUTINE_TASKS = (
         "enabled": False,
         "uses_march": True,
         "priority": 60,
-        "interval_minutes": 1.0,
+        "interval_minutes": 0.1,
         "timeout_seconds": 12.0,
         "march_duration_minutes": 10.0,
         "completion_uid": "",
         "march_completion_runtime_step": "march",
         "settings": {
             "fallback_levels": 3,
+            "not_found_retry_seconds": 60,
             "stamina_reserve": 0,
+            "use_stamina_items": True,
+            "stamina_item_amount": "auto",
             "max_attacks": 0,
         },
     },
@@ -619,8 +622,28 @@ TASK_SETTING_SPECS = {
         {"key": "squad", "label": "Номер отряда", "kind": "int", "min": 1, "max": 5},
     ),
     "zombie_hunt": (
-        {"key": "fallback_levels", "label": "Понижений от уровня в игре", "kind": "int", "min": 0, "max": 3},
+        {"key": "fallback_levels", "label": "Понижений от уровня в игре", "kind": "int", "min": 0, "max": 10},
+        {
+            "key": "not_found_retry_seconds",
+            "label": "Повтор, если зомби нет (сек)",
+            "kind": "int",
+            "min": 10,
+            "max": 3600,
+        },
         {"key": "stamina_reserve", "label": "Оставлять выносливости", "kind": "int", "min": 0, "max": 10000},
+        {"key": "use_stamina_items", "label": "Использовать предметы выносливости", "kind": "bool"},
+        {
+            "key": "stamina_item_amount",
+            "label": "Предмет выносливости",
+            "kind": "choice",
+            "choices": (
+                ("auto", "Авто: минимальный +50"),
+                ("50", "+50"),
+                ("100", "+100"),
+                ("500", "+500"),
+                ("1000", "+1000"),
+            ),
+        },
         {"key": "max_attacks", "label": "Максимум атак (0 = без лимита)", "kind": "int", "min": 0, "max": 1000},
     ),
     "collective_mind": (
@@ -874,7 +897,10 @@ def routine_idle_screen_recovery_due(
 ):
     """Recover an idle-completion task that became stuck on another screen."""
     timeout = max(1.0, float(task.get("timeout_seconds", 8.0) or 8.0))
-    recovery_delay = max(45.0, min(90.0, timeout * 3.0))
+    if str(task.get("id") or "") in RADAR_TASK_IDS:
+        recovery_delay = max(8.0, min(20.0, timeout))
+    else:
+        recovery_delay = max(45.0, min(90.0, timeout * 3.0))
     return bool(
         task.get("complete_when_idle")
         and had_action
@@ -926,6 +952,8 @@ def effective_active_marches(observed, estimated, confirmed_floor, now, grace_un
     if observed is None:
         return estimated
     observed = max(0, int(observed))
+    if observed == 0:
+        return 0
     if float(now) < float(grace_until):
         return max(observed, estimated, max(0, int(confirmed_floor)))
     return observed
@@ -934,9 +962,13 @@ def effective_active_marches(observed, estimated, confirmed_floor, now, grace_un
 def reconcile_march_deadlines(deadlines, observed, now, grace_until):
     """Drop stale local reservations after the visible game counter disproves them."""
     active = [float(deadline) for deadline in deadlines if float(deadline) > float(now)]
-    if observed is None or float(now) < float(grace_until):
+    if observed is None:
         return active
     observed = max(0, int(observed))
+    if observed == 0:
+        return []
+    if float(now) < float(grace_until):
+        return active
     if observed >= len(active):
         return active
     return active[:observed]
@@ -964,7 +996,7 @@ def resource_search_retry_due(task, completed_steps, attempts, max_attempts=3):
     )
 
 
-def zombie_fallback_levels(settings, maximum=3):
+def zombie_fallback_levels(settings, maximum=10):
     """Return the bounded number of lower zombie levels to try."""
     try:
         configured = int((settings or {}).get("fallback_levels", maximum))
@@ -989,11 +1021,13 @@ def radar_marker_was_confirmed(uid, x, y, confirmed_keys, radius=12):
 
 
 def radar_marker_requires_notification(image, task_id):
-    """Require a red dot for new tasks, but not for already-earned rewards."""
+    """Radar map markers are actionable without the unrelated pass-shop badge."""
+    if is_radar_task_id(task_id):
+        return False
     configured = image.get("requires_radar_notification")
     if configured is not None:
         return bool(configured)
-    return str(task_id or "") != "radar_rewards"
+    return False
 
 
 def upgrade_resource_runtime_metadata(images, tasks):
@@ -1104,6 +1138,7 @@ def upgrade_repeatable_claim_metadata(images, tasks):
             "select_project_zombies",
             "select_project_elite",
             "select_project_fire_water",
+            "select_project_gathering_elite",
         )
     ]
     vip_claim_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "vip_rewards:claim_chest"))
@@ -1185,7 +1220,7 @@ def upgrade_repeatable_claim_metadata(images, tasks):
                 int(settings.get("max_donations", 0) or 0),
             )
             settings["max_project_checks"] = max(
-                5,
+                6,
                 int(settings.get("max_project_checks", 0) or 0),
             )
             task["timeout_seconds"] = max(
@@ -1413,6 +1448,7 @@ def upgrade_strict_runtime_metadata(images, tasks):
                 float(task.get("timeout_seconds", 0.0) or 0.0),
             )
         if task.get("id") == "zombie_hunt":
+            task["interval_minutes"] = 0.1
             settings = task.setdefault("settings", {})
             settings.pop("level_min", None)
             settings.pop("level_max", None)
@@ -1664,7 +1700,7 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image["runtime_step"] = "radar_marker"
                 image["repeat_runtime_step"] = True
                 image["prevents_idle_completion"] = True
-                image["requires_radar_notification"] = task_id != "radar_rewards"
+                image["requires_radar_notification"] = False
                 image["confidence"] = min(0.68, float(image.get("confidence", 0.82)))
                 image["orb_match_threshold"] = min(
                     3,
@@ -1704,7 +1740,6 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image["requires_runtime_steps"] = [
                     "radar_action",
                     "radar_march",
-                    "radar_forward",
                 ]
                 image["runtime_step_mode"] = "any"
                 image.pop("completes_routine", None)
@@ -1780,10 +1815,14 @@ def _normalize_task(source, default):
         "standalone": bool(source.get("standalone", default.get("standalone", False))),
         "uses_march": uses_march,
         "priority": int(_positive_float(source.get("priority"), default.get("priority", 100), 1)),
-        "interval_minutes": _positive_float(
-            source.get("interval_minutes"),
-            default.get("interval_minutes", 1.0),
-            0.1,
+        "interval_minutes": (
+            0.1
+            if task_id == "zombie_hunt"
+            else _positive_float(
+                source.get("interval_minutes"),
+                default.get("interval_minutes", 1.0),
+                0.1,
+            )
         ),
         "timeout_seconds": timeout_seconds,
         "march_duration_minutes": _positive_float(

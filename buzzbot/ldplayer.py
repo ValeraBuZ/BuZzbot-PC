@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -31,6 +32,32 @@ def serial_for_index(index):
 
 def tcp_serial_for_index(index):
     return f"127.0.0.1:{5555 + max(0, int(index)) * 2}"
+
+
+def bridged_adb_serial_for_index(index, log_root=None):
+    """Return the current guest ADB address when LDPlayer uses bridged networking."""
+    root = Path(log_root) if log_root else Path(os.environ.get("APPDATA", "")) / "XuanZhi9" / "log"
+    log_path = root / f"leidian{int(index)}_vbox.log"
+    if not log_path.is_file():
+        return None
+    try:
+        contents = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    matches = re.findall(
+        r"initADB\s+\(\d+\):emulator adbmode:\s*\d+,\s*((?:\d{1,3}\.){3}\d{1,3})",
+        contents,
+    )
+    if not matches:
+        return None
+    address = matches[-1]
+    try:
+        octets = [int(part) for part in address.split(".")]
+    except ValueError:
+        return None
+    if len(octets) != 4 or any(part < 0 or part > 255 for part in octets) or address == "0.0.0.0":
+        return None
+    return f"{address}:5555"
 
 
 def index_from_serial(serial):

@@ -40,6 +40,7 @@ from buzzbot.display import make_display_profile, matching_scales
 from buzzbot.grouping import build_group_iteration_plan, parse_click_sequence, parse_time_to_minutes, validate_hour_min
 from buzzbot.ldplayer import (
     adb_debug_enabled,
+    bridged_adb_serial_for_index,
     enable_adb_debug,
     find_ldconsole,
     index_from_serial,
@@ -61,12 +62,14 @@ from buzzbot.matching import (
     detect_radar_card_action_target,
     detect_radar_notification_targets,
     detect_radar_world_action_target,
+    detect_lowest_stamina_refill_target,
+    detect_stamina_refill_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
     healing_selection_is_empty,
     healing_troop_form_is_visible,
-    radar_category_has_notification,
     radar_marker_has_notification,
+    stamina_dialog_is_visible,
     zombie_camp_checkbox_is_checked,
 )
 from buzzbot.routines import (
@@ -149,9 +152,68 @@ GAME_LOGIN_RESTART_SECONDS = 150.0
 GAME_LOGIN_MAX_RESTARTS = 2
 GAME_LOGIN_WEBVIEW_GRACE_SECONDS = 60.0
 WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collective_mind"}
-MARCH_OBSERVER_GRACE_SECONDS = 15.0
+# A complete map-search and squad-deployment pass can take 20-30 seconds.
+# Keep confirmed local reservations long enough to fill all five marches even
+# when the game's small counter updates late or is briefly hidden by dialogs.
+MARCH_OBSERVER_GRACE_SECONDS = 180.0
 
 logger = configure_logging(APP_DIR / "bot.log")
+
+
+class _WindowsPoint(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+class _WindowsRect(ctypes.Structure):
+    _fields_ = [
+        ("left", ctypes.c_long),
+        ("top", ctypes.c_long),
+        ("right", ctypes.c_long),
+        ("bottom", ctypes.c_long),
+    ]
+
+
+def find_window_client_region(window_title):
+    """Return the visible Windows client area for an exact window title."""
+    title = str(window_title or "").strip()
+    if os.name != "nt" or not title:
+        return None
+
+    user32 = ctypes.windll.user32
+    matches = []
+    callback_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+    @callback_type
+    def collect_window(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length <= 0:
+            return True
+        buffer = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buffer, length + 1)
+        if buffer.value.strip().casefold() == title.casefold():
+            matches.append(hwnd)
+        return True
+
+    user32.EnumWindows(collect_window, 0)
+    if len(matches) != 1:
+        return None
+
+    rect = _WindowsRect()
+    if not user32.GetClientRect(matches[0], ctypes.byref(rect)):
+        return None
+    top_left = _WindowsPoint(rect.left, rect.top)
+    bottom_right = _WindowsPoint(rect.right, rect.bottom)
+    if not user32.ClientToScreen(matches[0], ctypes.byref(top_left)):
+        return None
+    if not user32.ClientToScreen(matches[0], ctypes.byref(bottom_right)):
+        return None
+    width = int(bottom_right.x - top_left.x)
+    height = int(bottom_right.y - top_left.y)
+    if width < 100 or height < 100:
+        return None
+    return int(top_left.x), int(top_left.y), width, height
 
 # Пытаемся скрыть окно консоли, если оно есть
 try:
@@ -299,6 +361,7 @@ LANGUAGES = {
         'routine_tasks': "Рутинные задачи",
         'routine_start': "Старт рутины",
         'routine_settings': "Настроить задачи",
+        'routine_clear_selection': "Снять все",
         'routine_help': "Сначала лечение, затем заполнение свободных походов ресурсами по кругу.",
         'routine_name_game_login': "Вход в игру",
         'routine_name_radar_rewards': "Радар: награды",
@@ -505,6 +568,7 @@ LANGUAGES = {
         'routine_tasks': "Routine tasks",
         'routine_start': "Start routines",
         'routine_settings': "Configure tasks",
+        'routine_clear_selection': "Clear selection",
         'routine_help': "Healing runs first, then free marches are filled with resources in rotation.",
         'routine_name_game_login': "Launch game",
         'routine_name_radar_rewards': "Radar: rewards",
@@ -705,6 +769,7 @@ class AutoClicker:
         self.routine_idle_recovery_attempted = False
         self.routine_resource_retry_count = 0
         self.zombie_level_restore = {}
+        self.zombie_level_restore_pending = {}
         self.routine_radar_pending_marker_key = None
         self.routine_radar_confirmed_marker_keys = set()
         self.routine_radar_in_progress_seen = False
@@ -1154,6 +1219,51 @@ class AutoClicker:
     def get_display_profile(self):
         return make_display_profile(self.player_width, self.player_height)
 
+    def _screen_game_region(self):
+        """Resolve the game client area so screen-mode input follows LDPlayer."""
+        configured_region = getattr(self, "_region", None)
+        if configured_region is not None:
+            return configured_region
+        current_account = self.get_current_account()
+        candidate_titles = [
+            (current_account or {}).get("name", ""),
+            getattr(self, "player_name", ""),
+        ]
+        for title in dict.fromkeys(str(item).strip() for item in candidate_titles if item):
+            region = find_window_client_region(title)
+            if region is not None:
+                left, top, width, height = region
+                expected_width = int(getattr(self, "player_width", 1280) or 1280)
+                expected_height = int(getattr(self, "player_height", 720) or 720)
+                if (
+                    width >= expected_width
+                    and height >= expected_height
+                    and width - expected_width <= 200
+                    and height - expected_height <= 200
+                ):
+                    # LDPlayer draws its custom title bar inside the Win32
+                    # client area. The Android surface is centred horizontally
+                    # and aligned to the bottom of that client area.
+                    left += (width - expected_width) // 2
+                    top += height - expected_height
+                    return left, top, expected_width, expected_height
+                return region
+        return None
+
+    def _screen_normalized_point(self, x_ratio, y_ratio):
+        region = self._screen_game_region()
+        if region is not None:
+            left, top, width, height = region
+            return (
+                int(round(left + width * float(x_ratio))),
+                int(round(top + height * float(y_ratio))),
+            )
+        screen = pyautogui.size()
+        return (
+            int(round(screen.width * float(x_ratio))),
+            int(round(screen.height * float(y_ratio))),
+        )
+
     def _apply_player_resolution(self, width, height, persist=False):
         profile = make_display_profile(width, height)
         changed = (profile.width, profile.height) != (self.player_width, self.player_height)
@@ -1172,6 +1282,11 @@ class AutoClicker:
 
     def get_environment_summary(self):
         profile = self.get_display_profile()
+        if not self.uses_adb:
+            state = "готово" if self.environment_ready else "не готово"
+            return (
+                f"Экранный режим | шаблоны {profile.width}x{profile.height} | {state}"
+            )
         player = f"LDPlayer {self.player_index} {self.player_name}" if self.player_index is not None else "LDPlayer"
         state = "\u0433\u043e\u0442\u043e\u0432\u043e" if self.environment_ready else "\u043d\u0435\u0442 \u0441\u0432\u044f\u0437\u0438"
         return (
@@ -1184,8 +1299,12 @@ class AutoClicker:
         self.player_index = None
         self.player_name = ""
         if not self.uses_adb:
-            self.input_backend = "adb"
-            self._refresh_adb_client()
+            self.environment_ready = True
+            summary = self.get_environment_summary()
+            self.set_status_message(summary, force=True)
+            if notify:
+                self._show_notification('success', 'info', message=summary)
+            return True
         deadline = time.monotonic() + max(0.0, float(wait_seconds))
         connected = self.check_adb_connection(notify=False)
         while not connected and time.monotonic() < deadline:
@@ -1299,6 +1418,17 @@ class AutoClicker:
             if tcp_serial in devices:
                 self._adopt_adb_serial(tcp_serial, target.index)
                 return True
+
+            bridged_serial = bridged_adb_serial_for_index(target.index)
+            if bridged_serial:
+                try:
+                    probe.connect(bridged_serial)
+                    devices = probe.list_devices()
+                except AdbError as exc:
+                    logger.debug("Bridged ADB %s пока недоступен: %s", bridged_serial, exc)
+                if bridged_serial in devices:
+                    self._adopt_adb_serial(bridged_serial, target.index)
+                    return True
 
         _ldconsole, instances = self._ldplayer_instances()
         current = self.get_current_account()
@@ -1582,9 +1712,15 @@ class AutoClicker:
                 raise AdbError("Выбранная область находится вне экрана Android.")
             return frame[y1:y2, x1:x2], (x1, y1)
 
-        screenshot = pyautogui.screenshot(region=region)
+        effective_region = region if region is not None else self._screen_game_region()
+        screenshot = pyautogui.screenshot(region=effective_region)
         frame = cv2.cvtColor(np.array(screenshot), cv2.COLOR_RGB2BGR)
-        return frame, (int(region[0]), int(region[1])) if region else (0, 0)
+        return (
+            frame,
+            (int(effective_region[0]), int(effective_region[1]))
+            if effective_region
+            else (0, 0),
+        )
 
     def _capture_bbox_bgr(self, bbox):
         frame, _ = self._capture_screen_bgr(region=bbox)
@@ -1865,19 +2001,23 @@ class AutoClicker:
                 img_config.get("grayscale", True),
                 scales,
             )
+        screen_region = self._screen_game_region()
         if self.scale_enabled and img_config.get("use_scaling", True):
             return self._find_template_scaled(
                 img_config["path"],
-                self._region,
+                screen_region,
                 confidence=confidence,
             )
 
-        rect = pyautogui.locateOnScreen(
-            img_config["path"],
-            region=self._region,
-            confidence=confidence,
-            grayscale=img_config.get("grayscale", True)
-        )
+        try:
+            rect = pyautogui.locateOnScreen(
+                img_config["path"],
+                region=screen_region,
+                confidence=confidence,
+                grayscale=img_config.get("grayscale", True)
+            )
+        except pyautogui.ImageNotFoundException:
+            return None, None, 0
         if not rect:
             return None, None, 0
 
@@ -2334,14 +2474,14 @@ class AutoClicker:
                         for task_id, deadline in data.get('routine_next_run', {}).items()
                         if isinstance(deadline, (int, float))
                     }
-                    self.routine_march_deadlines = [
-                        float(deadline)
-                        for deadline in data.get('routine_march_deadlines', [])
-                        if isinstance(deadline, (int, float)) and float(deadline) > now
-                    ][:self.routine_max_marches]
+                    # March reservations are estimates for the current process.
+                    # Carrying them across restarts can stop one squad too early
+                    # after the real march has already returned.
+                    self.routine_march_deadlines = []
                     self.routine_march_context = str(data.get('routine_march_context') or "")
                     raw_zombie_restore = data.get('zombie_level_restore', {})
-                    self.zombie_level_restore = {
+                    self.zombie_level_restore = {}
+                    self.zombie_level_restore_pending = {
                         str(context): min(3, max(0, int(levels)))
                         for context, levels in raw_zombie_restore.items()
                         if isinstance(context, str) and isinstance(levels, (int, float))
@@ -2520,9 +2660,11 @@ class AutoClicker:
                 'group_execution': self.group_execution,
                 'routine_tasks': self.routine_tasks,
                 'routine_max_marches': self.routine_max_marches,
-                'routine_march_deadlines': self.routine_march_deadlines,
                 'routine_march_context': self.routine_march_context,
-                'zombie_level_restore': self.zombie_level_restore,
+                'zombie_level_restore': {
+                    **getattr(self, 'zombie_level_restore_pending', {}),
+                    **self.zombie_level_restore,
+                },
                 'routine_next_run': self.routine_next_run,
                 'account_profiles': self.account_profiles,
                 'current_account_id': self.current_account_id,
@@ -2727,6 +2869,20 @@ class AutoClicker:
         self.save_config()
         if self.root:
             self.root.event_generate("<<GroupsChanged>>")
+
+    def clear_routine_selection(self):
+        changed = 0
+        for task in self.routine_tasks:
+            if task.get("enabled", False):
+                changed += 1
+            task["enabled"] = False
+            group = effective_task_group(task)
+            if group:
+                self.groups[group] = False
+        self.save_config()
+        if self.root:
+            self.root.event_generate("<<GroupsChanged>>")
+        return changed
 
     def get_current_account(self):
         return find_account(self.account_profiles, self.current_account_id)
@@ -3145,7 +3301,6 @@ class AutoClicker:
         if roi_bgr.size == 0:
             return None
         screen_roi = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2GRAY)
-        _, screen_roi = cv2.threshold(screen_roi, 180, 255, cv2.THRESH_BINARY)
         best_count = None
         best_score = -1.0
         for image in observers:
@@ -3154,7 +3309,6 @@ class AutoClicker:
                 continue
             if template.shape != screen_roi.shape:
                 template = cv2.resize(template, (screen_roi.shape[1], screen_roi.shape[0]))
-            _, template = cv2.threshold(template, 180, 255, cv2.THRESH_BINARY)
             if not screen_roi.size or not template.size:
                 continue
             result = cv2.matchTemplate(screen_roi, template, cv2.TM_CCOEFF_NORMED)
@@ -3162,7 +3316,37 @@ class AutoClicker:
             if score >= float(image.get("observer_confidence", 0.70)) and score > best_score:
                 best_score = float(score)
                 best_count = int(image["march_count"])
+        if best_count is None and self._world_map_visible_in_frame(frame):
+            # The game hides the deployment panel completely when no squads
+            # are active. On a confirmed world-map frame that absence is 0/5,
+            # not an unknown value that should preserve old time estimates.
+            return 0
         return best_count
+
+    def _world_map_visible_in_frame(self, frame):
+        height, width = frame.shape[:2]
+        roi = frame[
+            int(height * 380 / 720):int(height * 510 / 720),
+            0:int(width * 120 / 1280),
+        ]
+        if roi.size == 0:
+            return False
+        candidates = [
+            image for image in self.search_images
+            if image.get("runtime_step") == "world_search"
+            and image.get("description") == "Открыть поиск"
+        ]
+        for image in candidates:
+            template = self.template_cache.get_color(image["path"])
+            if template is None:
+                continue
+            if template.shape[0] > roi.shape[0] or template.shape[1] > roi.shape[1]:
+                continue
+            result = cv2.matchTemplate(roi, template, cv2.TM_CCOEFF_NORMED)
+            _, score, _, _ = cv2.minMaxLoc(result)
+            if score >= 0.72:
+                return True
+        return False
 
     def reset_routine_marches(self):
         self.routine_march_deadlines = []
@@ -3177,23 +3361,38 @@ class AutoClicker:
 
     def _register_routine_march(self, task, now=None):
         now = time.time() if now is None else float(now)
-        active_count = self.get_active_marches(now)
-        if active_count >= self.routine_max_marches:
-            return False
+        self._ensure_routine_march_context()
+        self.routine_march_deadlines = [
+            deadline for deadline in self.routine_march_deadlines
+            if float(deadline) > now
+        ][:self.routine_max_marches]
+        estimated_before = len(self.routine_march_deadlines)
+        observed = self._detect_observed_marches()
+        if observed is None:
+            target_count = min(self.routine_max_marches, estimated_before + 1)
+        else:
+            # The counter is read after the send screen closes, so it already
+            # includes this march and also reflects squads that returned while
+            # the next target was being selected.
+            target_count = min(self.routine_max_marches, max(1, int(observed)))
         duration = max(1.0, float(task.get("march_duration_minutes", 30.0)))
-        self.routine_march_deadlines.append(now + duration * 60.0)
-        self.routine_confirmed_march_floor = min(
-            self.routine_max_marches,
-            max(len(self.routine_march_deadlines), active_count + 1),
-        )
+        kept_deadlines = self.routine_march_deadlines[:target_count]
+        if len(kept_deadlines) < target_count:
+            kept_deadlines.extend(
+                now + duration * 60.0
+                for _ in range(target_count - len(kept_deadlines))
+            )
+        self.routine_march_deadlines = kept_deadlines
+        self.routine_confirmed_march_floor = target_count
         self.routine_display_active_marches = self.routine_confirmed_march_floor
         self.routine_march_observer_grace_until = max(
             self.routine_march_observer_grace_until,
             now + MARCH_OBSERVER_GRACE_SECONDS,
         )
         logger.info(
-            "Confirmed march reserved: active=%s, observer grace=%.0f sec",
+            "Confirmed march reserved: active=%s, observed=%s, observer grace=%.0f sec",
             self.routine_confirmed_march_floor,
+            observed,
             MARCH_OBSERVER_GRACE_SECONDS,
         )
         self.save_config()
@@ -3445,10 +3644,6 @@ class AutoClicker:
                     if (
                         radar_marker_requires_notification(image, task.get("id"))
                         and not radar_marker_has_notification(frame, blocker_bbox)
-                        and not radar_category_has_notification(
-                            frame,
-                            task.get("id"),
-                        )
                     ):
                         logger.info(
                             "Idle completion ignores radar-like shape without notification: %s",
@@ -3488,6 +3683,26 @@ class AutoClicker:
     def _routine_runtime_completion_ready(self, task):
         required_step = str(task.get("completion_runtime_step") or "")
         return not required_step or required_step in self.routine_completed_steps
+
+    def _synchronize_radar_cycle_deadlines(self, now):
+        radar_task_ids = [
+            task["id"]
+            for task in self.routine_tasks
+            if is_radar_task_id(task.get("id"))
+            and is_task_effectively_enabled(task)
+        ]
+        if not radar_task_ids:
+            return
+        deadlines = {
+            task_id: float(self.routine_next_run.get(task_id, 0.0) or 0.0)
+            for task_id in radar_task_ids
+        }
+        # Other due categories still belong to the current radar pass.
+        if any(deadline <= float(now) for deadline in deadlines.values()):
+            return
+        next_cycle = min(deadlines.values())
+        for task_id in radar_task_ids:
+            self.routine_next_run[task_id] = next_cycle
 
     def _finish_current_routine(self, now=None, completion_clicked=False):
         now = time.time() if now is None else float(now)
@@ -3608,6 +3823,8 @@ class AutoClicker:
                 self.save_config()
         else:
             self.routine_next_run[task["id"]] = next_run_after_finish(task, now)
+        if is_radar_task_id(task.get("id")):
+            self._synchronize_radar_cycle_deadlines(now)
         next_run_minutes = max(
             1,
             int(
@@ -3630,7 +3847,8 @@ class AutoClicker:
             )
         elif radar_has_in_progress:
             self.set_status_message(
-                f"Радар: быстрый проход завершён, задания с отрядами проверю через {next_run_minutes} мин",
+                f"Радар: проход «{self.get_routine_task_name(task)}» завершён, "
+                f"повтор через {next_run_minutes} мин",
                 force=True,
             )
         else:
@@ -3700,6 +3918,9 @@ class AutoClicker:
         ):
             return False
         self.blocked_coords.clear()
+        if is_radar_task_id(task.get("id")):
+            self.routine_completed_steps.clear()
+            self.routine_radar_pending_marker_key = None
         self.routine_idle_guard_visible = False
         self.routine_idle_outside_since = 0.0
         self.routine_last_action_time = time.time()
@@ -5035,6 +5256,11 @@ class AutoClicker:
         self.routine_mode = True
         for task in self.routine_tasks:
             self.routine_next_run.setdefault(task["id"], 0.0)
+        # A new manual run must start every selected radar category immediately.
+        # Fixed game-reset deadlines apply again after each category finishes.
+        for task in enabled_tasks:
+            if is_radar_task_id(task.get("id")):
+                self.routine_next_run[task["id"]] = 0.0
         self.current_routine_index = 0
         self.current_routine_task_id = None
         self.routine_last_action_time = time.time()
@@ -5534,10 +5760,6 @@ class AutoClicker:
                                     radar_frame, _radar_origin = self._capture_screen_bgr()
                                     if (
                                         not radar_marker_has_notification(radar_frame, bbox)
-                                        and not radar_category_has_notification(
-                                            radar_frame,
-                                            current_routine_task.get("id"),
-                                        )
                                     ):
                                         logger.info(
                                             "Radar marker rejected without notification dot: %s @ %s",
@@ -6364,6 +6586,15 @@ class AutoClicker:
             return True
 
         if action == "radar_return_shelter":
+            if not (
+                {"radar_action", "radar_march"}
+                & self.routine_completed_steps
+            ):
+                logger.info(
+                    "Radar return ignored until the task action is confirmed; steps=%s",
+                    sorted(self.routine_completed_steps),
+                )
+                return False
             if self.uses_adb:
                 self.adb_client.tap(int(round(target_x)), int(round(target_y)))
             else:
@@ -6590,8 +6821,8 @@ class AutoClicker:
                 self._interruptible_sleep(2.0)
                 if self.stop_event.is_set() or self.stop_hotkey_pressed:
                     return False
-                width, height = pyautogui.size()
-                pyautogui.click(width // 2, int(round(height * 0.49)))
+                center_x, center_y = self._screen_normalized_point(0.5, 0.49)
+                pyautogui.click(center_x, center_y)
             self._invalidate_capture()
             img_config["last_used"] = time.time()
             self.set_status_message(f"Поиск ресурса уровня {level}", force=True)
@@ -6614,6 +6845,24 @@ class AutoClicker:
                 )
                 restore_by_context = getattr(self, "zombie_level_restore", {})
                 self.zombie_level_restore = restore_by_context
+                pending_restore = getattr(self, "zombie_level_restore_pending", {})
+                self.zombie_level_restore_pending = pending_restore
+                startup_offset = min(
+                    fallback_levels,
+                    max(0, int(pending_restore.pop(context, 0) or 0)),
+                )
+                if startup_offset:
+                    self.set_status_message(
+                        f"Зомби: восстанавливаю уровень после остановки (+{startup_offset})",
+                        force=True,
+                    )
+                    for _ in range(startup_offset):
+                        click(plus_x, level_y)
+                        self._interruptible_sleep(0.35)
+                        if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                            return False
+                    restore_by_context.pop(context, None)
+                    self.save_config()
                 previous_level_exists = context in restore_by_context
                 current_offset = min(
                     fallback_levels,
@@ -6692,8 +6941,16 @@ class AutoClicker:
                         f"Зомби не найдены на стартовом и {fallback_levels} нижних уровнях",
                         force=True,
                     )
-                    self._interruptible_sleep(img_config.get("delay", self.sleep_found))
-                    return True
+                    retry_seconds = max(
+                        10,
+                        min(3600, int(settings.get("not_found_retry_seconds", 60) or 60)),
+                    )
+                    self._defer_current_routine_unavailable(
+                        "зомби подходящего уровня не найдены",
+                        time.time(),
+                        retry_delay=retry_seconds,
+                    )
+                    return False
 
                 # Keep the chosen level in the game and rotate to the next
                 # configured level for the following squad. This prevents the
@@ -6703,8 +6960,8 @@ class AutoClicker:
                 if self.uses_adb:
                     self.adb_client.tap(display.width // 2, int(round(display.height * 0.49)))
                 else:
-                    width, height = pyautogui.size()
-                    pyautogui.click(width // 2, int(round(height * 0.49)))
+                    center_x, center_y = self._screen_normalized_point(0.5, 0.49)
+                    pyautogui.click(center_x, center_y)
                 self._invalidate_capture()
                 img_config["last_used"] = time.time()
                 suffix = "" if found_offset == 0 else f" (-{found_offset} от стартового)"
@@ -6751,8 +7008,8 @@ class AutoClicker:
             if self.uses_adb:
                 self.adb_client.tap(display.width // 2, int(round(display.height * 0.49)))
             else:
-                width, height = pyautogui.size()
-                pyautogui.click(width // 2, int(round(height * 0.49)))
+                center_x, center_y = self._screen_normalized_point(0.5, 0.49)
+                pyautogui.click(center_x, center_y)
             self._invalidate_capture()
             img_config["last_used"] = time.time()
             self.set_status_message(
@@ -7451,9 +7708,132 @@ class AutoClicker:
             self._interruptible_sleep(delay)
 
         if img_config.get("confirm_disappears", False):
+            stamina_frame, stamina_origin = self._capture_screen_bgr(force=True)
+            if stamina_dialog_is_visible(stamina_frame):
+                settings = self._current_task_settings()
+                if not bool(settings.get("use_stamina_items", True)):
+                    logger.warning("Недостаточно выносливости; автоматическое пополнение отключено")
+                    self.set_status_message(
+                        "Недостаточно выносливости: автопополнение отключено",
+                        force=True,
+                    )
+                    return False
+
+                configured_amount = str(settings.get("stamina_item_amount", "auto") or "auto")
+                refill_amount = 50 if configured_amount == "auto" else int(configured_amount)
+                stamina_target = detect_stamina_refill_target(stamina_frame, refill_amount)
+                if refill_amount == 1000:
+                    frame_height, frame_width = stamina_frame.shape[:2]
+                    swipe_x = int(round(650 * frame_width / 1280.0))
+                    swipe_from_y = int(round(600 * frame_height / 720.0))
+                    swipe_to_y = int(round(535 * frame_height / 720.0))
+                    logger.info("Прокручиваю список к предмету выносливости +1000")
+                    if self.uses_adb:
+                        self.adb_client.swipe(swipe_x, swipe_from_y, swipe_x, swipe_to_y, 300)
+                    else:
+                        screen_x = stamina_origin[0] + swipe_x
+                        pyautogui.moveTo(screen_x, stamina_origin[1] + swipe_from_y)
+                        pyautogui.dragTo(
+                            screen_x,
+                            stamina_origin[1] + swipe_to_y,
+                            duration=0.3,
+                            button="left",
+                        )
+                    self._invalidate_capture()
+                    self._interruptible_sleep(0.5)
+                    stamina_frame, stamina_origin = self._capture_screen_bgr(force=True)
+                    stamina_target = detect_lowest_stamina_refill_target(stamina_frame)
+
+                if stamina_target is None:
+                    logger.warning("Предмет выносливости +%s не найден", refill_amount)
+                    self.set_status_message(
+                        f"Предмет выносливости +{refill_amount} не найден",
+                        force=True,
+                    )
+                    return False
+
+                refill_x, refill_y = stamina_target
+                logger.info(
+                    "Недостаточно выносливости: использую предмет +%s в (%s, %s)",
+                    refill_amount,
+                    refill_x,
+                    refill_y,
+                )
+                self.set_status_message(
+                    f"Недостаточно выносливости: использую предмет +{refill_amount}",
+                    force=True,
+                )
+                if self.uses_adb:
+                    self.adb_client.tap(refill_x, refill_y)
+                else:
+                    pyautogui.click(
+                        stamina_origin[0] + refill_x,
+                        stamina_origin[1] + refill_y,
+                    )
+                self._invalidate_capture()
+                self._interruptible_sleep(0.8)
+
+                post_refill_frame, post_refill_origin = self._capture_screen_bgr(force=True)
+                if stamina_dialog_is_visible(post_refill_frame):
+                    frame_height, frame_width = post_refill_frame.shape[:2]
+                    close_x = int(round(1057 * frame_width / 1280.0))
+                    close_y = int(round(97 * frame_height / 720.0))
+                    logger.info(
+                        "Закрываю подтверждение пополнения выносливости в (%s, %s)",
+                        close_x,
+                        close_y,
+                    )
+                    if self.uses_adb:
+                        self.adb_client.tap(close_x, close_y)
+                    else:
+                        pyautogui.click(
+                            post_refill_origin[0] + close_x,
+                            post_refill_origin[1] + close_y,
+                        )
+                    self._invalidate_capture()
+                    self._interruptible_sleep(0.6)
+
+                retry_location = None
+                retry_deadline = time.monotonic() + 4.0
+                while time.monotonic() < retry_deadline and not self.stop_event.is_set():
+                    retry_location, _retry_bbox, _retry_score = self._locate_image(img_config)
+                    if retry_location is not None:
+                        break
+                    self._interruptible_sleep(0.25)
+
+                if retry_location is None:
+                    img_config["last_used"] = 0
+                    logger.warning("Экран отряда не восстановился после пополнения выносливости")
+                    self.set_status_message(
+                        "Выносливость пополнена, но экран отряда не готов: повторю позже",
+                        force=True,
+                    )
+                    return False
+
+                self.set_status_message(
+                    f"Выносливость пополнена на {refill_amount}: повторяю отправку",
+                    force=True,
+                )
+                retry_x = retry_location.x + offset[0] * display.scale_x
+                retry_y = retry_location.y + offset[1] * display.scale_y
+                if self.uses_adb:
+                    self.adb_client.tap(int(round(retry_x)), int(round(retry_y)))
+                else:
+                    pyautogui.click(retry_x, retry_y)
+                self._invalidate_capture()
+                self._interruptible_sleep(0.8)
+
             deadline = time.monotonic() + 6.0
             while time.monotonic() < deadline and not self.stop_event.is_set():
                 self._interruptible_sleep(0.5)
+                confirmation_frame, _confirmation_origin = self._capture_screen_bgr(force=True)
+                if stamina_dialog_is_visible(confirmation_frame):
+                    logger.warning("Отправка всё ещё требует выносливость после выбранного предмета")
+                    self.set_status_message(
+                        "Выносливости всё ещё недостаточно: поход не засчитан",
+                        force=True,
+                    )
+                    return False
                 location_after, bbox_after, _score = self._locate_image(img_config)
                 if not location_after or not bbox_after:
                     logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
@@ -9947,6 +10327,11 @@ def build_ui(root, bot):
         routine_buttons,
         text=bot.tr('routine_settings'),
         command=lambda: RoutineTasksDialog(root, bot).show(),
+    ).pack(side=tk.LEFT, padx=3)
+    ttk.Button(
+        routine_buttons,
+        text=bot.tr('routine_clear_selection'),
+        command=lambda: [bot.clear_routine_selection(), rebuild_routine_cards()],
     ).pack(side=tk.LEFT, padx=3)
     ttk.Button(
         routine_buttons,
