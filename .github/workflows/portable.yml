@@ -53,6 +53,8 @@ jobs:
 
       - name: Проверить запуск EXE
         shell: pwsh
+        env:
+          BUZZBOT_SMOKE_TEST: "1"
         run: |
           $marker = 'dist/BuZzbotPortable/smoke-test.ok'
           Remove-Item $marker -Force -ErrorAction SilentlyContinue

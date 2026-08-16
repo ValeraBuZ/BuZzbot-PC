@@ -10704,7 +10704,12 @@ def should_autostart_routines(argv=None):
 
 def should_run_smoke_test(argv=None):
     args = sys.argv[1:] if argv is None else argv
-    return any(str(arg).strip().lower() == "--smoke-test" for arg in args)
+    env_enabled = os.environ.get("BUZZBOT_SMOKE_TEST", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    return env_enabled or any(str(arg).strip().lower() == "--smoke-test" for arg in args)
 
 
 def validate_smoke_test_layout(app_dir=APP_DIR):
