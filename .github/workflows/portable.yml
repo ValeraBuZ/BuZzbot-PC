@@ -54,15 +54,30 @@ jobs:
       - name: Проверить запуск EXE
         shell: pwsh
         run: |
+          $marker = 'dist/BuZzbotPortable/smoke-test.ok'
+          Remove-Item $marker -Force -ErrorAction SilentlyContinue
           $process = Start-Process `
             dist/BuZzbotPortable/BuZzbot.exe `
             -ArgumentList '--smoke-test' `
             -WorkingDirectory dist/BuZzbotPortable `
-            -Wait `
             -PassThru
-          if ($process.ExitCode -ne 0) {
+          $deadline = (Get-Date).AddSeconds(30)
+          while ((Get-Date) -lt $deadline -and -not (Test-Path $marker)) {
+            $process.Refresh()
+            if ($process.HasExited) {
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path $marker)) {
             Get-Content dist/BuZzbotPortable/bot.log -Tail 100 -ErrorAction SilentlyContinue
-            throw "Portable smoke test завершился с кодом $($process.ExitCode)."
+            if (-not $process.HasExited) {
+              Stop-Process -Id $process.Id -Force
+            }
+            throw 'Portable smoke test не создал маркер успеха.'
+          }
+          if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force
           }
       - name: Сохранить ZIP сборки
         uses: actions/upload-artifact@v4

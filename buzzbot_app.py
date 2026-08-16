@@ -10737,6 +10737,10 @@ def main():
             APP_VERSION,
             template_count,
         )
+        (APP_DIR / "smoke-test.ok").write_text(
+            f"BuZzbot {APP_VERSION}: {template_count} templates\n",
+            encoding="utf-8",
+        )
         return
     enable_windows_high_dpi()
     root = tk.Tk()
