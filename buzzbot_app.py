@@ -152,10 +152,9 @@ GAME_LOGIN_RESTART_SECONDS = 150.0
 GAME_LOGIN_MAX_RESTARTS = 2
 GAME_LOGIN_WEBVIEW_GRACE_SECONDS = 60.0
 WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collective_mind"}
-# A complete map-search and squad-deployment pass can take 20-30 seconds.
-# Keep confirmed local reservations long enough to fill all five marches even
-# when the game's small counter updates late or is briefly hidden by dialogs.
-MARCH_OBSERVER_GRACE_SECONDS = 180.0
+# The deployment panel briefly disappears after a march. Ignore only that
+# transient false 0/5; every visible positive count remains authoritative.
+MARCH_OBSERVER_GRACE_SECONDS = 8.0
 
 logger = configure_logging(APP_DIR / "bot.log")
 
@@ -3249,6 +3248,7 @@ class AutoClicker:
 
     def get_active_marches(self, now=None):
         now = time.time() if now is None else float(now)
+        previous_display = int(getattr(self, "routine_display_active_marches", 0) or 0)
         context_changed = self._ensure_routine_march_context()
         active = [deadline for deadline in self.routine_march_deadlines if float(deadline) > now]
         if context_changed or len(active) != len(self.routine_march_deadlines):
@@ -3279,6 +3279,13 @@ class AutoClicker:
         if now >= self.routine_march_observer_grace_until:
             self.routine_confirmed_march_floor = 0
         self.routine_display_active_marches = min(self.routine_max_marches, active_count)
+        if self.routine_display_active_marches != previous_display:
+            logger.info(
+                "March counter updated: displayed=%s, observed=%s, estimated=%s",
+                self.routine_display_active_marches,
+                observed,
+                len(reconciled),
+            )
         return self.routine_display_active_marches
 
     def _detect_observed_marches(self):
@@ -3291,8 +3298,13 @@ class AutoClicker:
         try:
             frame, _origin = self._capture_screen_bgr(force=False)
         except Exception:
-            logger.exception("Не удалось проверить фактическое число походов")
+            logged_at = float(getattr(self, "_march_observer_error_logged_at", 0.0) or 0.0)
+            now = time.monotonic()
+            if now - logged_at >= 30.0:
+                logger.exception("Не удалось проверить фактическое число походов")
+                self._march_observer_error_logged_at = now
             return None
+        self._march_observer_error_logged_at = 0.0
 
         height, width = frame.shape[:2]
         x1, y1 = int(width * 1194 / 1280), int(height * 150 / 720)

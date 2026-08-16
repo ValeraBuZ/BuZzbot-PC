@@ -947,27 +947,23 @@ def routine_march_context_key(input_backend, adb_serial, account_id):
 
 
 def effective_active_marches(observed, estimated, confirmed_floor, now, grace_until):
-    """Keep newly confirmed marches occupied while the game counter catches up."""
+    """Prefer the visible game counter over local duration estimates."""
     estimated = max(0, int(estimated))
     if observed is None:
         return estimated
     observed = max(0, int(observed))
-    if observed == 0:
-        return 0
-    if float(now) < float(grace_until):
-        return max(observed, estimated, max(0, int(confirmed_floor)))
+    if observed == 0 and estimated and float(now) < float(grace_until):
+        return max(estimated, max(0, int(confirmed_floor)))
     return observed
 
 
 def reconcile_march_deadlines(deadlines, observed, now, grace_until):
-    """Drop stale local reservations after the visible game counter disproves them."""
+    """Drop reservations immediately when the visible counter disproves them."""
     active = [float(deadline) for deadline in deadlines if float(deadline) > float(now)]
     if observed is None:
         return active
     observed = max(0, int(observed))
-    if observed == 0:
-        return []
-    if float(now) < float(grace_until):
+    if observed == 0 and active and float(now) < float(grace_until):
         return active
     if observed >= len(active):
         return active

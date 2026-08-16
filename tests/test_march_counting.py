@@ -51,6 +51,26 @@ class MarchCountingTests(unittest.TestCase):
         self.assertEqual(len(bot.routine_march_deadlines), 4)
         self.assertEqual(bot.routine_confirmed_march_floor, 4)
 
+    def test_visible_partial_count_replaces_stale_full_reservation(self):
+        for observed in (2, 3, 4):
+            with self.subTest(observed=observed):
+                bot = self.make_bot(deadlines=(1000.0,) * 5, observed=observed)
+                bot.routine_confirmed_march_floor = 5
+                bot.routine_march_observer_grace_until = 300.0
+
+                self.assertEqual(bot.get_active_marches(now=100.0), observed)
+                self.assertEqual(len(bot.routine_march_deadlines), observed)
+
+    def test_transient_zero_after_send_does_not_drop_the_new_march(self):
+        bot = self.make_bot(deadlines=(1000.0,), observed=0)
+        bot.routine_confirmed_march_floor = 1
+        bot.routine_march_observer_grace_until = 108.0
+
+        self.assertEqual(bot.get_active_marches(now=103.0), 1)
+        self.assertEqual(len(bot.routine_march_deadlines), 1)
+        self.assertEqual(bot.get_active_marches(now=109.0), 0)
+        self.assertEqual(bot.routine_march_deadlines, [])
+
     def test_world_map_without_deployment_panel_means_zero_marches(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.search_images = [{

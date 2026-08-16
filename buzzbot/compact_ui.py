@@ -1736,15 +1736,28 @@ def build_compact_ui(root, bot):
             return f"{seconds // 60}:{seconds % 60:02d}"
         return f"{seconds // 3600}:{(seconds % 3600) // 60:02d}"
 
+    march_refresh = {
+        "next_at": 0.0,
+        "value": int(getattr(bot, "routine_display_active_marches", 0) or 0),
+    }
+
     def update_state():
         now = time.time()
         enabled_tasks = [task for task in bot.routine_tasks if task.get("enabled")]
         selected_var.set(f"{len(enabled_tasks)} задач")
-        busy_marches = getattr(
-            bot,
-            "routine_display_active_marches",
-            sum(deadline > now for deadline in bot.routine_march_deadlines),
-        )
+        if bot.is_running:
+            march_refresh["value"] = int(getattr(
+                bot,
+                "routine_display_active_marches",
+                sum(deadline > now for deadline in bot.routine_march_deadlines),
+            ))
+        elif now >= march_refresh["next_at"]:
+            march_refresh["next_at"] = now + 2.0
+            try:
+                march_refresh["value"] = bot.get_active_marches(now)
+            except Exception:
+                logger.exception("Не удалось обновить счётчик походов в интерфейсе")
+        busy_marches = march_refresh["value"]
         march_usage_var.set(f"{busy_marches} / {bot.routine_max_marches}")
 
         current_task = bot.get_routine_task(bot.current_routine_task_id) if bot.current_routine_task_id else None

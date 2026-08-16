@@ -633,9 +633,10 @@ class RoutineTaskTests(unittest.TestCase):
             routine_march_context_key("ADB", "emulator-5564", "phoenix"),
         )
 
-    def test_confirmed_march_is_kept_while_observer_catches_up(self):
+    def test_visible_march_counter_overrides_local_estimates(self):
         self.assertEqual(effective_active_marches(1, 1, 1, 100.0, 220.0), 1)
-        self.assertEqual(effective_active_marches(4, 1, 5, 100.0, 220.0), 5)
+        self.assertEqual(effective_active_marches(4, 1, 5, 100.0, 220.0), 4)
+        self.assertEqual(effective_active_marches(2, 5, 5, 100.0, 220.0), 2)
         self.assertEqual(effective_active_marches(0, 1, 1, 221.0, 220.0), 0)
         self.assertEqual(effective_active_marches(None, 2, 4, 100.0, 220.0), 2)
 
@@ -647,17 +648,19 @@ class RoutineTaskTests(unittest.TestCase):
         )
         self.assertEqual(
             reconcile_march_deadlines(deadlines, 4, 180.0, 190.0),
-            deadlines,
+            deadlines[:4],
         )
 
-    def test_visible_zero_marches_clears_reservations_during_grace(self):
+    def test_transient_zero_is_ignored_only_during_short_send_grace(self):
         deadlines = [500.0, 600.0, 700.0]
 
         self.assertEqual(
             reconcile_march_deadlines(deadlines, 0, 180.0, 300.0),
-            [],
+            deadlines,
         )
-        self.assertEqual(effective_active_marches(0, 3, 3, 180.0, 300.0), 0)
+        self.assertEqual(effective_active_marches(0, 3, 3, 180.0, 300.0), 3)
+        self.assertEqual(reconcile_march_deadlines(deadlines, 0, 301.0, 300.0), [])
+        self.assertEqual(effective_active_marches(0, 3, 3, 301.0, 300.0), 0)
 
     def test_missing_march_button_defers_after_squad_screen_grace(self):
         task = {"uses_march": True}
