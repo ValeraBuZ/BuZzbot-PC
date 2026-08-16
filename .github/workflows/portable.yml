@@ -54,20 +54,15 @@ jobs:
       - name: Проверить запуск EXE
         shell: pwsh
         run: |
-          $process = Start-Process dist/BuZzbotPortable/BuZzbot.exe -PassThru
-          try {
-            Start-Sleep -Seconds 10
-            $process.Refresh()
-            if ($process.HasExited) {
-              throw "Portable EXE завершился при запуске."
-            }
-            if ($process.MainWindowTitle -like "*Unhandled exception*") {
-              throw "Portable EXE открыл окно необработанной ошибки."
-            }
-          } finally {
-            if (-not $process.HasExited) {
-              Stop-Process -Id $process.Id
-            }
+          $process = Start-Process `
+            dist/BuZzbotPortable/BuZzbot.exe `
+            -ArgumentList '--smoke-test' `
+            -WorkingDirectory dist/BuZzbotPortable `
+            -Wait `
+            -PassThru
+          if ($process.ExitCode -ne 0) {
+            Get-Content dist/BuZzbotPortable/bot.log -Tail 100 -ErrorAction SilentlyContinue
+            throw "Portable smoke test завершился с кодом $($process.ExitCode)."
           }
       - name: Сохранить ZIP сборки
         uses: actions/upload-artifact@v4

@@ -10702,7 +10702,42 @@ def should_autostart_routines(argv=None):
     return any(str(arg).strip().lower() == "--autostart" for arg in args)
 
 
+def should_run_smoke_test(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    return any(str(arg).strip().lower() == "--smoke-test" for arg in args)
+
+
+def validate_smoke_test_layout(app_dir=APP_DIR):
+    app_dir = Path(app_dir)
+    config_path = app_dir / "config.json"
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Portable config is missing: {config_path}")
+    config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+    images = config.get("images", [])
+    if not images:
+        raise RuntimeError("Portable config contains no templates.")
+    missing = []
+    for image in images:
+        configured = Path(str(image.get("path") or ""))
+        resolved = configured if configured.is_absolute() else app_dir / configured
+        if not resolved.is_file():
+            missing.append(str(image.get("description") or configured))
+    if missing:
+        raise FileNotFoundError(
+            f"Portable build is missing {len(missing)} templates: {', '.join(missing[:5])}"
+        )
+    return len(images)
+
+
 def main():
+    if should_run_smoke_test():
+        template_count = validate_smoke_test_layout()
+        logger.info(
+            "Smoke test passed for BuZzbot %s: %s configured templates",
+            APP_VERSION,
+            template_count,
+        )
+        return
     enable_windows_high_dpi()
     root = tk.Tk()
     try:
