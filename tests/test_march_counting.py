@@ -96,6 +96,31 @@ class MarchCountingTests(unittest.TestCase):
             self.assertIsNone(bot._detect_observed_marches())
             self.assertEqual(bot._detect_observed_marches(), 0)
 
+    def test_lower_positive_count_requires_stable_observation(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.search_images = [{
+            "path": "observer-4.png",
+            "observer_only": True,
+            "march_count": 4,
+            "observer_confidence": 0.70,
+        }]
+        bot.routine_display_active_marches = 5
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        template = np.tile(np.arange(80, dtype=np.uint8), (38, 1))
+        frame[150:188, 1194:1274] = cv2.cvtColor(template, cv2.COLOR_GRAY2BGR)
+
+        class Cache:
+            def get_gray(self, _path):
+                return template
+
+        bot.template_cache = Cache()
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+
+        with patch("buzzbot_app.time.monotonic", side_effect=(100.0, 101.0, 102.1)):
+            self.assertEqual(bot._detect_observed_marches(), 5)
+            self.assertEqual(bot._detect_observed_marches(), 5)
+            self.assertEqual(bot._detect_observed_marches(), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

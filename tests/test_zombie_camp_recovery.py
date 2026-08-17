@@ -20,9 +20,11 @@ class ZombieCampRecoveryTests(unittest.TestCase):
     def frame(*, camp=False, retreat=False):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
         if camp:
+            cv2.rectangle(frame, (1172, 260), (1268, 329), (180, 180, 220), thickness=2)
             cv2.rectangle(frame, (1240, 301), (1259, 319), (220, 180, 20), thickness=-1)
         if retreat:
-            cv2.circle(frame, (696, 456), 31, (40, 145, 205), thickness=-1)
+            cv2.circle(frame, (582, 456), 38, (40, 145, 205), thickness=-1)
+            cv2.circle(frame, (696, 456), 38, (40, 145, 205), thickness=-1)
         return frame
 
     def make_bot(self, frames):
@@ -32,6 +34,7 @@ class ZombieCampRecoveryTests(unittest.TestCase):
         bot.stop_event = threading.Event()
         bot.stop_hotkey_pressed = False
         bot.zombie_camp_scan_next_at = 0.0
+        bot.zombie_camp_blocked_until = 0.0
         bot.current_routine_task_id = None
         bot.routine_only_task_id = None
         bot.groups = {"Убийство зомби": True}
@@ -53,27 +56,45 @@ class ZombieCampRecoveryTests(unittest.TestCase):
         bot = self.make_bot(
             [
                 self.frame(camp=True),
-                self.frame(camp=True),
+                self.frame(camp=True, retreat=True),
                 self.frame(camp=True, retreat=True),
                 self.frame(camp=False),
             ]
         )
 
         self.assertTrue(bot._try_return_camped_zombie_march(5, now=100.0))
-        self.assertEqual(bot.adb_client.taps, [(1218, 292), (640, 360), (696, 456)])
+        self.assertEqual(bot.adb_client.taps[0], (1218, 292))
+        self.assertLessEqual(abs(bot.adb_client.taps[1][0] - 696), 8)
+        self.assertLessEqual(abs(bot.adb_client.taps[1][1] - 456), 8)
 
-    def test_does_not_tap_retreat_without_confirmed_action(self):
+    def test_blocks_dispatch_without_confirmed_retreat_action(self):
         bot = self.make_bot(
             [
-                self.frame(camp=True),
                 self.frame(camp=True),
                 self.frame(camp=True),
                 self.frame(camp=True),
             ]
         )
 
-        self.assertFalse(bot._try_return_camped_zombie_march(5, now=100.0))
-        self.assertEqual(bot.adb_client.taps, [(1218, 292), (640, 360), (640, 360)])
+        self.assertTrue(bot._try_return_camped_zombie_march(5, now=100.0))
+        self.assertEqual(bot.adb_client.taps, [(1218, 292), (1218, 292)])
+        self.assertTrue(bot._try_return_camped_zombie_march(5, now=101.0))
+
+    def test_blocks_dispatch_when_retreat_does_not_remove_camp(self):
+        bot = self.make_bot(
+            [
+                self.frame(camp=True),
+                self.frame(camp=True, retreat=True),
+                self.frame(camp=True, retreat=True),
+                *(self.frame(camp=True) for _ in range(10)),
+            ]
+        )
+
+        self.assertTrue(bot._try_return_camped_zombie_march(5, now=100.0))
+        self.assertEqual(bot.adb_client.taps[0], (1218, 292))
+        self.assertLessEqual(abs(bot.adb_client.taps[1][0] - 696), 8)
+        self.assertLessEqual(abs(bot.adb_client.taps[1][1] - 456), 8)
+        self.assertGreater(bot.zombie_camp_blocked_until, 100.0)
 
 
 if __name__ == "__main__":

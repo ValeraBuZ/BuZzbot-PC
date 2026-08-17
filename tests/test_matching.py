@@ -8,6 +8,7 @@ import numpy as np
 from buzzbot.matching import (
     TemplateCache,
     detect_alliance_marked_project_target,
+    detect_back_confirmation_cancel_target,
     detect_blank_webview_close_target,
     detect_camped_march_card_targets,
     detect_collective_tutorial_continue_target,
@@ -281,17 +282,54 @@ class DynamicGameControlTests(unittest.TestCase):
 
     def test_detects_camped_march_cards_but_not_other_statuses(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (1172, 260), (1268, 329), (180, 180, 220), thickness=2)
         cv2.rectangle(frame, (1240, 301), (1259, 319), (220, 180, 20), thickness=-1)
         cv2.rectangle(frame, (1240, 371), (1259, 389), (20, 20, 220), thickness=-1)
 
         self.assertEqual(detect_camped_march_card_targets(frame), [(1218, 292)])
 
+    def test_rejects_cyan_world_text_without_march_card(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (1240, 231), (1259, 249), (220, 180, 20), thickness=-1)
+
+        self.assertEqual(detect_camped_march_card_targets(frame), [])
+
     def test_detects_selected_march_retreat_action(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
         self.assertIsNone(detect_march_retreat_target(frame))
 
-        cv2.circle(frame, (696, 456), 31, (40, 145, 205), thickness=-1)
-        self.assertEqual(detect_march_retreat_target(frame), (696, 456))
+        cv2.circle(frame, (582, 456), 38, (40, 145, 205), thickness=-1)
+        cv2.circle(frame, (696, 456), 38, (40, 145, 205), thickness=-1)
+        target = detect_march_retreat_target(frame)
+        self.assertIsNotNone(target)
+        self.assertLessEqual(abs(target[0] - 696), 8)
+        self.assertLessEqual(abs(target[1] - 456), 8)
+
+    def test_detects_moved_retreat_action_pair(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.circle(frame, (445, 519), 28, (40, 145, 205), thickness=-1)
+        cv2.circle(frame, (531, 519), 28, (40, 145, 205), thickness=-1)
+
+        target = detect_march_retreat_target(frame)
+        self.assertIsNotNone(target)
+        self.assertLessEqual(abs(target[0] - 531), 8)
+        self.assertLessEqual(abs(target[1] - 519), 8)
+
+    def test_rejects_asymmetric_world_map_circle_pair(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.circle(frame, (775, 502), 35, (40, 145, 205), thickness=-1)
+        cv2.circle(frame, (841, 512), 43, (40, 145, 205), thickness=-1)
+
+        self.assertIsNone(detect_march_retreat_target(frame))
+
+    def test_detects_back_confirmation_cancel_without_matching_world_map(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        self.assertIsNone(detect_back_confirmation_cancel_target(frame))
+
+        frame[210:470, 330:950] = (210, 215, 220)
+        frame[482:535, 360:632] = (80, 95, 110)
+        frame[482:535, 650:920] = (20, 180, 245)
+        self.assertEqual(detect_back_confirmation_cancel_target(frame), (495, 509))
 
     def test_healing_checkbox_border_is_not_mistaken_for_checkmark(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)

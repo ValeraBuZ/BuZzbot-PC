@@ -59,6 +59,7 @@ from buzzbot.multi_emulator import (
 from buzzbot.matching import (
     TemplateCache,
     detect_alliance_marked_project_target,
+    detect_back_confirmation_cancel_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
     detect_camped_march_card_targets,
@@ -166,6 +167,7 @@ WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collect
 # transient false 0/5; every visible positive count remains authoritative.
 MARCH_OBSERVER_GRACE_SECONDS = 8.0
 MARCH_ZERO_CONFIRMATION_SECONDS = 5.0
+MARCH_DECREASE_CONFIRMATION_SECONDS = 2.0
 
 logger = configure_logging(RUNTIME_DIR / "bot.log")
 
@@ -766,7 +768,11 @@ class AutoClicker:
         self.routine_display_active_marches = 0
         self.routine_zero_observation_started_at = 0.0
         self.routine_zero_observation_count = 0
+        self.routine_lower_observation_value = None
+        self.routine_lower_observation_started_at = 0.0
+        self.routine_lower_observation_count = 0
         self.zombie_camp_scan_next_at = 0.0
+        self.zombie_camp_blocked_until = 0.0
         self.routine_next_run = {}
         self.current_routine_index = 0
         self.current_routine_task_id = None
@@ -1904,6 +1910,21 @@ class AutoClicker:
                         foreground_package,
                     )
                     return False
+            try:
+                frame, origin = self._capture_screen_bgr(force=True)
+                cancel_target = detect_back_confirmation_cancel_target(frame)
+            except Exception:
+                cancel_target = None
+            if cancel_target is not None:
+                cancel_x, cancel_y = cancel_target
+                logger.warning("Отменяю окно выхода из игры во время возврата на главный экран")
+                if self.uses_adb:
+                    self.adb_client.tap(cancel_x, cancel_y)
+                else:
+                    pyautogui.click(origin[0] + cancel_x, origin[1] + cancel_y)
+                self._invalidate_capture()
+                self._interruptible_sleep(0.8)
+                continue
             if self._is_main_screen_visible():
                 if require_settlement and not self._is_settlement_screen_visible():
                     return self._switch_to_settlement_screen()
@@ -3265,6 +3286,9 @@ class AutoClicker:
         self.routine_march_observer_grace_until = 0.0
         self.routine_zero_observation_started_at = 0.0
         self.routine_zero_observation_count = 0
+        self.routine_lower_observation_value = None
+        self.routine_lower_observation_started_at = 0.0
+        self.routine_lower_observation_count = 0
         return True
 
     def get_active_marches(self, now=None):
@@ -3312,8 +3336,12 @@ class AutoClicker:
     def _try_return_camped_zombie_march(self, active_marches, now=None):
         """Recall one zombie squad that remained in a camp after combat."""
         now = time.time() if now is None else float(now)
-        if active_marches <= 0 or now < self.zombie_camp_scan_next_at:
+        if active_marches <= 0:
+            self.zombie_camp_blocked_until = 0.0
             return False
+        blocked_until = float(getattr(self, "zombie_camp_blocked_until", 0.0) or 0.0)
+        if now < self.zombie_camp_scan_next_at:
+            return now < blocked_until
         self.zombie_camp_scan_next_at = now + 3.0
 
         if self.current_routine_task_id:
@@ -3333,12 +3361,15 @@ class AutoClicker:
             self.zombie_camp_scan_next_at = now + 15.0
             return False
         if not self._world_map_visible_in_frame(frame):
-            return False
+            return now < blocked_until
 
         camp_targets = detect_camped_march_card_targets(frame)
         if not camp_targets:
+            self.zombie_camp_blocked_until = 0.0
             return False
         card_x, card_y = camp_targets[0]
+        camp_count_before = len(camp_targets)
+        self.zombie_camp_blocked_until = now + 20.0
 
         def tap_frame(x, y, current_origin):
             if self.uses_adb:
@@ -3353,42 +3384,58 @@ class AutoClicker:
         self.set_status_message("Возвращаю отряд, оставшийся в лагере", force=True)
         logger.info("Найден лагерь похода в карточке (%s, %s); начинаю возврат", card_x, card_y)
         tap_frame(card_x, card_y, origin)
-        self._interruptible_sleep(1.0)
+        self._interruptible_sleep(0.8)
 
         selected_frame, selected_origin = self._capture_screen_bgr(force=True)
-        center_x = selected_frame.shape[1] // 2
-        center_y = selected_frame.shape[0] // 2
-        retreat_target = None
-        for _attempt in range(2):
-            tap_frame(center_x, center_y, selected_origin)
-            self._interruptible_sleep(0.45)
-            selected_frame, selected_origin = self._capture_screen_bgr(force=True)
-            retreat_target = detect_march_retreat_target(selected_frame)
-            if retreat_target is not None:
-                break
+        retreat_target = detect_march_retreat_target(selected_frame)
+        if retreat_target is None:
+            # March cards may reorder while a squad returns. Re-read the cyan
+            # card instead of clicking a stale row or an arbitrary map point.
+            refreshed_targets = detect_camped_march_card_targets(selected_frame)
+            if refreshed_targets:
+                refreshed_x, refreshed_y = refreshed_targets[0]
+                tap_frame(refreshed_x, refreshed_y, selected_origin)
+                self._interruptible_sleep(0.8)
+                selected_frame, selected_origin = self._capture_screen_bgr(force=True)
+                retreat_target = detect_march_retreat_target(selected_frame)
+        if retreat_target is not None:
+            # The world map contains many circular gold controls. Confirm the
+            # same action pair on a second frame before issuing a retreat tap.
+            self._interruptible_sleep(0.25)
+            confirmed_frame, confirmed_origin = self._capture_screen_bgr(force=True)
+            confirmed_target = detect_march_retreat_target(confirmed_frame)
+            if (
+                confirmed_target is None
+                or abs(confirmed_target[0] - retreat_target[0]) > 12
+                or abs(confirmed_target[1] - retreat_target[1]) > 12
+            ):
+                retreat_target = None
+            else:
+                retreat_target = confirmed_target
+                selected_origin = confirmed_origin
         if retreat_target is None:
             logger.warning("Лагерь выбран, но кнопка возврата не подтверждена")
             self.set_status_message("Лагерь найден, возврат не подтверждён: повторю позже", force=True)
             self.zombie_camp_scan_next_at = time.time() + 15.0
-            return False
+            self.zombie_camp_blocked_until = self.zombie_camp_scan_next_at
+            return True
 
         retreat_x, retreat_y = retreat_target
         tap_frame(retreat_x, retreat_y, selected_origin)
-        self._interruptible_sleep(0.9)
-        result_frame, _result_origin = self._capture_screen_bgr(force=True)
-        same_card_is_camped = any(
-            abs(target_y - card_y) <= max(8, int(round(18 * result_frame.shape[0] / 720.0)))
-            for _target_x, target_y in detect_camped_march_card_targets(result_frame)
-        )
-        if same_card_is_camped:
-            logger.warning("После нажатия возврата карточка похода осталась в лагере")
-            self.set_status_message("Отряд остался в лагере: повторю возврат позже", force=True)
-            self.zombie_camp_scan_next_at = time.time() + 15.0
-            return False
+        for _attempt in range(10):
+            self._interruptible_sleep(0.5)
+            result_frame, _result_origin = self._capture_screen_bgr(force=True)
+            if len(detect_camped_march_card_targets(result_frame)) < camp_count_before:
+                logger.info("Возврат застрявшего похода подтверждён исчезновением значка лагеря")
+                self.set_status_message("Застрявший отряд возвращается в убежище", force=True)
+                self.zombie_camp_scan_next_at = time.time() + 1.5
+                self.zombie_camp_blocked_until = self.zombie_camp_scan_next_at
+                return True
 
-        logger.info("Возврат застрявшего похода подтверждён сменой значка карточки")
-        self.set_status_message("Застрявший отряд возвращается в убежище", force=True)
-        self.zombie_camp_scan_next_at = time.time() + 1.5
+        logger.warning("После нажатия возврата значок лагеря не исчез")
+        self.set_status_message("Отряд остался в лагере: повторю возврат позже", force=True)
+        self.zombie_camp_scan_next_at = time.time() + 15.0
+        self.zombie_camp_blocked_until = self.zombie_camp_scan_next_at
         return True
 
     def _detect_observed_marches(self):
@@ -3434,6 +3481,29 @@ class AutoClicker:
         if best_count is not None:
             self.routine_zero_observation_started_at = 0.0
             self.routine_zero_observation_count = 0
+            previous_count = int(getattr(self, "routine_display_active_marches", 0) or 0)
+            if 0 < best_count < previous_count:
+                observed_at = time.monotonic()
+                candidate = getattr(self, "routine_lower_observation_value", None)
+                if candidate != best_count:
+                    self.routine_lower_observation_value = best_count
+                    self.routine_lower_observation_started_at = observed_at
+                    self.routine_lower_observation_count = 1
+                    return previous_count
+                self.routine_lower_observation_count = int(
+                    getattr(self, "routine_lower_observation_count", 0) or 0
+                ) + 1
+                started_at = float(
+                    getattr(self, "routine_lower_observation_started_at", 0.0) or 0.0
+                )
+                if (
+                    self.routine_lower_observation_count < 3
+                    or observed_at - started_at < MARCH_DECREASE_CONFIRMATION_SECONDS
+                ):
+                    return previous_count
+            self.routine_lower_observation_value = None
+            self.routine_lower_observation_started_at = 0.0
+            self.routine_lower_observation_count = 0
             return best_count
 
         if self._world_map_visible_in_frame(frame):

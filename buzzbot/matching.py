@@ -485,6 +485,42 @@ def detect_camped_march_card_targets(frame_bgr):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     targets = []
     for top in (190, 260, 330, 400):
+        # Cyan player names and world objects can pass the color test at the
+        # same screen position when the march panel is collapsed. Require the
+        # portrait card frame before interpreting cyan pixels as a camp icon.
+        card_roi_top = max(0, top - 15)
+        card_roi_bottom = min(frame.shape[0], top + 80)
+        card_roi_left, card_roi_right = 1155, 1275
+        card_roi = frame[
+            card_roi_top:card_roi_bottom,
+            card_roi_left:card_roi_right,
+        ]
+        if card_roi.size == 0:
+            continue
+        card_gray = cv2.cvtColor(card_roi, cv2.COLOR_BGR2GRAY)
+        card_edges = cv2.Canny(card_gray, 60, 140)
+        contours, _hierarchy = cv2.findContours(
+            card_edges,
+            cv2.RETR_LIST,
+            cv2.CHAIN_APPROX_SIMPLE,
+        )
+        card_frame_present = False
+        for contour in contours:
+            x, y, width, height = cv2.boundingRect(contour)
+            absolute_x = card_roi_left + x
+            absolute_y = card_roi_top + y
+            if (
+                75 <= width <= 110
+                and 50 <= height <= 80
+                and absolute_x <= 1180
+                and absolute_x + width >= 1250
+                and top - 15 <= absolute_y <= top + 12
+            ):
+                card_frame_present = True
+                break
+        if not card_frame_present:
+            continue
+
         status_roi = hsv[top + 38:top + 66, 1237:1263]
         if status_roi.size == 0:
             continue
@@ -505,23 +541,122 @@ def detect_camped_march_card_targets(frame_bgr):
 
 
 def detect_march_retreat_target(frame_bgr):
-    """Return the retreat action shown for a selected world-map squad."""
+    """Return the right-hand retreat action for a selected world-map squad."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    action_roi = hsv[414:487, 657:734]
+    # Selecting a march card centers its camp at a camera-dependent position.
+    # The two action circles (emoji, retreat) therefore move together instead
+    # of staying at one fixed coordinate. Detect the pair and use the right one.
+    roi_left, roi_top, roi_right, roi_bottom = 280, 360, 920, 590
+    action_roi = frame[roi_top:roi_bottom, roi_left:roi_right]
     if action_roi.size == 0:
         return None
-    gold = cv2.inRange(
-        action_roi,
-        np.array([8, 80, 80], dtype=np.uint8),
-        np.array([40, 255, 255], dtype=np.uint8),
+    gray = cv2.cvtColor(action_roi, cv2.COLOR_BGR2GRAY)
+    circles = cv2.HoughCircles(
+        gray,
+        cv2.HOUGH_GRADIENT,
+        dp=1.2,
+        minDist=45,
+        param1=90,
+        param2=26,
+        minRadius=22,
+        maxRadius=45,
     )
-    if float(np.mean(gold > 0)) < 0.15:
+    if circles is None:
         return None
-    return int(round(696 * scale_x)), int(round(456 * scale_y))
+
+    hsv = cv2.cvtColor(action_roi, cv2.COLOR_BGR2HSV)
+    gold = (
+        (hsv[:, :, 0] >= 5)
+        & (hsv[:, :, 0] <= 45)
+        & (hsv[:, :, 1] >= 70)
+        & (hsv[:, :, 2] >= 70)
+    )
+    candidates = np.round(circles[0]).astype(int).tolist()
+    best_pair = None
+    best_score = -1.0
+    yy, xx = np.ogrid[:action_roi.shape[0], :action_roi.shape[1]]
+    for index, first in enumerate(candidates):
+        for second in candidates[index + 1:]:
+            left_circle, right_circle = sorted((first, second), key=lambda item: item[0])
+            delta_x = right_circle[0] - left_circle[0]
+            average_radius = (left_circle[2] + right_circle[2]) / 2.0
+            if average_radius <= 0 or not 2.85 <= delta_x / average_radius <= 3.20:
+                continue
+            if abs(right_circle[1] - left_circle[1]) > 3:
+                continue
+            if abs(right_circle[2] - left_circle[2]) > 3:
+                continue
+
+            gold_scores = []
+            bright_scores = []
+            green_scores = []
+            for center_x, center_y, radius in (left_circle, right_circle):
+                mask = (xx - center_x) ** 2 + (yy - center_y) ** 2 <= radius ** 2
+                inner_mask = (
+                    (xx - center_x) ** 2 + (yy - center_y) ** 2
+                    <= (radius * 0.68) ** 2
+                )
+                gold_scores.append(float(np.mean(gold[mask])))
+                bright_scores.append(
+                    float(np.mean(hsv[:, :, 2][inner_mask] >= 170))
+                )
+                green_scores.append(
+                    float(
+                        np.mean(
+                            (
+                                (hsv[:, :, 0][inner_mask] >= 45)
+                                & (hsv[:, :, 0][inner_mask] <= 110)
+                                & (hsv[:, :, 1][inner_mask] >= 90)
+                                & (hsv[:, :, 2][inner_mask] >= 80)
+                            )
+                        )
+                    )
+                )
+            score = sum(gold_scores)
+            if (
+                min(gold_scores) >= 0.25
+                and min(bright_scores) >= 0.20
+                and max(green_scores) <= 0.08
+                and score > best_score
+            ):
+                best_score = score
+                best_pair = right_circle
+
+    if best_pair is None:
+        return None
+    return (
+        int(round((roi_left + best_pair[0]) * scale_x)),
+        int(round((roi_top + best_pair[1]) * scale_y)),
+    )
+
+
+def detect_back_confirmation_cancel_target(frame_bgr):
+    """Return Cancel for the confirmation dialog opened by Android Back."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    modal_body = frame[210:470, 330:950]
+    left_button = frame[482:535, 360:632]
+    right_button = frame[482:535, 650:920]
+    if not modal_body.size or not left_button.size or not right_button.size:
+        return None
+
+    body_hsv = cv2.cvtColor(modal_body, cv2.COLOR_BGR2HSV)
+    right_hsv = cv2.cvtColor(right_button, cv2.COLOR_BGR2HSV)
+    pale_body = (body_hsv[:, :, 1] <= 55) & (body_hsv[:, :, 2] >= 135)
+    gold_button = (
+        (right_hsv[:, :, 0] >= 8)
+        & (right_hsv[:, :, 0] <= 40)
+        & (right_hsv[:, :, 1] >= 70)
+        & (right_hsv[:, :, 2] >= 120)
+    )
+    if float(np.mean(pale_body)) < 0.45 or float(np.mean(gold_button)) < 0.35:
+        return None
+    return int(round(495 * scale_x)), int(round(509 * scale_y))
 
 
 def healing_auto_fill_is_checked(frame_bgr):
