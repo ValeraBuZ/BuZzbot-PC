@@ -9,6 +9,7 @@ from buzzbot.matching import (
     TemplateCache,
     detect_alliance_marked_project_target,
     detect_blank_webview_close_target,
+    detect_camped_march_card_targets,
     detect_collective_tutorial_continue_target,
     detect_finished_healing_target,
     detect_login_saved_account_continue_target,
@@ -18,6 +19,7 @@ from buzzbot.matching import (
     detect_radar_notification_targets,
     detect_radar_world_action_target,
     detect_lowest_stamina_refill_target,
+    detect_march_retreat_target,
     detect_stamina_refill_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
@@ -276,6 +278,20 @@ class DynamicGameControlTests(unittest.TestCase):
         cv2.line(frame, (810, 683), (820, 670), (220, 220, 220), thickness=3)
         self.assertTrue(zombie_camp_checkbox_is_checked(frame))
         self.assertTrue(healing_auto_fill_is_checked(frame))
+
+    def test_detects_camped_march_cards_but_not_other_statuses(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (1240, 301), (1259, 319), (220, 180, 20), thickness=-1)
+        cv2.rectangle(frame, (1240, 371), (1259, 389), (20, 20, 220), thickness=-1)
+
+        self.assertEqual(detect_camped_march_card_targets(frame), [(1218, 292)])
+
+    def test_detects_selected_march_retreat_action(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        self.assertIsNone(detect_march_retreat_target(frame))
+
+        cv2.circle(frame, (696, 456), 31, (40, 145, 205), thickness=-1)
+        self.assertEqual(detect_march_retreat_target(frame), (696, 456))
 
     def test_healing_checkbox_border_is_not_mistaken_for_checkmark(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)

@@ -2,6 +2,7 @@ import unittest
 
 import cv2
 import numpy as np
+from unittest.mock import patch
 
 from buzzbot_app import AutoClicker
 
@@ -71,7 +72,7 @@ class MarchCountingTests(unittest.TestCase):
         self.assertEqual(bot.get_active_marches(now=109.0), 0)
         self.assertEqual(bot.routine_march_deadlines, [])
 
-    def test_world_map_without_deployment_panel_means_zero_marches(self):
+    def test_world_map_without_deployment_panel_requires_stable_zero(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.search_images = [{
             "path": "observer.png",
@@ -90,7 +91,10 @@ class MarchCountingTests(unittest.TestCase):
         bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
         bot._world_map_visible_in_frame = lambda _frame: True
 
-        self.assertEqual(bot._detect_observed_marches(), 0)
+        with patch("buzzbot_app.time.monotonic", side_effect=(100.0, 103.0, 106.0)):
+            self.assertIsNone(bot._detect_observed_marches())
+            self.assertIsNone(bot._detect_observed_marches())
+            self.assertEqual(bot._detect_observed_marches(), 0)
 
 
 if __name__ == "__main__":

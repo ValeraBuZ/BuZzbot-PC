@@ -476,6 +476,54 @@ def zombie_camp_checkbox_is_checked(frame_bgr):
     return float(np.count_nonzero(colored_bright)) / float(colored_bright.size) >= 0.08
 
 
+def detect_camped_march_card_targets(frame_bgr):
+    """Return visible march cards whose status icon is the cyan camp tent."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return []
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    targets = []
+    for top in (190, 260, 330, 400):
+        status_roi = hsv[top + 38:top + 66, 1237:1263]
+        if status_roi.size == 0:
+            continue
+        cyan = cv2.inRange(
+            status_roi,
+            np.array([75, 90, 90], dtype=np.uint8),
+            np.array([105, 255, 255], dtype=np.uint8),
+        )
+        if int(np.count_nonzero(cyan)) < 80:
+            continue
+        targets.append(
+            (
+                int(round(1218 * scale_x)),
+                int(round((top + 32) * scale_y)),
+            )
+        )
+    return targets
+
+
+def detect_march_retreat_target(frame_bgr):
+    """Return the retreat action shown for a selected world-map squad."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    action_roi = hsv[414:487, 657:734]
+    if action_roi.size == 0:
+        return None
+    gold = cv2.inRange(
+        action_roi,
+        np.array([8, 80, 80], dtype=np.uint8),
+        np.array([40, 255, 255], dtype=np.uint8),
+    )
+    if float(np.mean(gold > 0)) < 0.15:
+        return None
+    return int(round(696 * scale_x)), int(round(456 * scale_y))
+
+
 def healing_auto_fill_is_checked(frame_bgr):
     """Detect the hospital auto-fill tick without relying on its caption."""
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)

@@ -61,6 +61,7 @@ from buzzbot.matching import (
     detect_alliance_marked_project_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
+    detect_camped_march_card_targets,
     detect_finished_healing_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
@@ -69,6 +70,7 @@ from buzzbot.matching import (
     detect_radar_notification_targets,
     detect_radar_world_action_target,
     detect_lowest_stamina_refill_target,
+    detect_march_retreat_target,
     detect_stamina_refill_target,
     healing_auto_fill_is_checked,
     healing_number_editor_is_open,
@@ -163,6 +165,7 @@ WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collect
 # The deployment panel briefly disappears after a march. Ignore only that
 # transient false 0/5; every visible positive count remains authoritative.
 MARCH_OBSERVER_GRACE_SECONDS = 8.0
+MARCH_ZERO_CONFIRMATION_SECONDS = 5.0
 
 logger = configure_logging(RUNTIME_DIR / "bot.log")
 
@@ -761,6 +764,9 @@ class AutoClicker:
         self.routine_confirmed_march_floor = 0
         self.routine_march_observer_grace_until = 0.0
         self.routine_display_active_marches = 0
+        self.routine_zero_observation_started_at = 0.0
+        self.routine_zero_observation_count = 0
+        self.zombie_camp_scan_next_at = 0.0
         self.routine_next_run = {}
         self.current_routine_index = 0
         self.current_routine_task_id = None
@@ -3257,6 +3263,8 @@ class AutoClicker:
         self.routine_deployment_blocked_until = 0.0
         self.routine_confirmed_march_floor = 0
         self.routine_march_observer_grace_until = 0.0
+        self.routine_zero_observation_started_at = 0.0
+        self.routine_zero_observation_count = 0
         return True
 
     def get_active_marches(self, now=None):
@@ -3301,6 +3309,88 @@ class AutoClicker:
             )
         return self.routine_display_active_marches
 
+    def _try_return_camped_zombie_march(self, active_marches, now=None):
+        """Recall one zombie squad that remained in a camp after combat."""
+        now = time.time() if now is None else float(now)
+        if active_marches <= 0 or now < self.zombie_camp_scan_next_at:
+            return False
+        self.zombie_camp_scan_next_at = now + 3.0
+
+        if self.current_routine_task_id:
+            return False
+        if self.routine_only_task_id not in {None, "zombie_hunt"}:
+            return False
+        task = self.get_routine_task("zombie_hunt")
+        if not task or not is_task_effectively_enabled(task):
+            return False
+        if not self.groups.get(effective_task_group(task), True):
+            return False
+
+        try:
+            frame, origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Не удалось проверить лагеря походов")
+            self.zombie_camp_scan_next_at = now + 15.0
+            return False
+        if not self._world_map_visible_in_frame(frame):
+            return False
+
+        camp_targets = detect_camped_march_card_targets(frame)
+        if not camp_targets:
+            return False
+        card_x, card_y = camp_targets[0]
+
+        def tap_frame(x, y, current_origin):
+            if self.uses_adb:
+                self.adb_client.tap(int(round(x)), int(round(y)))
+            else:
+                pyautogui.click(
+                    current_origin[0] + int(round(x)),
+                    current_origin[1] + int(round(y)),
+                )
+            self._invalidate_capture()
+
+        self.set_status_message("Возвращаю отряд, оставшийся в лагере", force=True)
+        logger.info("Найден лагерь похода в карточке (%s, %s); начинаю возврат", card_x, card_y)
+        tap_frame(card_x, card_y, origin)
+        self._interruptible_sleep(1.0)
+
+        selected_frame, selected_origin = self._capture_screen_bgr(force=True)
+        center_x = selected_frame.shape[1] // 2
+        center_y = selected_frame.shape[0] // 2
+        retreat_target = None
+        for _attempt in range(2):
+            tap_frame(center_x, center_y, selected_origin)
+            self._interruptible_sleep(0.45)
+            selected_frame, selected_origin = self._capture_screen_bgr(force=True)
+            retreat_target = detect_march_retreat_target(selected_frame)
+            if retreat_target is not None:
+                break
+        if retreat_target is None:
+            logger.warning("Лагерь выбран, но кнопка возврата не подтверждена")
+            self.set_status_message("Лагерь найден, возврат не подтверждён: повторю позже", force=True)
+            self.zombie_camp_scan_next_at = time.time() + 15.0
+            return False
+
+        retreat_x, retreat_y = retreat_target
+        tap_frame(retreat_x, retreat_y, selected_origin)
+        self._interruptible_sleep(0.9)
+        result_frame, _result_origin = self._capture_screen_bgr(force=True)
+        same_card_is_camped = any(
+            abs(target_y - card_y) <= max(8, int(round(18 * result_frame.shape[0] / 720.0)))
+            for _target_x, target_y in detect_camped_march_card_targets(result_frame)
+        )
+        if same_card_is_camped:
+            logger.warning("После нажатия возврата карточка похода осталась в лагере")
+            self.set_status_message("Отряд остался в лагере: повторю возврат позже", force=True)
+            self.zombie_camp_scan_next_at = time.time() + 15.0
+            return False
+
+        logger.info("Возврат застрявшего похода подтверждён сменой значка карточки")
+        self.set_status_message("Застрявший отряд возвращается в убежище", force=True)
+        self.zombie_camp_scan_next_at = time.time() + 1.5
+        return True
+
     def _detect_observed_marches(self):
         observers = [
             image for image in self.search_images
@@ -3341,11 +3431,34 @@ class AutoClicker:
             if score >= float(image.get("observer_confidence", 0.70)) and score > best_score:
                 best_score = float(score)
                 best_count = int(image["march_count"])
-        if best_count is None and self._world_map_visible_in_frame(frame):
-            # The game hides the deployment panel completely when no squads
-            # are active. On a confirmed world-map frame that absence is 0/5,
-            # not an unknown value that should preserve old time estimates.
-            return 0
+        if best_count is not None:
+            self.routine_zero_observation_started_at = 0.0
+            self.routine_zero_observation_count = 0
+            return best_count
+
+        if self._world_map_visible_in_frame(frame):
+            # Overlays and animated panel transitions can temporarily hide an
+            # otherwise occupied counter. Only a stable absence may mean 0/5.
+            observed_at = time.monotonic()
+            started_at = float(
+                getattr(self, "routine_zero_observation_started_at", 0.0) or 0.0
+            )
+            if started_at <= 0.0:
+                self.routine_zero_observation_started_at = observed_at
+                self.routine_zero_observation_count = 1
+                return None
+            self.routine_zero_observation_count = int(
+                getattr(self, "routine_zero_observation_count", 0) or 0
+            ) + 1
+            if (
+                self.routine_zero_observation_count >= 3
+                and observed_at - started_at >= MARCH_ZERO_CONFIRMATION_SECONDS
+            ):
+                return 0
+            return None
+
+        self.routine_zero_observation_started_at = 0.0
+        self.routine_zero_observation_count = 0
         return best_count
 
     def _world_map_visible_in_frame(self, frame):
@@ -3482,6 +3595,8 @@ class AutoClicker:
                 self.account_session_deadline = now + 60.0
 
         active_marches = self.get_active_marches(now)
+        if self._try_return_camped_zombie_march(active_marches, now):
+            return None
         deployment_wait = max(0.0, self.routine_deployment_blocked_until - now)
         if deployment_wait > 0:
             active_marches = self.routine_max_marches
