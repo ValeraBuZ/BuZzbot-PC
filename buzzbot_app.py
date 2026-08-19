@@ -6780,7 +6780,7 @@ class AutoClicker:
         else:
             pyautogui.click(clear_x, clear_y)
         self._invalidate_capture()
-        self._interruptible_sleep(0.45)
+        self._interruptible_sleep(0.35)
         frame, _origin = self._capture_screen_bgr(force=True)
         if not healing_selection_is_empty(frame):
             logger.error("Healing global troop reset was not confirmed")
@@ -6800,7 +6800,7 @@ class AutoClicker:
             else:
                 pyautogui.click(field_x, target_y)
             self._invalidate_capture()
-            self._interruptible_sleep(0.25)
+            self._interruptible_sleep(0.20)
 
             editor_frame, _origin = self._capture_screen_bgr(force=True)
             if not healing_number_editor_is_open(editor_frame):
@@ -6817,7 +6817,7 @@ class AutoClicker:
                 pyautogui.hotkey("ctrl", "a")
                 pyautogui.write(str(quota))
             self._invalidate_capture()
-            self._interruptible_sleep(0.15)
+            self._interruptible_sleep(0.12)
 
             editor_frame, _origin = self._capture_screen_bgr(force=True)
             if not healing_number_editor_is_open(editor_frame):
@@ -6858,7 +6858,7 @@ class AutoClicker:
             else:
                 pyautogui.click(ok_x, ok_y)
             self._invalidate_capture()
-            self._interruptible_sleep(0.25)
+            self._interruptible_sleep(0.20)
 
             after_frame, _origin = self._capture_screen_bgr(force=True)
             if healing_number_editor_is_open(after_frame):

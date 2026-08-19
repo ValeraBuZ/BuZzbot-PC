@@ -944,6 +944,16 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(tasks[0]["interval_minutes"], 0.1)
         self.assertEqual(tasks[0]["timeout_seconds"], 8.0)
 
+    def test_healing_start_uses_short_verified_settle_delay(self):
+        import uuid
+
+        start_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "heal:start_healing"))
+        images = [{"uid": start_uid, "delay": 0.8}]
+        tasks = [{"id": "heal", "timeout_seconds": 8.0}]
+
+        self.assertEqual(upgrade_strict_runtime_metadata(images, tasks), 1)
+        self.assertEqual(images[0]["delay"], 0.6)
+
     def test_research_queue_allows_lab_selection_before_deferred(self):
         research_queue_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:queue"))
         research_lab_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:lab"))

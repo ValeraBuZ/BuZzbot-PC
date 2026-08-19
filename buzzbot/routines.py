@@ -1351,6 +1351,13 @@ def upgrade_strict_runtime_metadata(images, tasks):
                 image["action"] = "open_healing_hospital"
                 image["allow_repeat"] = True
                 image["block_seconds"] = 0.5
+            if task_id == "heal" and step_id == "start_healing":
+                # The form is verified again after this short settle time, so
+                # a longer generic template delay only slows tiny heal batches.
+                image["delay"] = min(
+                    0.6,
+                    float(image.get("delay", 0.8) or 0.8),
+                )
             image.pop("requires_runtime_steps", None)
             selected_training_building = (
                 task_id.startswith("train_") and step_id == "building"
