@@ -6,6 +6,7 @@ from buzzbot.accounts import (
     extract_google_account_targets,
     extract_android_google_accounts,
     extract_google_accounts,
+    extract_igg_id_targets,
     extract_igg_login_form,
     mask_google_account,
     next_enabled_account,
@@ -143,7 +144,8 @@ class AccountProfileTests(unittest.TestCase):
 
     def test_igg_login_form_supports_flattened_webview(self):
         xml = (
-            '<hierarchy><node class="android.widget.TextView" text="Вход в IGG Account" />'
+            '<hierarchy><node class="android.widget.TextView" text="Вход в IGG Account" '
+            'bounds="[520,15][760,52]" />'
             '<node class="android.webkit.WebView" '
             'resource-id="com.igg.android.doomsdaylastsurvivors:id/webview_web" '
             'bounds="[0,68][1280,720]" /></hierarchy>'
@@ -152,6 +154,29 @@ class AccountProfileTests(unittest.TestCase):
             extract_igg_login_form(xml),
             {"login": (640, 122), "password": (640, 208), "submit": (538, 294)},
         )
+
+    def test_igg_login_form_rejects_id_selection_webview(self):
+        xml = (
+            '<hierarchy><node class="android.widget.TextView" text="Выбрать IGG ID" '
+            'bounds="[543,15][736,52]" />'
+            '<node class="android.webkit.WebView" text="IGG Account" '
+            'bounds="[0,68][1280,720]" /></hierarchy>'
+        )
+        self.assertIsNone(extract_igg_login_form(xml))
+
+    def test_extracts_saved_igg_id_rows_without_exposing_ids(self):
+        xml = (
+            '<hierarchy><node class="android.widget.TextView" text="Выбрать IGG ID" '
+            'bounds="[543,15][736,52]" />'
+            '<node class="android.widget.TextView" text="IGG ID: 123456789" '
+            'bounds="[261,149][894,176]" />'
+            '<node class="android.widget.TextView" text="IGG ID: 987654321" '
+            'bounds="[261,214][894,241]" /></hierarchy>'
+        )
+        self.assertEqual(extract_igg_id_targets(xml), [
+            {"chooser_index": 1, "center": (577, 162)},
+            {"chooser_index": 2, "center": (577, 227)},
+        ])
 
 
 if __name__ == "__main__":

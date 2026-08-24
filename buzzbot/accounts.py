@@ -229,15 +229,23 @@ def extract_igg_login_form(ui_xml):
     except ET.ParseError:
         return None
 
-    title_visible = any(
-        "igg account" in " ".join(
+    title_visible = False
+    login_title_visible = False
+    for node in root.iter():
+        label = " ".join(
             (
                 str(node.attrib.get("text", "")),
                 str(node.attrib.get("content-desc", "")),
             )
         ).casefold()
-        for node in root.iter()
-    )
+        if "igg account" not in label:
+            continue
+        title_visible = True
+        bounds = _BOUNDS_RE.fullmatch(str(node.attrib.get("bounds", "")))
+        if bounds is not None:
+            _left, top, _right, bottom = map(int, bounds.groups())
+            if top <= 20 and bottom <= 80:
+                login_title_visible = True
     if not title_visible:
         return None
 
@@ -276,6 +284,8 @@ def extract_igg_login_form(ui_xml):
     # Recent IGG builds expose the form as one non-accessible WebView. The
     # native title and WebView bounds still provide a stable, verifiable frame
     # for the three controls across LDPlayer resolutions.
+    if not login_title_visible:
+        return None
     for node in root.iter():
         if node.attrib.get("class") != "android.webkit.WebView":
             continue
@@ -293,6 +303,52 @@ def extract_igg_login_form(ui_xml):
             "submit": (left + round(width * 0.42), top + round(height * 0.347)),
         }
     return None
+
+
+def extract_igg_id_targets(ui_xml):
+    """Return saved IGG ID rows from the account-selection WebView."""
+    try:
+        root = ET.fromstring(str(ui_xml or ""))
+    except ET.ParseError:
+        return []
+
+    page_title_visible = any(
+        "igg id" in " ".join(
+            (
+                str(node.attrib.get("text", "")),
+                str(node.attrib.get("content-desc", "")),
+            )
+        ).casefold()
+        for node in root.iter()
+        if node.attrib.get("class") == "android.widget.TextView"
+    )
+    if not page_title_visible:
+        return []
+
+    centers = []
+    seen = set()
+    for node in root.iter():
+        if node.attrib.get("class") != "android.widget.TextView":
+            continue
+        label = str(node.attrib.get("text", "")).strip()
+        if re.match(r"^IGG\s*ID\s*:\s*\d+", label, re.IGNORECASE) is None:
+            continue
+        bounds = _BOUNDS_RE.fullmatch(str(node.attrib.get("bounds", "")))
+        if bounds is None:
+            continue
+        left, top, right, bottom = map(int, bounds.groups())
+        if right <= left or bottom <= top or top < 68:
+            continue
+        center = ((left + right) // 2, (top + bottom) // 2)
+        if center not in seen:
+            seen.add(center)
+            centers.append(center)
+
+    centers.sort(key=lambda point: (point[1], point[0]))
+    return [
+        {"chooser_index": index, "center": center}
+        for index, center in enumerate(centers, start=1)
+    ]
 
 
 def mask_google_account(email):

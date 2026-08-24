@@ -12,8 +12,14 @@ from buzzbot.matching import (
     detect_blank_webview_close_target,
     detect_camped_march_card_targets,
     detect_collective_tutorial_continue_target,
+    detect_commander_profile_back_target,
     detect_finished_healing_target,
+    detect_game_event_overlay_close_target,
+    detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
+    detect_account_settings_back_target,
+    detect_account_details_close_target,
+    detect_settings_close_target,
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
     detect_radar_card_action_target,
@@ -56,6 +62,37 @@ class UnicodeImageReadTests(unittest.TestCase):
 
 
 class DynamicGameControlTests(unittest.TestCase):
+    def test_detects_igg_id_selection_webview(self):
+        frame = np.full((720, 1280, 3), 250, dtype=np.uint8)
+        cv2.rectangle(frame, (0, 0), (1279, 67), (238, 238, 238), thickness=-1)
+        cv2.line(frame, (42, 20), (27, 34), (55, 55, 55), thickness=4)
+        cv2.line(frame, (27, 34), (42, 48), (55, 55, 55), thickness=4)
+        cv2.line(frame, (1234, 21), (1257, 47), (100, 100, 100), thickness=3)
+        cv2.line(frame, (1257, 21), (1234, 47), (100, 100, 100), thickness=3)
+        cv2.putText(frame, "Select IGG ID", (535, 46), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (35, 35, 35), 2)
+        cv2.rectangle(frame, (239, 131), (1041, 192), (215, 215, 215), thickness=1)
+        cv2.putText(frame, "IGG ID", (263, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (45, 45, 45), 2)
+        cv2.putText(frame, "Create new IGG ID", (836, 235), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 125, 0), 2)
+
+        self.assertEqual(detect_igg_id_selection_target(frame), (640, 162))
+        self.assertEqual(
+            detect_igg_id_selection_target(cv2.resize(frame, (640, 360))),
+            (320, 81),
+        )
+        self.assertIsNone(detect_igg_id_selection_target(np.full_like(frame, 250)))
+
+    def test_detects_blocking_game_event_overlay_close(self):
+        frame = np.full((720, 1280, 3), (25, 30, 35), dtype=np.uint8)
+        cv2.rectangle(frame, (150, 70), (1130, 570), (35, 95, 150), thickness=-1)
+        cv2.line(frame, (1136, 95), (1168, 129), (45, 180, 220), thickness=7)
+        cv2.line(frame, (1168, 95), (1136, 129), (45, 180, 220), thickness=7)
+        cv2.rectangle(frame, (473, 580), (807, 636), (45, 180, 235), thickness=-1)
+
+        self.assertEqual(detect_game_event_overlay_close_target(frame), (1152, 112))
+        self.assertIsNone(
+            detect_game_event_overlay_close_target(np.full_like(frame, (25, 30, 35)))
+        )
+
     @staticmethod
     def stamina_dialog_frame(width=1280, height=720):
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -135,6 +172,46 @@ class DynamicGameControlTests(unittest.TestCase):
 
         frame[294:360, 238:1043] = (215, 215, 215)
         self.assertIsNone(detect_login_saved_account_continue_target(frame))
+
+    def test_detects_account_settings_back_button_only(self):
+        frame = np.full((720, 1280, 3), 160, dtype=np.uint8)
+        frame[86:668, 133:1147] = (35, 35, 35)
+        frame[594:643, 507:773] = (45, 180, 235)
+
+        self.assertEqual(detect_account_settings_back_target(frame), (640, 618))
+
+        frame[594:643, 507:773] = (35, 35, 35)
+        self.assertIsNone(detect_account_settings_back_target(frame))
+
+    def test_detects_outer_account_details_close_button(self):
+        frame = np.full((720, 1280, 3), (35, 35, 35), dtype=np.uint8)
+        for top, bottom in ((158, 191), (229, 263), (371, 406)):
+            frame[top:bottom, 950:1130] = (45, 180, 235)
+
+        self.assertEqual(detect_account_details_close_target(frame), (1133, 43))
+
+        frame[229:263, 950:1130] = (35, 35, 35)
+        self.assertIsNone(detect_account_details_close_target(frame))
+
+    def test_detects_root_settings_close_button(self):
+        frame = np.full((720, 1280, 3), (25, 25, 25), dtype=np.uint8)
+        for left, right in ((188, 387), (430, 629), (670, 869), (910, 1110)):
+            frame[118:263, left:right] = (65, 80, 95)
+
+        self.assertEqual(detect_settings_close_target(frame), (1133, 43))
+
+        frame[118:263, 670:869] = (25, 25, 25)
+        self.assertIsNone(detect_settings_close_target(frame))
+
+    def test_detects_commander_profile_back_button(self):
+        frame = np.full((720, 1280, 3), (130, 130, 130), dtype=np.uint8)
+        frame[26:286, 808:1274] = (35, 35, 35)
+        cv2.circle(frame, (47, 45), 28, (30, 150, 220), thickness=-1)
+
+        self.assertEqual(detect_commander_profile_back_target(frame), (47, 45))
+
+        frame[26:286, 808:1274] = (130, 130, 130)
+        self.assertIsNone(detect_commander_profile_back_target(frame))
 
     def test_detects_blank_login_webview_close_button_only(self):
         blank_webview = np.full((720, 1280, 3), 255, dtype=np.uint8)

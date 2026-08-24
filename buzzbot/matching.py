@@ -198,6 +198,170 @@ def detect_login_saved_account_continue_target(frame_bgr):
     return int(round(640 * scale_x)), int(round(326 * scale_y))
 
 
+def detect_igg_id_selection_target(frame_bgr):
+    """Detect the first saved-ID row in IGG's non-accessible WebView."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    body = gray[70:680, 0:1280]
+    back_icon = gray[8:60, 8:62]
+    close_icon = gray[8:60, 1210:1272]
+    title = gray[10:58, 500:780]
+    account_row = gray[128:196, 225:1055]
+    link = hsv[198:260, 760:1080]
+
+    blue_link = (
+        (link[:, :, 0] >= 90)
+        & (link[:, :, 0] <= 125)
+        & (link[:, :, 1] >= 110)
+        & (link[:, :, 2] >= 150)
+    )
+    if (
+        float(np.mean(body >= 230)) < 0.94
+        or not 0.01 <= float(np.mean(back_icon < 120)) <= 0.20
+        or not 0.01 <= float(np.mean(close_icon < 160)) <= 0.20
+        or float(np.mean(title < 120)) < 0.015
+        or float(np.mean(account_row < 130)) < 0.006
+        or float(np.mean(blue_link)) < 0.008
+    ):
+        return None
+
+    return int(round(640 * scale_x)), int(round(162 * scale_y))
+
+
+def detect_game_event_overlay_close_target(frame_bgr):
+    """Detect a full-screen promotional overlay blocking account navigation."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    close_region = hsv[74:152, 1110:1195]
+    content = hsv[70:570, 150:1130]
+    action_button = hsv[565:650, 440:840]
+    gold_close = (
+        (close_region[:, :, 0] >= 5)
+        & (close_region[:, :, 0] <= 40)
+        & (close_region[:, :, 1] >= 45)
+        & (close_region[:, :, 2] >= 105)
+    )
+    rich_content = (content[:, :, 1] >= 55) & (content[:, :, 2] >= 75)
+    gold_button = (
+        (action_button[:, :, 0] >= 8)
+        & (action_button[:, :, 0] <= 40)
+        & (action_button[:, :, 1] >= 70)
+        & (action_button[:, :, 2] >= 135)
+    )
+    if (
+        float(np.mean(gold_close)) < 0.035
+        or float(np.mean(rich_content)) < 0.30
+        or float(np.mean(gold_button)) < 0.20
+    ):
+        return None
+    return int(round(1152 * scale_x)), int(round(112 * scale_y))
+
+
+def detect_account_settings_back_target(frame_bgr):
+    """Detect the in-game Account page shown after an IGG ID is selected."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    panel = gray[86:668, 133:1147]
+    back_button = hsv[594:643, 507:773]
+    dark_panel = panel < 105
+    gold_button = (
+        (back_button[:, :, 0] >= 10)
+        & (back_button[:, :, 0] <= 40)
+        & (back_button[:, :, 1] >= 55)
+        & (back_button[:, :, 2] >= 135)
+    )
+    if float(np.mean(dark_panel)) < 0.72 or float(np.mean(gold_button)) < 0.55:
+        return None
+    return int(round(640 * scale_x)), int(round(618 * scale_y))
+
+
+def detect_account_details_close_target(frame_bgr):
+    """Detect the outer Account details page reached after the login-method page."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    join_rows = (
+        hsv[158:191, 950:1130],
+        hsv[229:263, 950:1130],
+        hsv[371:406, 950:1130],
+    )
+    gold_fractions = []
+    for row in join_rows:
+        gold = (
+            (row[:, :, 0] >= 8)
+            & (row[:, :, 0] <= 40)
+            & (row[:, :, 1] >= 35)
+            & (row[:, :, 2] >= 120)
+        )
+        gold_fractions.append(float(np.mean(gold)))
+    if min(gold_fractions) < 0.55:
+        return None
+    return int(round(1133 * scale_x)), int(round(43 * scale_y))
+
+
+def detect_settings_close_target(frame_bgr):
+    """Detect the root in-game Settings grid after account dialogs are closed."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    tile_regions = (
+        hsv[118:263, 188:387],
+        hsv[118:263, 430:629],
+        hsv[118:263, 670:869],
+        hsv[118:263, 910:1110],
+    )
+    tile_fractions = []
+    for tile in tile_regions:
+        muted_brown = (
+            (tile[:, :, 0] >= 5)
+            & (tile[:, :, 0] <= 35)
+            & (tile[:, :, 1] >= 15)
+            & (tile[:, :, 1] <= 180)
+            & (tile[:, :, 2] >= 40)
+            & (tile[:, :, 2] <= 180)
+        )
+        tile_fractions.append(float(np.mean(muted_brown)))
+    if min(tile_fractions) < 0.35:
+        return None
+    return int(round(1133 * scale_x)), int(round(43 * scale_y))
+
+
+def detect_commander_profile_back_target(frame_bgr):
+    """Detect the commander profile screen that remains under Settings."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    back = hsv[12:82, 12:90]
+    right_panel = gray[26:286, 808:1274]
+    gold_back = (
+        (back[:, :, 0] >= 8)
+        & (back[:, :, 0] <= 40)
+        & (back[:, :, 1] >= 70)
+        & (back[:, :, 2] >= 110)
+    )
+    if float(np.mean(gold_back)) < 0.11 or float(np.mean(right_panel < 95)) < 0.75:
+        return None
+    return int(round(47 * scale_x)), int(round(45 * scale_y))
+
+
 def detect_collective_tutorial_continue_target(frame_bgr):
     """Detect the guided collective-mind overlay that blocks the map."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

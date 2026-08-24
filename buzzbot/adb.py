@@ -142,7 +142,15 @@ class AdbClient:
         encoded = base64.b64encode(secret.encode("utf-8")).decode("ascii")
         script = (
             f"value=$(printf %s {encoded} | base64 -d); "
-            'input text "$value"; unset value; exit\n'
+            'remaining="$value"; '
+            'while :; do case "$remaining" in '
+            '*@*) chunk=${remaining%%@*}; '
+            '[ -z "$chunk" ] || input text "$chunk" || exit $?; '
+            'input keyevent KEYCODE_AT || exit $?; '
+            'remaining=${remaining#*@} ;; '
+            '*) [ -z "$remaining" ] || input text "$remaining" || exit $?; '
+            'break ;; esac; done; '
+            'unset value remaining chunk; exit\n'
         ).encode("ascii")
         command = [str(self.adb_path), "-s", self.serial, "shell"]
         kwargs = {

@@ -23,6 +23,7 @@ from buzzbot.accounts import (
     extract_android_google_accounts,
     extract_google_account_targets,
     extract_google_accounts,
+    extract_igg_id_targets,
     extract_igg_login_form,
     find_account,
     mask_google_account,
@@ -59,17 +60,23 @@ from buzzbot.multi_emulator import (
 from buzzbot.matching import (
     TemplateCache,
     detect_alliance_marked_project_target,
+    detect_account_details_close_target,
     detect_back_confirmation_cancel_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
+    detect_commander_profile_back_target,
     detect_camped_march_card_targets,
+    detect_account_settings_back_target,
     detect_finished_healing_target,
+    detect_game_event_overlay_close_target,
+    detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
     detect_radar_card_action_target,
     detect_radar_notification_targets,
     detect_radar_world_action_target,
+    detect_settings_close_target,
     detect_lowest_stamina_refill_target,
     detect_march_retreat_target,
     detect_stamina_refill_target,
@@ -3991,9 +3998,9 @@ class AutoClicker:
             self.current_routine_task_id = None
             self.routine_current_had_action = False
             self.account_switch_task = None
-            self.account_switch_error = ""
+            self.account_switch_error = switch_error
             self.account_switch_selected_at = 0.0
-            self.account_switch_confirmed = False
+            self.account_switch_confirmed = bool(switch_confirmed and not switch_error)
             self.account_switch_probe_ready = False
             self.account_switch_auto_login_attempted = False
             self.routine_only_task_id = None
@@ -4496,14 +4503,79 @@ class AutoClicker:
         self._interruptible_sleep(2.0)
         return True
 
+    def _try_account_switch_connection_recovery(self, task):
+        """Dismiss an interrupted-session dialog and restart account navigation."""
+        if task.get("id") != "__account_switch__":
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Account switch recovery could not capture the screen")
+            return False
+
+        target = detect_login_session_expired_ok_target(frame)
+        if target is None:
+            return False
+
+        # Previous navigation coordinates must not block the retry.
+        self.blocked_coords.clear()
+        if not self._tap_routine_fallback(
+            target,
+            ("account_switch_connection_recovery", *target),
+            "Соединение прервано: переподключаю аккаунт",
+        ):
+            return False
+
+        self.account_switch_selected_at = 0.0
+        self.account_switch_auto_login_attempted = False
+        self.account_switch_error = ""
+        self.routine_completed_steps = {
+            step for step in self.routine_completed_steps
+            if not str(step).startswith("account_switch_")
+        }
+        self.routine_current_had_action = False
+        self.routine_last_action_time = time.time()
+        logger.warning("Interrupted game session dismissed; account switch will retry")
+        self._interruptible_sleep(5.0)
+        return True
+
     def _try_account_switch_visual_fallback(self, task):
         if task.get("id") != "__account_switch__" or self.account_switch_selected_at:
             return False
+        if self.uses_adb:
+            try:
+                foreground = self.adb_client.current_foreground_package()
+                if foreground != GAME_PACKAGE:
+                    self.adb_client.launch_package(GAME_PACKAGE)
+                    self._invalidate_capture()
+                    self.routine_last_action_time = time.time()
+                    self.set_status_message(
+                        "Переключение аккаунта: запускаю Doomsday",
+                        force=True,
+                    )
+                    logger.info(
+                        "Account switch launched game from foreground package %s",
+                        foreground or "unknown",
+                    )
+                    self._interruptible_sleep(10.0)
+                    return True
+            except AdbError:
+                logger.exception("Account switch could not launch the game package")
+                return False
         try:
             frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("Account switch fallback could not capture the screen")
             return False
+        event_close_target = detect_game_event_overlay_close_target(frame)
+        if event_close_target is not None and self._tap_routine_fallback(
+            event_close_target,
+            ("account_switch_event_close", *event_close_target),
+            "Переключение аккаунта: закрываю игровой баннер",
+        ):
+            logger.info("Account switch closed a blocking game event overlay")
+            self._interruptible_sleep(3.0)
+            return True
         if not self._is_main_screen_visible():
             return False
         scale_x = frame.shape[1] / 1280.0
@@ -4670,6 +4742,149 @@ class AutoClicker:
         self.click_count += 1
         logger.info("IGG credentials submitted for account profile %s", account_id)
         self._interruptible_sleep(4.0)
+        return True
+
+    def _try_account_switch_igg_confirmation(self, task):
+        settings = task.get("settings", {})
+        if (
+            task.get("id") != "__account_switch__"
+            or settings.get("login_method") != "igg"
+            or not self.uses_adb
+        ):
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("IGG account confirmation fallback could not capture the screen")
+            return False
+
+        target = detect_login_saved_account_continue_target(frame)
+        if target is None:
+            return False
+
+        if not self.account_switch_auto_login_attempted:
+            other_target = (
+                int(round(frame.shape[1] * 640 / 1280.0)),
+                int(round(frame.shape[0] * 412 / 720.0)),
+            )
+            if not self._tap_routine_fallback(
+                other_target,
+                ("account_switch_igg_other", *other_target),
+                "Выбираю вход в другой IGG Account",
+            ):
+                return False
+            logger.info("IGG other-account form requested at %s", other_target)
+            self._interruptible_sleep(3.0)
+            return True
+
+        if not self._tap_routine_fallback(
+            target,
+            ("account_switch_igg_continue", *target),
+            "IGG подтвердил целевой аккаунт; продолжаю вход в игру",
+        ):
+            return False
+
+        # Give the game a fresh loading window after the intermediate IGG page.
+        self.account_switch_selected_at = time.time()
+        logger.info("IGG account confirmation accepted at %s", target)
+        self._interruptible_sleep(4.0)
+        return True
+
+    def _try_account_switch_igg_id_selection(self, task):
+        settings = task.get("settings", {})
+        if (
+            task.get("id") != "__account_switch__"
+            or settings.get("login_method") != "igg"
+            or not self.uses_adb
+        ):
+            return False
+        chooser_index = min(20, max(1, int(settings.get("chooser_index", 1))))
+        try:
+            targets = extract_igg_id_targets(self.adb_client.ui_xml())
+        except AdbError:
+            targets = []
+
+        if targets:
+            available_count = len(targets)
+            target = targets[chooser_index - 1]["center"] if chooser_index <= available_count else None
+        else:
+            try:
+                frame, _origin = self._capture_screen_bgr(force=True)
+            except Exception:
+                logger.exception("IGG ID selection fallback could not capture the screen")
+                return False
+            visual_target = detect_igg_id_selection_target(frame)
+            available_count = 1 if visual_target else 0
+            target = visual_target if chooser_index == 1 else None
+
+        if not available_count:
+            return False
+        if target is None:
+            self.account_switch_error = (
+                f"IGG ID №{chooser_index} не найден; доступно: {available_count}"
+            )
+            self.set_status_message(self.account_switch_error, force=True)
+            return True
+
+        if not self._tap_routine_fallback(
+            target,
+            ("account_switch_igg_id", chooser_index, *target),
+            f"Выбран сохранённый IGG ID №{chooser_index}; загружаю игру",
+        ):
+            return False
+        self.routine_completed_steps.add("account_switch_igg_id_selected")
+        self.account_switch_selected_at = time.time()
+        logger.info("Saved IGG ID row %s selected at %s", chooser_index, target)
+        self._interruptible_sleep(6.0)
+        return True
+
+    def _try_account_switch_return_to_main(self, task):
+        if (
+            task.get("id") != "__account_switch__"
+            or "account_switch_igg_id_selected" not in self.routine_completed_steps
+            or not self.account_switch_selected_at
+        ):
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Account switch completion fallback could not capture the screen")
+            return False
+
+        if "account_switch_profile_closed" in self.routine_completed_steps:
+            return False
+        if "account_switch_login_methods_closed" not in self.routine_completed_steps:
+            target = detect_account_settings_back_target(frame)
+            step = "login_methods_back"
+            marker = "account_switch_login_methods_closed"
+            message = "Аккаунт выбран; возвращаюсь из способов входа"
+        elif "account_switch_details_closed" not in self.routine_completed_steps:
+            target = detect_account_details_close_target(frame)
+            step = "account_close"
+            marker = "account_switch_details_closed"
+            message = "Аккаунт выбран; закрываю страницу аккаунта"
+        elif "account_switch_settings_closed" not in self.routine_completed_steps:
+            target = detect_settings_close_target(frame)
+            step = "settings_close"
+            marker = "account_switch_settings_closed"
+            message = "Аккаунт выбран; закрываю настройки"
+        else:
+            target = detect_commander_profile_back_target(frame)
+            step = "profile_back"
+            marker = "account_switch_profile_closed"
+            message = "Аккаунт выбран; возвращаюсь из профиля на карту"
+        if target is None:
+            return False
+        if not self._tap_routine_fallback(
+            target,
+            ("account_switch_return_main", step, *target),
+            message,
+        ):
+            return False
+        self.routine_completed_steps.add(marker)
+        self.account_switch_selected_at = time.time()
+        logger.info("Account switch completed settings step %s at %s", step, target)
+        self._interruptible_sleep(3.0)
         return True
 
     def _tap_routine_fallback(self, target, coord_key, status_message):
@@ -6023,6 +6238,10 @@ class AutoClicker:
                         if (
                             img.get("group") == current_group
                             and self._is_active(img)
+                            and not (
+                                current_routine_task.get("id") == "__account_switch__"
+                                and self.account_switch_selected_at
+                            )
                             and runtime_step_is_ready(img, self.routine_completed_steps)
                             and healing_pending_allows_image(
                                 img,
@@ -6427,6 +6646,38 @@ class AutoClicker:
                     self.routine_mode
                     and current_routine_task.get("id") == "__account_switch__"
                     and not action_occurred
+                    and self._try_account_switch_connection_recovery(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
+                    and self._try_account_switch_igg_confirmation(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
+                    and self._try_account_switch_igg_id_selection(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
+                    and self._try_account_switch_return_to_main(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
                     and self._try_account_switch_igg_login(current_routine_task)
                 ):
                     continue
@@ -6520,6 +6771,11 @@ class AutoClicker:
                             ):
                                 self.account_switch_confirmed = True
                                 self._finish_current_routine(time.time())
+                            elif elapsed >= timeout:
+                                self.account_switch_error = (
+                                    "Переключение не завершено: главный экран игры не появился"
+                                )
+                                self._finish_current_routine(time.time())
                             elif (
                                 current_routine_task.get("settings", {}).get("login_method") == "igg"
                                 and time.time() - self.account_switch_selected_at >= 15.0
@@ -6535,11 +6791,6 @@ class AutoClicker:
                                         "IGG не завершил вход: проверьте логин и пароль"
                                     )
                                     self._finish_current_routine(time.time())
-                            elif elapsed >= timeout:
-                                self.account_switch_error = (
-                                    "Переключение не завершено: главный экран игры не появился"
-                                )
-                                self._finish_current_routine(time.time())
                             continue
                         if elapsed >= timeout:
                             login_method = current_routine_task.get("settings", {}).get(

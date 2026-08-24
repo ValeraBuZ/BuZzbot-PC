@@ -148,6 +148,21 @@ class AdbClientTests(unittest.TestCase):
         self.assertNotIn(b"secret-123", payload)
         self.assertIn(b"base64 -d", payload)
 
+    @patch("buzzbot.adb.subprocess.Popen")
+    def test_private_email_uses_android_at_key_without_exposing_value(self, popen):
+        process = popen.return_value
+        process.communicate.return_value = (b"", b"")
+        process.returncode = 0
+        client = self.make_client(lambda *_args, **_kwargs: FakeResult())
+
+        client.input_private_text("person@example.com")
+
+        command = popen.call_args.args[0]
+        payload = process.communicate.call_args.args[0]
+        self.assertNotIn("person@example.com", " ".join(command))
+        self.assertNotIn(b"person@example.com", payload)
+        self.assertIn(b"KEYCODE_AT", payload)
+
     def test_current_foreground_package_reads_focused_window(self):
         calls = []
 
