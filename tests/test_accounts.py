@@ -141,6 +141,18 @@ class AccountProfileTests(unittest.TestCase):
         )
         self.assertIsNone(extract_igg_login_form(xml))
 
+    def test_igg_login_form_supports_flattened_webview(self):
+        xml = (
+            '<hierarchy><node class="android.widget.TextView" text="Вход в IGG Account" />'
+            '<node class="android.webkit.WebView" '
+            'resource-id="com.igg.android.doomsdaylastsurvivors:id/webview_web" '
+            'bounds="[0,68][1280,720]" /></hierarchy>'
+        )
+        self.assertEqual(
+            extract_igg_login_form(xml),
+            {"login": (640, 122), "password": (640, 208), "submit": (538, 294)},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

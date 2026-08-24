@@ -2573,6 +2573,7 @@ class AutoClicker:
                         data.get('account_profiles'),
                         self.adb_serial,
                     )
+                    self._migrate_account_logins_to_credential_store()
                     self.current_account_id = str(
                         data.get('current_account_id') or self.account_profiles[0]['id']
                     )
@@ -2934,6 +2935,29 @@ class AutoClicker:
         # Google passwords from older versions were stored under the bare ID.
         return str(account_id) if method == "google" else f"igg:{account_id}"
 
+    def _account_login_key(self, account_id, login_method=None):
+        method = str(login_method or "").strip().lower()
+        if not method:
+            profile = find_account(self.account_profiles, account_id)
+            method = str((profile or {}).get("login_method") or "igg").strip().lower()
+        return f"login:{method}:{account_id}"
+
+    def get_account_login(self, account_id, login_method=None):
+        try:
+            return self.credential_store.get_password(
+                self._account_login_key(account_id, login_method)
+            ) or ""
+        except CredentialError as exc:
+            logger.warning("Не удалось прочитать логин профиля %s: %s", account_id, exc)
+            return ""
+
+    def account_has_saved_login(self, account_id):
+        try:
+            return self.credential_store.has_password(self._account_login_key(account_id))
+        except CredentialError as exc:
+            logger.warning("Не удалось проверить логин профиля %s: %s", account_id, exc)
+            return False
+
     def account_has_saved_password(self, account_id):
         try:
             return self.credential_store.has_password(self._account_password_key(account_id))
@@ -2949,27 +2973,62 @@ class AutoClicker:
         if not normalized_login:
             raise ValueError("Введите логин IGG.")
         login_method = str(profile.get("login_method") or "igg").strip().lower()
-        login_field = "google_login" if login_method == "google" else "igg_login"
-        profile[login_field] = normalized_login
-        profile["auto_login"] = bool(auto_login)
         if password is not None and str(password):
             self.credential_store.set_password(
                 self._account_password_key(account_id, login_method),
                 str(password),
             )
+        self.credential_store.set_password(
+            self._account_login_key(account_id, login_method),
+            normalized_login,
+        )
+        # Credentials are machine-local. Never keep even the login in portable config.json.
+        profile["google_login"] = ""
+        profile["igg_login"] = ""
+        profile["auto_login"] = bool(auto_login)
         self.save_config()
         return True
 
     def delete_account_password(self, account_id):
         profile = find_account(self.account_profiles, account_id)
         login_method = str((profile or {}).get("login_method") or "igg")
-        removed = self.credential_store.delete_password(
+        removed_password = self.credential_store.delete_password(
             self._account_password_key(account_id, login_method)
         )
+        removed_login = self.credential_store.delete_password(
+            self._account_login_key(account_id, login_method)
+        )
         if profile:
+            profile["google_login"] = ""
+            profile["igg_login"] = ""
             profile["auto_login"] = False
             self.save_config()
-        return removed
+        return removed_password or removed_login
+
+    def _migrate_account_logins_to_credential_store(self):
+        changed = False
+        for profile in self.account_profiles:
+            account_id = str(profile.get("id") or "").strip()
+            if not account_id:
+                continue
+            for method, field in (("igg", "igg_login"), ("google", "google_login")):
+                legacy_login = str(profile.get(field) or "").strip()
+                if not legacy_login:
+                    continue
+                key = self._account_login_key(account_id, method)
+                try:
+                    if not self.credential_store.has_password(key):
+                        self.credential_store.set_password(key, legacy_login)
+                except CredentialError as exc:
+                    logger.warning(
+                        "Не удалось перенести логин профиля %s в защищённое хранилище: %s",
+                        account_id,
+                        exc,
+                    )
+                    continue
+                profile[field] = ""
+                changed = True
+        return changed
 
     @staticmethod
     def _google_signin_frame_is_visible(frame):
@@ -3014,7 +3073,7 @@ class AutoClicker:
             frame = self.adb_client.screenshot_bgr()
             if not self._google_signin_frame_is_visible(frame):
                 raise CredentialError("Страница входа Google не подтверждена.")
-            value = str(profile.get("google_login") or "").strip()
+            value = self.get_account_login(account_id, "google")
             if stage == "password":
                 value = self.credential_store.get_password(
                     self._account_password_key(account_id, "google")
@@ -3056,7 +3115,7 @@ class AutoClicker:
         targets = form or extract_igg_login_form(ui_xml)
         if not targets:
             raise CredentialError("Форма входа IGG не подтверждена.")
-        login = str(profile.get("igg_login") or "").strip()
+        login = self.get_account_login(account_id, "igg")
         password = self.credential_store.get_password(
             self._account_password_key(account_id, "igg")
         ) or ""
@@ -3150,8 +3209,10 @@ class AutoClicker:
         try:
             self.credential_store.delete_password(self._account_password_key(account_id, "igg"))
             self.credential_store.delete_password(self._account_password_key(account_id, "google"))
+            self.credential_store.delete_password(self._account_login_key(account_id, "igg"))
+            self.credential_store.delete_password(self._account_login_key(account_id, "google"))
         except CredentialError as exc:
-            logger.warning("Не удалось удалить пароль профиля %s: %s", account_id, exc)
+            logger.warning("Не удалось удалить учётные данные профиля %s: %s", account_id, exc)
         self.account_profiles = [profile for profile in self.account_profiles if profile.get("id") != account_id]
         if self.current_account_id == account_id:
             self.select_account_profile(self.account_profiles[0]["id"], save=False)
@@ -3185,7 +3246,7 @@ class AutoClicker:
             if not profile.get("auto_login", False):
                 self.set_status_message("Для переключения включите автоматический вход IGG", force=True)
                 return False
-            if not str(profile.get("igg_login") or "").strip():
+            if not self.account_has_saved_login(profile["id"]):
                 self.set_status_message("Для переключения сохраните логин IGG", force=True)
                 return False
             if not self.account_has_saved_password(profile["id"]):

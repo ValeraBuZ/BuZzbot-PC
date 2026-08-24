@@ -46,6 +46,8 @@ class FormAdbClient(FakeAdbClient):
 
 class FakeCredentialStore:
     def get_password(self, key):
+        if key == "login:igg:main":
+            return "user@example.com"
         return "safe-password" if key == "igg:main" else None
 
 
@@ -103,7 +105,7 @@ class IggCredentialTests(unittest.TestCase):
         bot.input_backend = "adb"
         bot.adb_client = FormAdbClient()
         bot.account_profiles = [
-            {"id": "main", "login_method": "igg", "igg_login": "user@example.com"}
+            {"id": "main", "login_method": "igg", "igg_login": ""}
         ]
         bot.credential_store = FakeCredentialStore()
         bot._invalidate_capture = lambda: None
@@ -116,6 +118,53 @@ class IggCredentialTests(unittest.TestCase):
         )
         self.assertEqual(bot.adb_client.inputs, ["user@example.com", "safe-password"])
         self.assertEqual(bot.adb_client.clear_calls, 2)
+
+
+class MemoryCredentialStore:
+    def __init__(self):
+        self.values = {}
+
+    def has_password(self, key):
+        return key in self.values
+
+    def set_password(self, key, value):
+        self.values[key] = value
+
+    def get_password(self, key):
+        return self.values.get(key)
+
+    def delete_password(self, key):
+        return self.values.pop(key, None) is not None
+
+
+class LocalCredentialTests(unittest.TestCase):
+    def make_bot(self, profile):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_profiles = [profile]
+        bot.credential_store = MemoryCredentialStore()
+        bot.save_config = lambda: None
+        return bot
+
+    def test_login_and_password_are_kept_out_of_portable_profile(self):
+        profile = {"id": "zzub1", "login_method": "igg", "igg_login": "legacy"}
+        bot = self.make_bot(profile)
+
+        bot.save_account_credentials("zzub1", "local-login", "local-password", True)
+
+        self.assertEqual(profile["igg_login"], "")
+        self.assertEqual(profile["google_login"], "")
+        self.assertTrue(profile["auto_login"])
+        self.assertEqual(bot.get_account_login("zzub1", "igg"), "local-login")
+        self.assertEqual(bot.credential_store.get_password("igg:zzub1"), "local-password")
+
+    def test_legacy_login_is_migrated_to_machine_local_store(self):
+        profile = {"id": "zzub1", "login_method": "igg", "igg_login": "legacy-login"}
+        bot = self.make_bot(profile)
+
+        self.assertTrue(bot._migrate_account_logins_to_credential_store())
+
+        self.assertEqual(profile["igg_login"], "")
+        self.assertEqual(bot.get_account_login("zzub1", "igg"), "legacy-login")
 
 
 if __name__ == "__main__":

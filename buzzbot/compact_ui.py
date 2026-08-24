@@ -220,8 +220,8 @@ class AccountCredentialsDialog:
         ttk.Label(
             body,
             text=(
-                "Пароль шифруется средствами Windows и не сохраняется в config.json. "
-                "Он доступен только вашему пользователю Windows на этом компьютере."
+                "Логин и пароль шифруются средствами Windows и не сохраняются в config.json. "
+                "Они доступны только вашему пользователю Windows на этом компьютере."
             ),
             foreground="#72818A",
             wraplength=520,
@@ -231,7 +231,7 @@ class AccountCredentialsDialog:
         form.pack(fill=tk.X)
         form.columnconfigure(1, weight=1)
         ttk.Label(form, text="Логин IGG (эл. почта)").grid(row=0, column=0, sticky="w", padx=(0, 12), pady=5)
-        self.login_var = tk.StringVar(value=self.profile.get("igg_login", ""))
+        self.login_var = tk.StringVar(value=self.bot.get_account_login(self.profile["id"], "igg"))
         ttk.Entry(form, textvariable=self.login_var, width=42).grid(row=0, column=1, sticky="ew", pady=5)
 
         ttk.Label(form, text="Пароль").grid(row=1, column=0, sticky="w", padx=(0, 12), pady=5)
@@ -252,7 +252,7 @@ class AccountCredentialsDialog:
 
         actions = ttk.Frame(body)
         actions.pack(fill=tk.X, pady=(16, 0))
-        ttk.Button(actions, text="Удалить пароль", command=self.delete_password).pack(side=tk.LEFT)
+        ttk.Button(actions, text="Удалить данные входа", command=self.delete_password).pack(side=tk.LEFT)
 
         buttons = ttk.Frame(body)
         buttons.pack(fill=tk.X, side=tk.BOTTOM, pady=(14, 0))
@@ -261,8 +261,14 @@ class AccountCredentialsDialog:
         self.dialog.bind("<Escape>", lambda _event: self.dialog.destroy())
 
     def _refresh_saved_label(self):
-        saved = self.bot.account_has_saved_password(self.profile["id"])
-        self.saved_label.config(text=f"Зашифрованный пароль: {'сохранён' if saved else 'не сохранён'}")
+        login_saved = self.bot.account_has_saved_login(self.profile["id"])
+        password_saved = self.bot.account_has_saved_password(self.profile["id"])
+        self.saved_label.config(
+            text=(
+                f"Зашифровано локально: логин {'да' if login_saved else 'нет'}, "
+                f"пароль {'да' if password_saved else 'нет'}"
+            )
+        )
 
     def _save(self):
         login = self.login_var.get().strip()
@@ -341,7 +347,7 @@ class AccountsDialog:
         self.listbox.delete(0, tk.END)
         for profile in self.bot.account_profiles:
             mark = "●" if profile.get("id") == self.bot.current_account_id else " "
-            login = str(profile.get("igg_login") or "").strip()
+            login = self.bot.get_account_login(profile.get("id"), "igg")
             login_label = mask_account_login(login) or "нет"
             password_label = "да" if self.bot.account_has_saved_password(profile.get("id")) else "нет"
             self.listbox.insert(

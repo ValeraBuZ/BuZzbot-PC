@@ -229,9 +229,8 @@ def extract_igg_login_form(ui_xml):
     except ET.ParseError:
         return None
 
-    has_igg_webview = any(
-        node.attrib.get("class") == "android.webkit.WebView"
-        and "igg account" in " ".join(
+    title_visible = any(
+        "igg account" in " ".join(
             (
                 str(node.attrib.get("text", "")),
                 str(node.attrib.get("content-desc", "")),
@@ -239,7 +238,7 @@ def extract_igg_login_form(ui_xml):
         ).casefold()
         for node in root.iter()
     )
-    if not has_igg_webview:
+    if not title_visible:
         return None
 
     login_target = None
@@ -263,17 +262,37 @@ def extract_igg_login_form(ui_xml):
         elif node_class == "android.widget.Button" and attributes.get("clickable") == "true":
             submit_targets.append((top, center))
 
-    if login_target is None or password_target is None or not submit_targets:
-        return None
-    submit_target = next(
-        (center for top, center in sorted(submit_targets) if top >= password_target[1]),
-        sorted(submit_targets)[0][1],
-    )
-    return {
-        "login": login_target,
-        "password": password_target,
-        "submit": submit_target,
-    }
+    if login_target is not None and password_target is not None and submit_targets:
+        submit_target = next(
+            (center for top, center in sorted(submit_targets) if top >= password_target[1]),
+            sorted(submit_targets)[0][1],
+        )
+        return {
+            "login": login_target,
+            "password": password_target,
+            "submit": submit_target,
+        }
+
+    # Recent IGG builds expose the form as one non-accessible WebView. The
+    # native title and WebView bounds still provide a stable, verifiable frame
+    # for the three controls across LDPlayer resolutions.
+    for node in root.iter():
+        if node.attrib.get("class") != "android.webkit.WebView":
+            continue
+        bounds = _BOUNDS_RE.fullmatch(str(node.attrib.get("bounds", "")))
+        if bounds is None:
+            continue
+        left, top, right, bottom = map(int, bounds.groups())
+        width = right - left
+        height = bottom - top
+        if width < 500 or height < 300:
+            continue
+        return {
+            "login": (left + round(width * 0.50), top + round(height * 0.083)),
+            "password": (left + round(width * 0.50), top + round(height * 0.215)),
+            "submit": (left + round(width * 0.42), top + round(height * 0.347)),
+        }
+    return None
 
 
 def mask_google_account(email):
