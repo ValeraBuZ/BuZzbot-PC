@@ -27,8 +27,11 @@ from buzzbot_app import AutoClicker, logger
 
 GAME_PACKAGE = "com.igg.android.doomsdaylastsurvivors"
 DEFAULT_ACCOUNT_IDS = ("zzub1", "igg_3", "igg_4", "igg_5", "igg_6", "igg_7")
+PROTECTED_ACCOUNT_IDS = {"buzz"}
 EVENT_TEMPLATE = PROJECT_ROOT / "tools" / "assets" / "wasteland_event_entry.png"
 REGISTERED_TEMPLATE = PROJECT_ROOT / "tools" / "assets" / "wasteland_registered_status.png"
+TEAM_NAME_DIALOG_TEMPLATE = PROJECT_ROOT / "tools" / "assets" / "wasteland_team_name_dialog.png"
+TEAM_CREATED_TEMPLATE = PROJECT_ROOT / "tools" / "assets" / "wasteland_team_created.png"
 
 
 def _safe_name(value):
@@ -52,16 +55,34 @@ def _tap(client, frame, x, y):
     client.tap(*_scaled_point(frame, x, y))
 
 
-def _green_button_visible(frame):
+def _team_button_visible(frame):
     height, width = frame.shape[:2]
-    x1, y1 = _scaled_point(frame, 340, 425)
-    x2, y2 = _scaled_point(frame, 630, 520)
+    x1, y1 = _scaled_point(frame, 450, 570)
+    x2, y2 = _scaled_point(frame, 830, 670)
     roi = frame[y1:y2, x1:x2]
     if roi.size == 0:
         return False
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, np.array((35, 70, 70)), np.array((95, 255, 255)))
-    return int(cv2.countNonZero(mask)) >= max(250, int(roi.shape[0] * roi.shape[1] * 0.08))
+    mask = cv2.inRange(hsv, np.array((5, 100, 130)), np.array((40, 255, 255)))
+    return int(cv2.countNonZero(mask)) >= max(250, int(roi.shape[0] * roi.shape[1] * 0.12))
+
+
+def _template_visible(frame, template_path, threshold):
+    template = cv2.imread(str(template_path), cv2.IMREAD_COLOR)
+    if template is None or frame is None:
+        return False
+    if template.shape[0] > frame.shape[0] or template.shape[1] > frame.shape[1]:
+        return False
+    result = cv2.matchTemplate(frame, template, cv2.TM_CCOEFF_NORMED)
+    return float(cv2.minMaxLoc(result)[1]) >= float(threshold)
+
+
+def _team_name_dialog_visible(frame):
+    return _template_visible(frame, TEAM_NAME_DIALOG_TEMPLATE, 0.72)
+
+
+def _team_created_visible(frame):
+    return _template_visible(frame, TEAM_CREATED_TEMPLATE, 0.72)
 
 
 def _registration_phase_selected(frame):
@@ -157,13 +178,9 @@ def _open_wasteland_registration(client, output_dir, label):
         client.tap(*target)
         time.sleep(3.0)
         frame = _capture(client, output_dir / f"{label}_event_{attempt + 1}.png")
-        if _registered_status_visible(frame):
-            # This screen is alliance-wide and may show another member's team.
-            # It does not prove that the account we just switched to is enrolled.
-            return frame, "registered_unverified"
         if not _registration_phase_selected(frame):
             return frame, "registration_closed"
-        if _green_button_visible(frame):
+        if _team_button_visible(frame):
             return frame, "create"
         client.keyevent(4)
         time.sleep(1.0)
@@ -174,10 +191,6 @@ def _open_wasteland_registration(client, output_dir, label):
 def _create_solo_team(client, output_dir, account_name):
     label = _safe_name(account_name)
     frame, state = _open_wasteland_registration(client, output_dir, label)
-    if state == "registered_unverified":
-        client.keyevent(4)
-        time.sleep(1.0)
-        return False, "registration status is visible, but current account membership is unverified"
     if state == "registration_closed":
         client.keyevent(4)
         time.sleep(1.0)
@@ -185,9 +198,15 @@ def _create_solo_team(client, output_dir, account_name):
     if frame is None:
         return False, "registration prompt was not detected"
 
-    _tap(client, frame, 493, 472)
+    # The registered commander row is alliance-wide. Only the large Team
+    # button opens the current account's create/join flow.
+    _tap(client, frame, 640, 617)
     time.sleep(2.0)
     frame = _capture(client, output_dir / f"{label}_name_dialog.png")
+    if not _team_name_dialog_visible(frame):
+        client.keyevent(4)
+        time.sleep(1.0)
+        return False, "team name dialog was not confirmed"
     _tap(client, frame, 680, 313)
     time.sleep(0.7)
     team_name = f"Solo{label}"[:20]
@@ -210,7 +229,7 @@ def _create_solo_team(client, output_dir, account_name):
     _tap(client, frame, 785, 480)
     time.sleep(5.0)
     success_frame = _capture(client, output_dir / f"{label}_registered.png")
-    if not _registered_status_visible(success_frame):
+    if not _team_created_visible(success_frame):
         return False, "solo team creation was not confirmed"
     # Keep the proof screenshot, then close the confirmation before switching.
     _tap(client, success_frame, 640, 464)
@@ -225,14 +244,31 @@ def main():
     parser.add_argument("--serial", default="127.0.0.1:5565")
     parser.add_argument("--accounts", default=",".join(DEFAULT_ACCOUNT_IDS))
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--wait-until-open",
+        action="store_true",
+        help="Keep retrying unfinished accounts until the next registration phase opens",
+    )
+    parser.add_argument("--poll-seconds", type=float, default=3600.0)
+    parser.add_argument("--max-wait-hours", type=float, default=168.0)
     args = parser.parse_args()
+
+    account_ids = [item.strip() for item in args.accounts.split(",") if item.strip()]
+    if any(account_id.casefold() in PROTECTED_ACCOUNT_IDS for account_id in account_ids):
+        parser.error("The protected BuZz profile cannot be registered by this tool")
+    if args.poll_seconds < 60.0:
+        parser.error("--poll-seconds must be at least 60")
+    if args.max_wait_hours <= 0:
+        parser.error("--max-wait-hours must be positive")
 
     output_dir = args.output or PROJECT_ROOT / "test_runs" / f"wasteland_registration_{datetime.now():%Y%m%d_%H%M%S}"
     output_dir.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(output_dir / "registration.log", encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
     logger.addHandler(handler)
-    results = []
+    results_by_account = {}
+    pending = list(account_ids)
+    wait_deadline = time.time() + args.max_wait_hours * 3600.0
     bot = AutoClicker(root=None)
     bot.stop_schedule_thread()
     bot.save_config = lambda: None
@@ -249,26 +285,69 @@ def main():
         profile["ldplayer_index"] = 5
 
     try:
-        for account_id in (item.strip() for item in args.accounts.split(",") if item.strip()):
-            profile = next((item for item in bot.account_profiles if item.get("id") == account_id), None)
-            result = {"account_id": account_id, "name": profile.get("name") if profile else account_id}
-            results.append(result)
-            if profile is None or profile.get("login_method") != "igg":
-                result.update(ok=False, detail="profile is missing or is not IGG")
-                continue
+        while pending:
+            registration_closed = False
+            for account_id in list(pending):
+                profile = next(
+                    (item for item in bot.account_profiles if item.get("id") == account_id),
+                    None,
+                )
+                result = {
+                    "account_id": account_id,
+                    "name": profile.get("name") if profile else account_id,
+                    "attempted_at": datetime.now().astimezone().isoformat(),
+                }
+                results_by_account[account_id] = result
+                if profile is None or profile.get("login_method") != "igg":
+                    result.update(ok=False, detail="profile is missing or is not IGG")
+                else:
+                    switched, detail = _switch_account(bot, account_id)
+                    _pin_serial(bot, args.serial)
+                    result["switch"] = detail
+                    if not switched or not _wait_for_main_screen(bot, args.serial, 90.0):
+                        result.update(
+                            ok=False,
+                            detail="account switch did not reach the main screen",
+                        )
+                    else:
+                        ok, detail = _create_solo_team(
+                            client,
+                            output_dir,
+                            profile.get("name") or account_id,
+                        )
+                        result.update(ok=ok, detail=detail)
+                        if ok:
+                            pending.remove(account_id)
+                        elif detail == "registration phase is closed":
+                            registration_closed = True
 
-            switched, detail = _switch_account(bot, account_id)
-            _pin_serial(bot, args.serial)
-            result["switch"] = detail
-            if not switched or not _wait_for_main_screen(bot, args.serial, 90.0):
-                result.update(ok=False, detail="account switch did not reach the main screen")
-                continue
-            ok, detail = _create_solo_team(client, output_dir, profile.get("name") or account_id)
-            result.update(ok=ok, detail=detail)
-            (output_dir / "summary.json").write_text(
-                json.dumps(results, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+                ordered_results = [
+                    results_by_account[item]
+                    for item in account_ids
+                    if item in results_by_account
+                ]
+                (output_dir / "summary.json").write_text(
+                    json.dumps(ordered_results, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                if registration_closed:
+                    break
+
+            if not pending or not args.wait_until_open:
+                break
+            if time.time() >= wait_deadline:
+                logger.warning(
+                    "Wasteland registration wait expired with pending accounts: %s",
+                    ", ".join(pending),
+                )
+                break
+            wait_seconds = min(float(args.poll_seconds), max(0.0, wait_deadline - time.time()))
+            logger.info(
+                "Wasteland registration is not open; retrying %s in %.0f seconds",
+                ", ".join(pending),
+                wait_seconds,
             )
+            time.sleep(wait_seconds)
     finally:
         bot.stop()
         if bot._thread:
@@ -276,11 +355,21 @@ def main():
         bot.stop_schedule_thread()
         logger.removeHandler(handler)
         handler.close()
+        results = [
+            results_by_account[item]
+            for item in account_ids
+            if item in results_by_account
+        ]
         (output_dir / "summary.json").write_text(
             json.dumps(results, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
 
+    results = [
+        results_by_account[item]
+        for item in account_ids
+        if item in results_by_account
+    ]
     print(output_dir)
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return 0 if results and all(item.get("ok") for item in results) else 1

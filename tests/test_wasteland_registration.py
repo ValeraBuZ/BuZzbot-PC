@@ -13,6 +13,7 @@ class FakeClient:
     def __init__(self, frame):
         self.frame = frame
         self.keyevents = []
+        self.taps = []
 
     def screenshot_bgr(self):
         return self.frame
@@ -20,8 +21,8 @@ class FakeClient:
     def keyevent(self, value):
         self.keyevents.append(value)
 
-    def tap(self, *_args):
-        pass
+    def tap(self, *args):
+        self.taps.append(args)
 
     def clear_focused_text(self, *_args):
         pass
@@ -52,6 +53,45 @@ class WastelandRegistrationTests(unittest.TestCase):
 
         self.assertFalse(registration._registration_phase_selected(frame))
 
+    def test_team_button_uses_the_large_orange_action_area(self):
+        hsv = np.zeros((720, 1280, 3), dtype=np.uint8)
+        hsv[585:655, 470:810] = (20, 220, 220)
+        frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        self.assertTrue(registration._team_button_visible(frame))
+
+    def test_live_dialog_templates_are_specific(self):
+        name_dialog = cv2.imread(str(registration.TEAM_NAME_DIALOG_TEMPLATE))
+        created_dialog = cv2.imread(str(registration.TEAM_CREATED_TEMPLATE))
+
+        self.assertTrue(registration._team_name_dialog_visible(name_dialog))
+        self.assertFalse(registration._team_created_visible(name_dialog))
+        self.assertTrue(registration._team_created_visible(created_dialog))
+        self.assertFalse(registration._team_name_dialog_visible(created_dialog))
+
+    @patch.object(registration.time, "sleep")
+    @patch.object(registration, "_team_button_visible", return_value=True)
+    @patch.object(registration, "_registration_phase_selected", return_value=True)
+    @patch.object(registration, "_registered_status_visible", return_value=True)
+    @patch.object(registration, "_event_target", return_value=(500, 100))
+    def test_alliance_registration_row_does_not_hide_create_flow(
+        self,
+        _event_target,
+        _registered,
+        _registration_phase,
+        _team_button,
+        _sleep,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            frame, state = registration._open_wasteland_registration(
+                self.client,
+                Path(directory),
+                "Account",
+            )
+
+        self.assertIs(frame, self.frame)
+        self.assertEqual(state, "create")
+
     @patch.object(registration.time, "sleep")
     @patch.object(
         registration,
@@ -70,12 +110,13 @@ class WastelandRegistrationTests(unittest.TestCase):
         self.assertEqual(detail, "registration phase is closed")
 
     @patch.object(registration.time, "sleep")
-    @patch.object(
-        registration,
-        "_open_wasteland_registration",
-        return_value=(np.zeros((720, 1280, 3), dtype=np.uint8), "registered_unverified"),
-    )
-    def test_alliance_registration_status_is_not_account_proof(self, _open, _sleep):
+    @patch.object(registration, "_team_name_dialog_visible", return_value=False)
+    @patch.object(registration, "_capture")
+    @patch.object(registration, "_open_wasteland_registration")
+    def test_create_requires_name_dialog(self, open_registration, capture, _visible, _sleep):
+        open_registration.return_value = (self.frame, "create")
+        capture.return_value = self.frame
+
         with tempfile.TemporaryDirectory() as directory:
             ok, detail = registration._create_solo_team(
                 self.client,
@@ -84,13 +125,22 @@ class WastelandRegistrationTests(unittest.TestCase):
             )
 
         self.assertFalse(ok)
-        self.assertIn("unverified", detail)
+        self.assertEqual(detail, "team name dialog was not confirmed")
+        self.assertEqual(self.client.taps[0], (640, 617))
 
     @patch.object(registration.time, "sleep")
-    @patch.object(registration, "_registered_status_visible", return_value=False)
+    @patch.object(registration, "_team_created_visible", return_value=False)
+    @patch.object(registration, "_team_name_dialog_visible", return_value=True)
     @patch.object(registration, "_capture")
     @patch.object(registration, "_open_wasteland_registration")
-    def test_create_requires_visible_confirmation(self, open_registration, capture, _visible, _sleep):
+    def test_create_requires_specific_success_dialog(
+        self,
+        open_registration,
+        capture,
+        _name_visible,
+        _created_visible,
+        _sleep,
+    ):
         open_registration.return_value = (self.frame, "create")
         capture.return_value = self.frame
 
