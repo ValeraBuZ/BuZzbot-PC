@@ -305,6 +305,42 @@ def extract_igg_login_form(ui_xml):
     return None
 
 
+def extract_igg_unregistered_cancel_target(ui_xml):
+    """Return the safe cancel target from IGG's unregistered-email dialog."""
+    try:
+        root = ET.fromstring(str(ui_xml or ""))
+    except ET.ParseError:
+        return None
+
+    labels = " ".join(
+        " ".join(
+            (
+                str(node.attrib.get("text", "")),
+                str(node.attrib.get("content-desc", "")),
+            )
+        )
+        for node in root.iter()
+    ).casefold()
+    if "not registered" not in labels and "не зарегистрирован" not in labels:
+        return None
+
+    candidates = []
+    for node in root.iter():
+        if node.attrib.get("clickable") != "true":
+            continue
+        bounds = _BOUNDS_RE.fullmatch(str(node.attrib.get("bounds", "")))
+        if bounds is None:
+            continue
+        left, top, right, bottom = map(int, bounds.groups())
+        width = right - left
+        height = bottom - top
+        if 300 <= top <= 520 and 80 <= width <= 400 and 30 <= height <= 100:
+            candidates.append(((left + right) // 2, (top + bottom) // 2))
+    if len(candidates) < 2:
+        return None
+    return min(candidates, key=lambda point: (point[0], point[1]))
+
+
 def extract_igg_id_targets(ui_xml):
     """Return saved IGG ID rows from the account-selection WebView."""
     try:

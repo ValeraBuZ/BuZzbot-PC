@@ -9,6 +9,7 @@ class FakeAdbClient:
     def __init__(self, package="com.google.android.gms", ui_xml='<node text="Verify it\'s you" />'):
         self.package = package
         self._ui_xml = ui_xml
+        self.taps = []
 
     def current_foreground_package(self):
         return self.package
@@ -16,8 +17,20 @@ class FakeAdbClient:
     def ui_xml(self):
         return self._ui_xml
 
+    def tap(self, x, y):
+        self.taps.append((x, y))
+
 
 class GoogleCredentialTests(unittest.TestCase):
+    @staticmethod
+    def chooser_xml():
+        return (
+            '<hierarchy><node resource-id="com.google.android.gms:id/container" '
+            'clickable="true" bounds="[312,302][967,405]">'
+            '<node resource-id="com.google.android.gms:id/account_name" '
+            'text="other@example.com" /></node></hierarchy>'
+        )
+
     def make_switch_bot(self, *, auto_login=False, has_password=False, package="com.google.android.gms"):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 1.0
@@ -88,6 +101,23 @@ class GoogleCredentialTests(unittest.TestCase):
         self.assertTrue(handled)
         self.assertTrue(bot.account_switch_auto_login_attempted)
         self.assertIn("reCAPTCHA", bot.account_switch_error)
+
+    def test_google_chooser_refuses_a_different_installed_account(self):
+        bot = self.make_switch_bot()
+        bot.account_switch_selected_at = 0.0
+        bot.adb_client._ui_xml = self.chooser_xml()
+        bot.get_account_login = lambda *_args: "wanted@example.com"
+        bot.account_switch_candidates = []
+
+        handled = bot._try_account_switch_google_chooser(
+            {"id": "__account_switch__", "settings": {
+                "target_account_id": "main", "login_method": "google", "chooser_index": 1,
+            }}
+        )
+
+        self.assertFalse(handled)
+        self.assertFalse(bot.adb_client.taps)
+        self.assertIn("не найден", bot.account_switch_error)
 
 
 if __name__ == "__main__":

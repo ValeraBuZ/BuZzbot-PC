@@ -264,6 +264,40 @@ def detect_game_event_overlay_close_target(frame_bgr):
     return int(round(1152 * scale_x)), int(round(112 * scale_y))
 
 
+def detect_igg_game_login_ok_target(frame_bgr):
+    """Detect the final in-game confirmation shown after choosing an IGG ID."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    outside = gray[0:150, :]
+    dialog = gray[160:575, 315:965]
+    cancel_button = hsv[478:540, 355:635]
+    ok_button = hsv[478:540, 645:925]
+    neutral_cancel = (
+        (cancel_button[:, :, 0] <= 30)
+        & (cancel_button[:, :, 1] <= 150)
+        & (cancel_button[:, :, 2] >= 55)
+        & (cancel_button[:, :, 2] <= 190)
+    )
+    gold_ok = (
+        (ok_button[:, :, 0] >= 8)
+        & (ok_button[:, :, 0] <= 40)
+        & (ok_button[:, :, 1] >= 70)
+        & (ok_button[:, :, 2] >= 145)
+    )
+    if (
+        float(np.mean(outside <= 70)) < 0.75
+        or float(np.mean(dialog >= 145)) < 0.55
+        or float(np.mean(neutral_cancel)) < 0.45
+        or float(np.mean(gold_ok)) < 0.55
+    ):
+        return None
+    return int(round(784 * scale_x)), int(round(508 * scale_y))
+
+
 def detect_account_settings_back_target(frame_bgr):
     """Detect the in-game Account page shown after an IGG ID is selected."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

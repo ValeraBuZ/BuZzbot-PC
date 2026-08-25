@@ -8,6 +8,7 @@ from buzzbot.accounts import (
     extract_google_accounts,
     extract_igg_id_targets,
     extract_igg_login_form,
+    extract_igg_unregistered_cancel_target,
     mask_google_account,
     next_enabled_account,
     normalize_account_profiles,
@@ -19,6 +20,20 @@ from buzzbot.routines import default_routine_tasks
 
 
 class AccountProfileTests(unittest.TestCase):
+    def test_extracts_safe_cancel_from_unregistered_igg_dialog(self):
+        xml = """
+        <hierarchy>
+          <node text="This E-mail is not registered. Register?" class="android.widget.TextView" />
+          <node clickable="true" class="android.view.View" bounds="[411,416][642,483]" />
+          <node clickable="true" class="android.view.View" bounds="[640,416][870,483]" />
+          <node clickable="true" class="android.widget.Button" bounds="[238,260][837,326]" />
+        </hierarchy>
+        """
+        self.assertEqual(extract_igg_unregistered_cancel_target(xml), (526, 449))
+        self.assertIsNone(
+            extract_igg_unregistered_cancel_target('<hierarchy><node text="Sign in" /></hierarchy>')
+        )
+
     def test_extracts_unique_google_accounts_from_android_dump(self):
         account_dump = """
         Account {name=person@example.com, type=com.google}

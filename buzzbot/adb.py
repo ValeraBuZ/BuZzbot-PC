@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -318,12 +319,27 @@ class AdbClient:
                 continue
         return True
 
-    def ui_xml(self):
-        """Return the current Android accessibility tree without leaving files behind."""
-        remote_path = "/sdcard/buzzbot_ui.xml"
-        self._run(["shell", "uiautomator", "dump", remote_path], timeout=12)
+    def ui_xml(self, attempts=3):
+        """Return the accessibility tree, tolerating delayed UIAutomator writes."""
+        remote_path = f"/data/local/tmp/buzzbot_ui_{os.getpid()}.xml"
+        last_error = None
         try:
-            return self._run(["shell", "cat", remote_path], timeout=5)
+            for attempt in range(max(1, int(attempts))):
+                try:
+                    self._run(["shell", "rm", "-f", remote_path], timeout=5)
+                    self._run(
+                        ["shell", "uiautomator", "dump", "--compressed", remote_path],
+                        timeout=15,
+                    )
+                    xml = self._run(["shell", "cat", remote_path], timeout=6)
+                    if "<hierarchy" in str(xml or ""):
+                        return xml
+                    last_error = AdbError("UIAutomator вернул пустое дерево интерфейса.")
+                except AdbError as exc:
+                    last_error = exc
+                if attempt + 1 < max(1, int(attempts)):
+                    time.sleep(0.35 * (attempt + 1))
+            raise last_error or AdbError("Не удалось прочитать дерево интерфейса Android.")
         finally:
             try:
                 self._run(["shell", "rm", "-f", remote_path], timeout=5)

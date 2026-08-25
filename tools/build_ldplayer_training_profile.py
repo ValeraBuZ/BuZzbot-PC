@@ -33,6 +33,7 @@ DEFAULT_PROFILE = TRAINING_DIR / "BuZzbot_Phoenix675_1280x720.zip"
 PROFILE_NAMESPACE = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
 SYSTEM_GROUP = "Системные окна"
 ACCOUNT_SWITCH_GROUP = "Переключение аккаунта"
+WASTELAND_GROUP = "Исследование пустоши"
 RESOURCE_RESULT_LEVEL_TEMPLATES = {
     6: ("resource_level6_result.png", (628, 391, 661, 425)),
     7: ("resource_level7_result.png", (628, 391, 661, 425)),
@@ -157,6 +158,90 @@ SYSTEM_STEPS = (
         (398, 62, 882, 110),
         (-70, 470),
         False,
+    ),
+)
+
+WASTELAND_STEPS = (
+    (
+        "event_entry",
+        "Открыть исследование пустоши",
+        "wasteland_event_entry.png",
+        (775, 138, 865, 230),
+        (0, 0),
+        5.0,
+        (450, 110, 520, 180),
+    ),
+    (
+        "intro_map",
+        "Начать путь из безопасного лагеря",
+        "wasteland_intro_map.png",
+        (365, 535, 525, 650),
+        (0, -10),
+        1.5,
+        (200, 430, 450, 260),
+    ),
+    (
+        "attack",
+        "Атаковать встречу пустоши",
+        "wasteland_attack.png",
+        (1035, 495, 1200, 665),
+        (0, -12),
+        3.0,
+        (980, 430, 280, 280),
+    ),
+    (
+        "bypass",
+        "Обойти встречу после атаки",
+        "wasteland_bypass.png",
+        (865, 440, 975, 535),
+        (0, 0),
+        1.8,
+        (820, 360, 220, 230),
+    ),
+    (
+        "completed",
+        "Исследовать найденный беспорядок",
+        "wasteland_completed.png",
+        (1040, 490, 1200, 670),
+        (0, -12),
+        1.8,
+        (980, 430, 280, 280),
+    ),
+    (
+        "collect",
+        "Собрать сундук пустоши",
+        "wasteland_collect.png",
+        (1040, 490, 1200, 670),
+        (0, -12),
+        1.8,
+        (980, 430, 280, 280),
+    ),
+    (
+        "reward_close",
+        "Закрыть награду исследования пустоши",
+        "wasteland_reward.png",
+        (420, 560, 860, 615),
+        (0, 62),
+        1.0,
+        (350, 530, 580, 130),
+    ),
+    (
+        "explore",
+        "Разведать пустошь",
+        "wasteland_base.png",
+        (1035, 490, 1200, 670),
+        (0, -12),
+        2.0,
+        (980, 430, 280, 280),
+    ),
+    (
+        "stamina_empty",
+        "Завершить проход без выносливости",
+        "wasteland_stamina_empty.png",
+        (465, 65, 820, 110),
+        (428, -3),
+        1.0,
+        (350, 40, 750, 120),
     ),
 )
 
@@ -1378,6 +1463,46 @@ def build_profile(destination):
         manifest["images"].append(configured_image)
         payloads.append((output_path, entry_name))
         print(f"{'account_switch':15s} {step_id:15s} score={score:.3f} size={crop.shape[1]}x{crop.shape[0]}")
+
+    for step_id, description, source_name, box, offset, delay, search_region in WASTELAND_STEPS:
+        uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"wasteland_exploration:{step_id}"))
+        entry_name = f"templates/{uid}.png"
+        source, crop = crop_image(source_name, box)
+        score = verify_crop(source, crop, False)
+        output_path = staging / f"wasteland_exploration_{step_id}.png"
+        if not cv2.imwrite(str(output_path), crop):
+            raise OSError(f"Could not write {output_path}")
+        configured_image = image_config(
+            uid,
+            entry_name,
+            WASTELAND_GROUP,
+            description,
+            offset,
+            False,
+            delay,
+        )
+        configured_image.update(
+            {
+                "runtime_step": step_id,
+                "repeat_runtime_step": True,
+                "allow_repeat": True,
+                "block_seconds": max(0.8, min(3.0, delay)),
+                "confidence": 0.82,
+                "search_region": list(search_region),
+                "use_orb": True,
+                "orb_match_threshold": 3,
+            }
+        )
+        if step_id == "reward_close":
+            configured_image["limit_key"] = "max_encounters"
+        elif step_id == "stamina_empty":
+            configured_image["completes_routine"] = True
+        manifest["images"].append(configured_image)
+        payloads.append((output_path, entry_name))
+        print(
+            f"{'wasteland':15s} {step_id:15s} "
+            f"score={score:.3f} size={crop.shape[1]}x{crop.shape[0]}"
+        )
 
     for task_id, steps in DAILY_TASK_STEPS.items():
         task = next(item for item in tasks if item["id"] == task_id)

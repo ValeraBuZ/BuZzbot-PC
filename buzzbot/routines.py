@@ -481,6 +481,26 @@ DEFAULT_ROUTINE_TASKS = (
         },
     },
     {
+        "id": "wasteland_exploration",
+        "name": "Исследование пустоши",
+        "group": "Исследование пустоши",
+        "category": "event",
+        "enabled": False,
+        "uses_march": False,
+        "priority": 58,
+        "interval_minutes": 1440.0,
+        "timeout_seconds": 120.0,
+        "march_duration_minutes": 30.0,
+        "completion_uid": "",
+        "empty_home_is_success": True,
+        "settings": {
+            # The live event starts at 04:00 Moscow time (01:00 UTC).
+            "fixed_utc_hours": [1],
+            "max_encounters": 40,
+            "stamina_retry_minutes": 12,
+        },
+    },
+    {
         "id": "zombie_hunt",
         "name": "Убийство зомби",
         "group": "Убийство зомби",
@@ -620,6 +640,22 @@ TASK_SETTING_SPECS = {
     "prize_hunt": (
         {"key": "repeat_until_stopped", "label": "Повторять до остановки", "kind": "bool"},
         {"key": "squad", "label": "Номер отряда", "kind": "int", "min": 1, "max": 5},
+    ),
+    "wasteland_exploration": (
+        {
+            "key": "max_encounters",
+            "label": "Встреч за проход (0 = до конца выносливости)",
+            "kind": "int",
+            "min": 0,
+            "max": 1000,
+        },
+        {
+            "key": "stamina_retry_minutes",
+            "label": "Повтор после окончания выносливости, мин",
+            "kind": "int",
+            "min": 1,
+            "max": 1440,
+        },
     ),
     "zombie_hunt": (
         {"key": "fallback_levels", "label": "Понижений от уровня в игре", "kind": "int", "min": 0, "max": 10},

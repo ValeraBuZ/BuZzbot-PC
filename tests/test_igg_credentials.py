@@ -1,5 +1,6 @@
 import unittest
 import threading
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -46,6 +47,9 @@ class FormAdbClient(FakeAdbClient):
 
     def input_private_text(self, value):
         self.inputs.append(value)
+
+    def focused_edit_text_value(self):
+        return self.inputs[-1] if self.inputs else ""
 
 
 class FakeCredentialStore:
@@ -173,6 +177,80 @@ class IggCredentialTests(unittest.TestCase):
         self.assertEqual(bot.account_switch_error, "")
         self.assertEqual(bot.routine_completed_steps, {"unrelated_step"})
         self.assertFalse(bot.routine_current_had_action)
+
+    def test_final_igg_game_confirmation_keeps_selected_account(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 0.0
+        bot.routine_completed_steps = set()
+        bot._interruptible_sleep = lambda _seconds: None
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
+        cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
+        cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+        tapped = []
+        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+
+        handled = bot._try_account_switch_igg_game_confirmation(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(tapped, [(784, 508)])
+        self.assertGreater(bot.account_switch_selected_at, 0.0)
+        self.assertIn("account_switch_igg_id_selected", bot.routine_completed_steps)
+        self.assertIn("account_switch_igg_game_confirmed", bot.routine_completed_steps)
+
+    def test_igg_switch_does_not_accept_old_main_screen_before_final_confirmation(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 1.0
+        bot.routine_completed_steps = {"account_switch_igg_id_selected"}
+        bot._is_main_screen_visible = lambda: True
+        task = self.task()
+
+        self.assertFalse(bot._account_switch_main_screen_confirmed(task))
+
+        bot.routine_completed_steps.add("account_switch_igg_game_confirmed")
+        self.assertTrue(bot._account_switch_main_screen_confirmed(task))
+
+    def test_delayed_igg_confirmation_does_not_complete_google_switch(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 55.0
+        bot.account_switch_auto_login_attempted = True
+        bot.routine_completed_steps = {"account_switch_old", "unrelated"}
+        bot._interruptible_sleep = lambda _seconds: None
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
+        cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
+        cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+        bot._tap_routine_fallback = lambda *_args: True
+        task = {"id": "__account_switch__", "settings": {"login_method": "google"}}
+
+        self.assertTrue(bot._try_account_switch_igg_game_confirmation(task))
+        self.assertEqual(bot.account_switch_selected_at, 0.0)
+        self.assertFalse(bot.account_switch_auto_login_attempted)
+        self.assertEqual(bot.routine_completed_steps, {"unrelated"})
+
+    @patch("buzzbot_app.extract_igg_unregistered_cancel_target", return_value=(526, 449))
+    def test_rejected_igg_login_is_dismissed_and_retried_once(self, _detect):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient(ui_xml="<hierarchy />")
+        bot.account_switch_selected_at = 1.0
+        bot.account_switch_auto_login_attempted = True
+        bot.account_switch_error = ""
+        bot.routine_completed_steps = set()
+        bot._interruptible_sleep = lambda _seconds: None
+        tapped = []
+        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+
+        self.assertTrue(bot._try_account_switch_igg_rejected_login(self.task()))
+        self.assertEqual(tapped, [(526, 449)])
+        self.assertEqual(bot.account_switch_selected_at, 0.0)
+        self.assertFalse(bot.account_switch_auto_login_attempted)
+        self.assertEqual(bot.account_switch_error, "")
+
+        self.assertTrue(bot._try_account_switch_igg_rejected_login(self.task()))
+        self.assertIn("не зарегистрирован", bot.account_switch_error)
 
     def test_igg_completion_closes_each_nested_screen_once(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -328,6 +406,23 @@ class LocalCredentialTests(unittest.TestCase):
 
         self.assertEqual(profile["igg_login"], "")
         self.assertEqual(bot.get_account_login("zzub1", "igg"), "legacy-login")
+
+    def test_missing_email_separator_is_repaired_in_local_store(self):
+        profile = {"id": "zzub1", "login_method": "igg"}
+        bot = self.make_bot(profile)
+        bot.credential_store.set_password("login:igg:zzub1", "useryandex.ru")
+
+        self.assertEqual(bot.get_account_login("zzub1", "igg"), "user@yandex.ru")
+        self.assertEqual(
+            bot.credential_store.get_password("login:igg:zzub1"),
+            "user@yandex.ru",
+        )
+
+    def test_missing_icloud_separator_is_repaired(self):
+        self.assertEqual(
+            AutoClicker._normalize_account_login("usericloud.com"),
+            "user@icloud.com",
+        )
 
 
 if __name__ == "__main__":

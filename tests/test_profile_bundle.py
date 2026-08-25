@@ -99,6 +99,39 @@ class ProfileBundleTests(unittest.TestCase):
         self.assertTrue(images[no_result_uid]["observer_only"])
         self.assertEqual(images[search_uid]["no_result_template_uid"], no_result_uid)
 
+    def test_wasteland_profile_contains_live_event_flow(self):
+        profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        steps = {
+            "event_entry",
+            "intro_map",
+            "attack",
+            "bypass",
+            "completed",
+            "collect",
+            "reward_close",
+            "explore",
+            "stamina_empty",
+        }
+
+        with zipfile.ZipFile(profile_path) as archive:
+            manifest = json.loads(archive.read("profile.json"))
+            images = {image["uid"]: image for image in manifest["images"]}
+
+        tasks = {task["id"]: task for task in manifest["routine_tasks"]}
+        task = tasks["wasteland_exploration"]
+        self.assertEqual(task["settings"]["fixed_utc_hours"], [1])
+        self.assertEqual(task["settings"]["stamina_retry_minutes"], 12)
+
+        wasteland_images = {
+            step: images[str(uuid.uuid5(namespace, f"wasteland_exploration:{step}"))]
+            for step in steps
+        }
+        self.assertTrue(all(image["use_orb"] for image in wasteland_images.values()))
+        self.assertTrue(all(image["orb_match_threshold"] == 3 for image in wasteland_images.values()))
+        self.assertEqual(wasteland_images["reward_close"]["limit_key"], "max_encounters")
+        self.assertTrue(wasteland_images["stamina_empty"]["completes_routine"])
+
     def test_reported_routines_have_safe_runtime_metadata(self):
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
         namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")

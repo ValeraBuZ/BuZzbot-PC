@@ -25,6 +25,7 @@ from buzzbot.accounts import (
     extract_google_accounts,
     extract_igg_id_targets,
     extract_igg_login_form,
+    extract_igg_unregistered_cancel_target,
     find_account,
     mask_google_account,
     requires_manual_google_verification,
@@ -69,6 +70,7 @@ from buzzbot.matching import (
     detect_account_settings_back_target,
     detect_finished_healing_target,
     detect_game_event_overlay_close_target,
+    detect_igg_game_login_ok_target,
     detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
@@ -388,6 +390,7 @@ LANGUAGES = {
         'routine_name_radar_marches': "Радар: с отрядом",
         'routine_name_heal': "Лечение войск",
         'routine_name_prize_hunt': "Охота за призом",
+        'routine_name_wasteland_exploration': "Исследование пустоши",
         'routine_name_food': "Еда",
         'routine_name_wood': "Дерево",
         'routine_name_metal': "Металл",
@@ -595,6 +598,7 @@ LANGUAGES = {
         'routine_name_radar_marches': "Radar: squad tasks",
         'routine_name_heal': "Heal troops",
         'routine_name_prize_hunt': "Prize hunt",
+        'routine_name_wasteland_exploration': "Wasteland exploration",
         'routine_name_food': "Food",
         'routine_name_wood': "Wood",
         'routine_name_metal': "Metal",
@@ -2949,11 +2953,26 @@ class AutoClicker:
             method = str((profile or {}).get("login_method") or "igg").strip().lower()
         return f"login:{method}:{account_id}"
 
+    @staticmethod
+    def _normalize_account_login(login):
+        value = str(login or "").strip()
+        if value.count("@") == 1:
+            return value
+        if "@" in value:
+            return value
+        for domain in ("yandex.ru", "mail.ru", "gmail.com", "bk.ru", "icloud.com"):
+            if value.casefold().endswith(domain) and len(value) > len(domain):
+                return f"{value[:-len(domain)]}@{value[-len(domain):]}"
+        return value
+
     def get_account_login(self, account_id, login_method=None):
         try:
-            return self.credential_store.get_password(
-                self._account_login_key(account_id, login_method)
-            ) or ""
+            key = self._account_login_key(account_id, login_method)
+            stored_login = self.credential_store.get_password(key) or ""
+            normalized_login = self._normalize_account_login(stored_login)
+            if normalized_login != stored_login:
+                self.credential_store.set_password(key, normalized_login)
+            return normalized_login
         except CredentialError as exc:
             logger.warning("Не удалось прочитать логин профиля %s: %s", account_id, exc)
             return ""
@@ -2976,7 +2995,7 @@ class AutoClicker:
         profile = find_account(self.account_profiles, account_id)
         if not profile:
             raise ValueError("Профиль аккаунта не найден.")
-        normalized_login = str(login or "").strip()
+        normalized_login = self._normalize_account_login(login)
         if not normalized_login:
             raise ValueError("Введите логин IGG.")
         login_method = str(profile.get("login_method") or "igg").strip().lower()
@@ -3131,16 +3150,21 @@ class AutoClicker:
         if not password:
             raise CredentialError("Пароль IGG не сохранён в профиле.")
 
-        self.adb_client.tap(*targets["login"])
-        time.sleep(0.2)
-        self.adb_client.clear_focused_text(256)
-        self.adb_client.input_private_text(login)
-        time.sleep(0.25)
-        self.adb_client.tap(*targets["password"])
-        time.sleep(0.2)
-        self.adb_client.clear_focused_text(256)
-        self.adb_client.input_private_text(password)
-        time.sleep(0.25)
+        def enter_verified(target, value, label, *, exact):
+            for attempt in range(2):
+                self.adb_client.tap(*target)
+                time.sleep(0.25)
+                self.adb_client.clear_focused_text(256)
+                self.adb_client.input_private_text(value)
+                time.sleep(0.35)
+                actual = self.adb_client.focused_edit_text_value()
+                if actual is None or (actual == value if exact else bool(actual)):
+                    return
+                logger.warning("Поле IGG «%s» осталось пустым; повтор ввода", label)
+            raise CredentialError(f"Не удалось безопасно заполнить поле IGG «{label}».")
+
+        enter_verified(targets["login"], login, "логин", exact=True)
+        enter_verified(targets["password"], password, "пароль", exact=False)
 
         refreshed_targets = extract_igg_login_form(self.adb_client.ui_xml())
         if not refreshed_targets:
@@ -3268,7 +3292,7 @@ class AutoClicker:
             "uses_march": False,
             "priority": 1,
             "interval_minutes": 1.0,
-            "timeout_seconds": 180.0,
+            "timeout_seconds": 360.0,
             "march_duration_minutes": 1.0,
             "completion_uid": str(profile.get("switch_completion_uid") or ""),
             "settings": {
@@ -4067,6 +4091,7 @@ class AutoClicker:
             "train_vehicles",
             "processing_factory",
             "processing_contest",
+            "wasteland_exploration",
         }:
             self._return_to_main_screen(
                 require_settlement=routine_requires_settlement(task)
@@ -4100,6 +4125,17 @@ class AutoClicker:
             )
             if active_until:
                 self.save_config()
+        elif (
+            task.get("id") == "wasteland_exploration"
+            and "stamina_empty" in self.routine_completed_steps
+        ):
+            try:
+                retry_minutes = float(
+                    task.get("settings", {}).get("stamina_retry_minutes", 12) or 12
+                )
+            except (TypeError, ValueError):
+                retry_minutes = 12.0
+            self.routine_next_run[task["id"]] = now + max(1.0, retry_minutes) * 60.0
         else:
             self.routine_next_run[task["id"]] = next_run_after_finish(task, now)
         if is_radar_task_id(task.get("id")):
@@ -4139,6 +4175,7 @@ class AutoClicker:
                         next_run_minutes
                         if is_radar_task_id(task.get("id"))
                         or task.get("id") == "gathering_boost"
+                        or task.get("id") == "wasteland_exploration"
                         else float(task.get("interval_minutes", 1.0))
                     ),
                 ),
@@ -4539,6 +4576,83 @@ class AutoClicker:
         self._interruptible_sleep(5.0)
         return True
 
+    def _try_account_switch_igg_game_confirmation(self, task):
+        if task.get("id") != "__account_switch__":
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("IGG game confirmation could not capture the screen")
+            return False
+
+        target = detect_igg_game_login_ok_target(frame)
+        if target is None or not self._tap_routine_fallback(
+            target,
+            ("account_switch_igg_game_confirm", *target),
+            (
+                "IGG ID выбран: подтверждаю вход в игру"
+                if task.get("settings", {}).get("login_method") == "igg"
+                else "Закрываю отложенное подтверждение IGG"
+            ),
+        ):
+            return False
+        if task.get("settings", {}).get("login_method") != "igg":
+            self.account_switch_selected_at = 0.0
+            self.account_switch_auto_login_attempted = False
+            self.routine_completed_steps = {
+                step for step in self.routine_completed_steps
+                if not str(step).startswith("account_switch_")
+            }
+            logger.info("Delayed IGG confirmation cleared before another login method")
+            self._interruptible_sleep(8.0)
+            return True
+        self.routine_completed_steps.add("account_switch_igg_id_selected")
+        self.routine_completed_steps.add("account_switch_igg_game_confirmed")
+        self.account_switch_selected_at = time.time()
+        logger.info("Final IGG game login confirmation accepted at %s", target)
+        self._interruptible_sleep(8.0)
+        return True
+
+    def _account_switch_main_screen_confirmed(self, task):
+        if not self.account_switch_selected_at or not self._is_main_screen_visible():
+            return False
+        settings = task.get("settings", {})
+        if settings.get("login_method") == "igg":
+            return "account_switch_igg_game_confirmed" in self.routine_completed_steps
+        return True
+
+    def _try_account_switch_igg_rejected_login(self, task):
+        if (
+            task.get("id") != "__account_switch__"
+            or task.get("settings", {}).get("login_method") != "igg"
+            or not self.uses_adb
+        ):
+            return False
+        try:
+            target = extract_igg_unregistered_cancel_target(self.adb_client.ui_xml())
+        except AdbError:
+            return False
+        if target is None:
+            return False
+
+        repeated = "account_switch_igg_rejection_dismissed" in self.routine_completed_steps
+        if not self._tap_routine_fallback(
+            target,
+            ("account_switch_igg_rejection", *target),
+            "IGG отклонил логин: закрываю сообщение",
+        ):
+            return False
+        self.account_switch_selected_at = 0.0
+        self.account_switch_auto_login_attempted = False
+        self.routine_completed_steps.add("account_switch_igg_rejection_dismissed")
+        if repeated:
+            self.account_switch_error = "IGG отклонил логин: адрес не зарегистрирован"
+            logger.warning("IGG rejected the account login twice; account switch stopped")
+        else:
+            logger.warning("IGG rejected the previous login; retrying the current profile once")
+        self._interruptible_sleep(2.0)
+        return True
+
     def _try_account_switch_visual_fallback(self, task):
         if task.get("id") != "__account_switch__" or self.account_switch_selected_at:
             return False
@@ -4628,15 +4742,27 @@ class AutoClicker:
             logger.info("Google account XML probe: %s", message)
             return True
 
+        target_account_id = str(settings.get("target_account_id") or "")
+        expected_login = self.get_account_login(target_account_id, "google").casefold()
+        target = next(
+            (item for item in targets if item["email"].casefold() == expected_login),
+            None,
+        ) if expected_login else None
+        if expected_login and target is None:
+            self.account_switch_error = "Нужный Google-аккаунт не найден в LDPlayer"
+            self.set_status_message(self.account_switch_error, force=True)
+            return False
+
         chooser_index = min(20, max(1, int(settings.get("chooser_index", 1))))
-        if chooser_index > len(targets):
+        if target is None and chooser_index > len(targets):
             self.account_switch_error = (
                 f"Аккаунт Google №{chooser_index} не найден; доступно: {len(targets)}"
             )
             self.set_status_message(self.account_switch_error, force=True)
-            return True
+            return False
 
-        target = targets[chooser_index - 1]
+        target = target or targets[chooser_index - 1]
+        chooser_index = int(target["chooser_index"])
         self.adb_client.tap(*target["center"])
         self._invalidate_capture()
         self.account_switch_selected_at = time.time()
@@ -4824,7 +4950,7 @@ class AutoClicker:
                 f"IGG ID №{chooser_index} не найден; доступно: {available_count}"
             )
             self.set_status_message(self.account_switch_error, force=True)
-            return True
+            return False
 
         if not self._tap_routine_fallback(
             target,
@@ -6646,6 +6772,22 @@ class AutoClicker:
                     self.routine_mode
                     and current_routine_task.get("id") == "__account_switch__"
                     and not action_occurred
+                    and self._try_account_switch_igg_game_confirmation(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
+                    and self._try_account_switch_igg_rejected_login(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "__account_switch__"
+                    and not action_occurred
                     and self._try_account_switch_connection_recovery(current_routine_task)
                 ):
                     continue
@@ -6767,7 +6909,9 @@ class AutoClicker:
                         if self.account_switch_selected_at:
                             if (
                                 time.time() - self.account_switch_selected_at >= 8.0
-                                and self._is_main_screen_visible()
+                                and self._account_switch_main_screen_confirmed(
+                                    current_routine_task
+                                )
                             ):
                                 self.account_switch_confirmed = True
                                 self._finish_current_routine(time.time())
@@ -7814,6 +7958,20 @@ class AutoClicker:
                 img_config["last_used"] = time.time()
                 self.set_status_message(self.account_switch_error, force=True)
                 return
+            target_account_id = str(settings.get("target_account_id") or "")
+            expected_login = self.get_account_login(target_account_id, "google").casefold()
+            candidate = next(
+                (item for item in candidates if item["email"].casefold() == expected_login),
+                None,
+            ) if expected_login else None
+            if expected_login and candidate is None:
+                self.account_switch_error = "Нужный Google-аккаунт не найден в LDPlayer"
+                self.routine_action_completes_task = True
+                img_config["last_used"] = time.time()
+                self.set_status_message(self.account_switch_error, force=True)
+                return
+            if candidate is not None:
+                chooser_index = int(candidate["chooser_index"])
             account_x = int(640 * scale_x)
             account_y = int((353 + (chooser_index - 1) * 103) * scale_y)
             if self.uses_adb:

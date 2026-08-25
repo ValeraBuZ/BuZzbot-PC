@@ -73,6 +73,7 @@ class RoutineTaskTests(unittest.TestCase):
                 "zombie_hunt",
                 "collective_mind",
                 "prize_hunt",
+                "wasteland_exploration",
                 "food",
                 "wood",
                 "metal",
@@ -475,6 +476,24 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(next_fixed_utc_run(before_noon, [0, 12]), at_noon)
         self.assertEqual(next_fixed_utc_run(at_noon, [0, 12]), at_midnight)
         self.assertEqual(next_fixed_utc_run(before_midnight, [0, 12]), at_midnight)
+
+    def test_wasteland_uses_live_utc_start_and_stamina_retry_settings(self):
+        task = next(
+            task
+            for task in default_routine_tasks()
+            if task["id"] == "wasteland_exploration"
+        )
+
+        self.assertFalse(task["enabled"])
+        self.assertEqual(task["settings"]["fixed_utc_hours"], [1])
+        self.assertEqual(task["settings"]["max_encounters"], 40)
+        self.assertEqual(task["settings"]["stamina_retry_minutes"], 12)
+        self.assertTrue(task["empty_home_is_success"])
+        self.assertFalse(task["uses_march"])
+        self.assertEqual(
+            {spec["key"] for spec in task_setting_specs(task["id"])},
+            {"max_encounters", "stamina_retry_minutes"},
+        )
 
     def test_radar_next_run_uses_fixed_game_reset(self):
         task = next(task for task in default_routine_tasks() if task["id"] == "radar_quick")

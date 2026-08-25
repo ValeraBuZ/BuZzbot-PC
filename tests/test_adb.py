@@ -317,12 +317,36 @@ class AdbClientTests(unittest.TestCase):
 
         xml = self.make_client(runner).ui_xml()
         self.assertIn("Verify", xml)
+        remote_path = calls[0][0][-1]
+        self.assertTrue(remote_path.startswith("/data/local/tmp/buzzbot_ui_"))
+        self.assertEqual(calls[0][0][-3:-1], ["rm", "-f"])
         self.assertEqual(
-            calls[0][0][-3:],
-            ["uiautomator", "dump", "/sdcard/buzzbot_ui.xml"],
+            calls[1][0][-4:-1],
+            ["uiautomator", "dump", "--compressed"],
         )
-        self.assertEqual(calls[1][0][-2:], ["cat", "/sdcard/buzzbot_ui.xml"])
-        self.assertEqual(calls[2][0][-3:], ["rm", "-f", "/sdcard/buzzbot_ui.xml"])
+        self.assertEqual(calls[2][0][-2:], ["cat", remote_path])
+        self.assertEqual(calls[3][0][-3:], ["rm", "-f", remote_path])
+
+    @patch("buzzbot.adb.time.sleep", return_value=None)
+    def test_ui_xml_retries_when_dump_file_is_delayed(self, _sleep):
+        calls = []
+        cat_count = 0
+
+        def runner(command, **kwargs):
+            nonlocal cat_count
+            calls.append((command, kwargs))
+            if "cat" in command:
+                cat_count += 1
+                if cat_count == 1:
+                    return FakeResult(returncode=1, stderr="No such file or directory")
+                return FakeResult(stdout='<hierarchy rotation="0" />')
+            return FakeResult()
+
+        xml = self.make_client(runner).ui_xml()
+
+        self.assertIn("hierarchy", xml)
+        self.assertEqual(cat_count, 2)
+        _sleep.assert_called_once()
 
     @patch("buzzbot.adb.os.name", "nt")
     def test_windows_commands_do_not_open_a_console(self):

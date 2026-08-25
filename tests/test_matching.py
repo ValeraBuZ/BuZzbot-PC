@@ -15,6 +15,7 @@ from buzzbot.matching import (
     detect_commander_profile_back_target,
     detect_finished_healing_target,
     detect_game_event_overlay_close_target,
+    detect_igg_game_login_ok_target,
     detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
     detect_account_settings_back_target,
@@ -92,6 +93,19 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertIsNone(
             detect_game_event_overlay_close_target(np.full_like(frame, (25, 30, 35)))
         )
+
+    def test_detects_final_igg_game_confirmation(self):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
+        cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
+        cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
+
+        self.assertEqual(detect_igg_game_login_ok_target(frame), (784, 508))
+        self.assertIsNone(detect_igg_game_login_ok_target(np.zeros_like(frame)))
+
+        lighter_overlay = frame.copy()
+        lighter_overlay[:150, :] = 50
+        self.assertEqual(detect_igg_game_login_ok_target(lighter_overlay), (784, 508))
 
     @staticmethod
     def stamina_dialog_frame(width=1280, height=720):
