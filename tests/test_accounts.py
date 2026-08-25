@@ -135,6 +135,12 @@ class AccountProfileTests(unittest.TestCase):
 
     def test_recaptcha_requires_manual_verification(self):
         self.assertTrue(requires_manual_google_verification('<node text="reCAPTCHA" />'))
+        self.assertTrue(
+            requires_manual_google_verification('<node text="Security verification: complete the puzzle" />')
+        )
+        self.assertTrue(
+            requires_manual_google_verification('<node text="Подтвердите, что вы не робот" />')
+        )
         self.assertFalse(requires_manual_google_verification('<node text="Password" />'))
 
     def test_google_accounts_are_extracted_in_chooser_order(self):

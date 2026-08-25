@@ -213,7 +213,20 @@ def requires_google_reauthentication(ui_xml):
 
 def requires_manual_google_verification(ui_xml):
     text = str(ui_xml or "").casefold()
-    return "recaptcha" in text
+    markers = (
+        "recaptcha",
+        "captcha",
+        "security verification",
+        "complete the puzzle",
+        "slide to complete",
+        "verify you are human",
+        "verify you're human",
+        "подтвердите, что вы не робот",
+        "проверка безопасности",
+        "пройдите проверку",
+        "перетащите ползунок",
+    )
+    return any(marker in text for marker in markers)
 
 
 def extract_google_accounts(ui_xml):

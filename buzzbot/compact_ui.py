@@ -199,6 +199,110 @@ class TaskSettingsDialog:
         )
 
 
+class TaskOrderDialog:
+    def __init__(self, parent, bot, refresh):
+        self.parent = parent
+        self.bot = bot
+        self.refresh = refresh
+        self.task_ids = [task["id"] for task in bot.routine_tasks]
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Очередность выполнения")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.minsize(520, 560)
+        _center(self.dialog, 560, 640)
+        self._build()
+
+    def _build(self):
+        body = ttk.Frame(self.dialog, padding=16)
+        body.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(body, text="Очередность выполнения", style="CompactTitle.TLabel").pack(anchor="w")
+        ttk.Label(
+            body,
+            text=(
+                "Бот проходит готовые отмеченные задачи сверху вниз. "
+                "Задачи с активным таймером временно пропускаются."
+            ),
+            foreground="#72818A",
+            wraplength=510,
+        ).pack(anchor="w", pady=(5, 12))
+
+        list_frame = ttk.Frame(body)
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.listbox = tk.Listbox(
+            list_frame,
+            selectmode=tk.SINGLE,
+            activestyle="none",
+            font=("Segoe UI", 10),
+            yscrollcommand=scrollbar.set,
+        )
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.configure(command=self.listbox.yview)
+        self._redraw()
+
+        move_buttons = ttk.Frame(body)
+        move_buttons.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(move_buttons, text="В начало", command=lambda: self._move_to(0)).pack(side=tk.LEFT)
+        ttk.Button(move_buttons, text="Вверх", command=lambda: self._move(-1)).pack(side=tk.LEFT, padx=6)
+        ttk.Button(move_buttons, text="Вниз", command=lambda: self._move(1)).pack(side=tk.LEFT)
+        ttk.Button(move_buttons, text="В конец", command=lambda: self._move_to(len(self.task_ids) - 1)).pack(
+            side=tk.LEFT, padx=6
+        )
+
+        buttons = ttk.Frame(body)
+        buttons.pack(fill=tk.X, pady=(16, 0))
+        ttk.Button(buttons, text="Сохранить", style="Primary.TButton", command=self._save).pack(side=tk.RIGHT)
+        ttk.Button(buttons, text="Отмена", command=self.dialog.destroy).pack(side=tk.RIGHT, padx=8)
+        self.dialog.bind("<Alt-Up>", lambda _event: self._move(-1))
+        self.dialog.bind("<Alt-Down>", lambda _event: self._move(1))
+        self.dialog.bind("<Escape>", lambda _event: self.dialog.destroy())
+
+    def _task_label(self, task_id, position):
+        task = next(task for task in self.bot.routine_tasks if task["id"] == task_id)
+        state = "ВКЛ" if task.get("enabled", False) else "выкл"
+        return f"{position:02d}.  {task.get('name', task_id)}   [{state}]"
+
+    def _redraw(self, selected=0):
+        self.listbox.delete(0, tk.END)
+        for position, task_id in enumerate(self.task_ids, start=1):
+            self.listbox.insert(tk.END, self._task_label(task_id, position))
+        if self.task_ids:
+            selected = min(max(0, selected), len(self.task_ids) - 1)
+            self.listbox.selection_set(selected)
+            self.listbox.activate(selected)
+            self.listbox.see(selected)
+
+    def _selected_index(self):
+        selection = self.listbox.curselection()
+        return selection[0] if selection else None
+
+    def _move(self, delta):
+        index = self._selected_index()
+        if index is None:
+            return
+        target = min(max(0, index + delta), len(self.task_ids) - 1)
+        if target == index:
+            return
+        task_id = self.task_ids.pop(index)
+        self.task_ids.insert(target, task_id)
+        self._redraw(target)
+
+    def _move_to(self, target):
+        index = self._selected_index()
+        if index is None or target == index:
+            return
+        task_id = self.task_ids.pop(index)
+        self.task_ids.insert(target, task_id)
+        self._redraw(target)
+
+    def _save(self):
+        self.bot.set_routine_task_order(self.task_ids)
+        self.refresh()
+        self.dialog.destroy()
+
+
 class AccountCredentialsDialog:
     def __init__(self, parent, bot, profile, refresh):
         self.parent = parent
@@ -1125,6 +1229,23 @@ def build_compact_ui(root, bot):
         fg=colors["muted"],
         activebackground=colors["paper"],
         activeforeground=colors["red"],
+        relief=tk.FLAT,
+        bd=0,
+        font=("Bahnschrift", 8),
+        cursor="hand2",
+    ).pack(side=tk.RIGHT, padx=(12, 0), pady=(8, 0))
+    tk.Button(
+        heading,
+        text="Очередность",
+        command=lambda: TaskOrderDialog(
+            root,
+            bot,
+            lambda: (build_task_rows(), refresh_task_state()),
+        ),
+        bg=colors["paper"],
+        fg=colors["accent"],
+        activebackground=colors["paper"],
+        activeforeground="#C65317",
         relief=tk.FLAT,
         bd=0,
         font=("Bahnschrift", 8),

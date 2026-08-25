@@ -29,6 +29,7 @@ from buzzbot.routines import (
     radar_marker_requires_notification,
     radar_marker_was_confirmed,
     reset_radar_card_runtime_steps,
+    reorder_routine_tasks,
     reconcile_march_deadlines,
     resource_search_retry_due,
     setting_requirement_matches,
@@ -222,6 +223,38 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(fence_survivors["empty_home_is_success"])
         self.assertTrue(vip_rewards["empty_home_is_success"])
         self.assertEqual(custom["name"], "Ежедневная награда")
+
+    def test_normalization_preserves_user_task_order(self):
+        tasks = normalize_routine_tasks([
+            {"id": "oil", "enabled": True},
+            {"id": "vip_rewards", "enabled": True},
+            {"id": "food", "enabled": True},
+        ])
+
+        self.assertEqual([task["id"] for task in tasks[:3]], ["oil", "vip_rewards", "food"])
+
+    def test_reorder_keeps_unspecified_tasks_at_the_end(self):
+        tasks = [
+            {"id": "food"},
+            {"id": "wood"},
+            {"id": "metal"},
+        ]
+
+        reordered = reorder_routine_tasks(tasks, ["metal", "food"])
+
+        self.assertEqual([task["id"] for task in reordered], ["metal", "food", "wood"])
+
+    def test_scheduler_follows_user_order_after_first_pass(self):
+        tasks = [
+            {"id": "vip", "enabled": True},
+            {"id": "radar", "enabled": True},
+            {"id": "mail", "enabled": True},
+        ]
+        next_run = {"vip": 90.0, "radar": 80.0, "mail": 70.0}
+
+        index = pick_due_task_index(tasks, next_run, start_index=1, now=100.0)
+
+        self.assertEqual(tasks[index]["id"], "radar")
 
     def test_healing_has_priority_when_selected(self):
         tasks = default_routine_tasks()

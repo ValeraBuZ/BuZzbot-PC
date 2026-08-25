@@ -2017,23 +2017,28 @@ def normalize_routine_tasks(raw_tasks):
             if isinstance(item, dict) and item.get("id")
         }
 
-    normalized = []
+    normalized_by_id = {}
     built_in_ids = {item["id"] for item in DEFAULT_ROUTINE_TASKS}
     retired_built_in_ids = {LEGACY_RADAR_TASK_ID}
     for default in DEFAULT_ROUTINE_TASKS:
         source = raw_by_id.get(default["id"], {})
-        normalized.append(_normalize_task(source, default))
+        normalized_by_id[default["id"]] = _normalize_task(source, default)
 
+    normalized = []
+    added_ids = set()
     if isinstance(raw_tasks, list):
         for source in raw_tasks:
-            if (
-                not isinstance(source, dict)
-                or source.get("id") in built_in_ids
-                or source.get("id") in retired_built_in_ids
-            ):
+            if not isinstance(source, dict):
+                continue
+            task_id = source.get("id")
+            if not task_id or task_id in added_ids or task_id in retired_built_in_ids:
+                continue
+            if task_id in built_in_ids:
+                normalized.append(normalized_by_id[task_id])
+                added_ids.add(task_id)
                 continue
             fallback = {
-                "id": str(source.get("id") or "custom"),
+                "id": str(task_id or "custom"),
                 "name": "Новая задача",
                 "group": "Новая задача",
                 "category": "custom",
@@ -2046,7 +2051,36 @@ def normalize_routine_tasks(raw_tasks):
                 "settings": {},
             }
             normalized.append(_normalize_task(source, fallback))
+            added_ids.add(task_id)
+
+    # New built-in tasks are appended without disturbing the order chosen by
+    # the user in an older configuration.
+    for default in DEFAULT_ROUTINE_TASKS:
+        task_id = default["id"]
+        if task_id not in added_ids:
+            normalized.append(normalized_by_id[task_id])
     return normalized
+
+
+def reorder_routine_tasks(tasks, ordered_ids):
+    """Return tasks in the requested order and keep omitted tasks at the end."""
+    tasks_by_id = {
+        task.get("id"): task
+        for task in tasks
+        if isinstance(task, dict) and task.get("id")
+    }
+    reordered = []
+    added_ids = set()
+    for task_id in ordered_ids or ():
+        if task_id in tasks_by_id and task_id not in added_ids:
+            reordered.append(tasks_by_id[task_id])
+            added_ids.add(task_id)
+    for task in tasks:
+        task_id = task.get("id") if isinstance(task, dict) else None
+        if task_id and task_id not in added_ids:
+            reordered.append(task)
+            added_ids.add(task_id)
+    return reordered
 
 
 def effective_task_group(task):
@@ -2064,7 +2098,7 @@ def is_task_effectively_enabled(task):
 
 
 def pick_due_task_index(tasks, next_run, start_index, now, active_marches=0, max_marches=5):
-    """Pick the longest-waiting due task, using priority only for equal waits."""
+    """Pick the next due task in the user-defined cyclic order."""
     if not tasks:
         return None
     start_index = int(start_index or 0) % len(tasks)
@@ -2078,10 +2112,11 @@ def pick_due_task_index(tasks, next_run, start_index, now, active_marches=0, max
             continue
         deadline = float(next_run.get(task["id"], 0.0))
         if deadline <= float(now):
-            # A retried high-priority task must not starve a checkbox that has
-            # never received its first attempt.
-            candidates.append((deadline, int(task.get("priority", 100)), offset, index))
-    return min(candidates)[3] if candidates else None
+            # Finish the first pass before repeating a task that has already
+            # run, then follow the visible order from start_index.
+            first_attempt = 0 if deadline <= 0.0 else 1
+            candidates.append((first_attempt, offset, index))
+    return min(candidates)[2] if candidates else None
 
 
 def training_queue_match_is_safe(bbox, display_width, display_height):

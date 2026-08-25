@@ -119,6 +119,7 @@ from buzzbot.routines import (
     radar_marker_requires_notification,
     radar_marker_was_confirmed,
     reset_radar_card_runtime_steps,
+    reorder_routine_tasks,
     reconcile_march_deadlines,
     resource_search_retry_due,
     setting_requirement_matches,
@@ -2957,6 +2958,13 @@ class AutoClicker:
             self.root.event_generate("<<GroupsChanged>>")
         return changed
 
+    def set_routine_task_order(self, ordered_ids):
+        self.routine_tasks = reorder_routine_tasks(self.routine_tasks, ordered_ids)
+        self.current_routine_index = 0
+        self.save_config()
+        if self.root:
+            self.root.event_generate("<<GroupsChanged>>")
+
     def get_current_account(self):
         return find_account(self.account_profiles, self.current_account_id)
 
@@ -4944,6 +4952,26 @@ class AutoClicker:
         self.set_status_message("Пароль Google введён; проверяю главный экран", force=True)
         return True
 
+    def _pause_for_manual_account_verification(self, task):
+        if task.get("id") != "__account_switch__" or not self.uses_adb:
+            return False
+        try:
+            ui_xml = self.adb_client.ui_xml()
+        except AdbError:
+            return False
+        if not requires_manual_google_verification(ui_xml):
+            return False
+
+        self.account_switch_auto_login_attempted = True
+        self.account_switch_error = (
+            "Обнаружена CAPTCHA или проверка безопасности. "
+            "Пройдите её вручную и нажмите «Продолжить»."
+        )
+        logger.warning("Manual account verification detected; automation paused")
+        self.pause()
+        self.set_status_message(self.account_switch_error, force=True)
+        return True
+
     def _try_account_switch_igg_login(self, task):
         settings = task.get("settings", {})
         if (
@@ -6438,6 +6466,8 @@ class AutoClicker:
                     current_routine_task = self._begin_due_routine(now)
                     if current_routine_task is None:
                         time.sleep(max(0.1, min(0.5, self.sleep_not_found)))
+                        continue
+                    if self._pause_for_manual_account_verification(current_routine_task):
                         continue
                     current_group = effective_task_group(current_routine_task)
                     system_images = [
