@@ -205,6 +205,7 @@ class TaskOrderDialog:
         self.bot = bot
         self.refresh = refresh
         self.task_ids = [task["id"] for task in bot.routine_tasks]
+        self.drag_index = None
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Очередность выполнения")
         self.dialog.transient(parent)
@@ -221,6 +222,7 @@ class TaskOrderDialog:
             body,
             text=(
                 "Бот проходит готовые отмеченные задачи сверху вниз. "
+                "Перетащите строку мышью, чтобы изменить порядок. "
                 "Задачи с активным таймером временно пропускаются."
             ),
             foreground="#72818A",
@@ -240,6 +242,9 @@ class TaskOrderDialog:
         )
         self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.configure(command=self.listbox.yview)
+        self.listbox.bind("<ButtonPress-1>", self._drag_start)
+        self.listbox.bind("<B1-Motion>", self._drag_motion)
+        self.listbox.bind("<ButtonRelease-1>", self._drag_drop)
         self._redraw()
 
         move_buttons = ttk.Frame(body)
@@ -277,6 +282,42 @@ class TaskOrderDialog:
     def _selected_index(self):
         selection = self.listbox.curselection()
         return selection[0] if selection else None
+
+    def _drag_start(self, event):
+        if not self.task_ids:
+            return "break"
+        index = self.listbox.nearest(event.y)
+        bounds = self.listbox.bbox(index)
+        if bounds is None or not bounds[1] <= event.y <= bounds[1] + bounds[3]:
+            self.drag_index = None
+            return "break"
+        self.drag_index = index
+        self.listbox.selection_clear(0, tk.END)
+        self.listbox.selection_set(index)
+        self.listbox.activate(index)
+        return "break"
+
+    def _drag_motion(self, event):
+        if self.drag_index is None or not self.task_ids:
+            return "break"
+        target = min(max(0, self.listbox.nearest(event.y)), len(self.task_ids) - 1)
+        self.listbox.selection_clear(0, tk.END)
+        self.listbox.selection_set(target)
+        self.listbox.activate(target)
+        self.listbox.see(target)
+        return "break"
+
+    def _drag_drop(self, event):
+        if self.drag_index is None or not self.task_ids:
+            return "break"
+        source = self.drag_index
+        target = min(max(0, self.listbox.nearest(event.y)), len(self.task_ids) - 1)
+        self.drag_index = None
+        if target != source:
+            task_id = self.task_ids.pop(source)
+            self.task_ids.insert(target, task_id)
+        self._redraw(target)
+        return "break"
 
     def _move(self, delta):
         index = self._selected_index()
@@ -1517,7 +1558,7 @@ def build_compact_ui(root, bot):
             )
             if value and task["settings"]["branch"] == "off":
                 task["settings"]["branch"] = "any"
-        bot.set_routine_enabled(task["id"], value)
+        bot.set_routine_enabled(task["id"], value, emit_event=False)
         refresh_task_state()
 
     def create_task_toggle(parent, task, variable):
@@ -1558,7 +1599,6 @@ def build_compact_ui(root, bot):
 
         def click(_event=None):
             variable.set(not bool(variable.get()))
-            redraw()
             toggle_task(task)
             return "break"
 

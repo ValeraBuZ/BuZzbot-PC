@@ -2932,7 +2932,7 @@ class AutoClicker:
             images = [img for img in images if img.get("enabled", True)]
         return images
 
-    def set_routine_enabled(self, task_id, enabled):
+    def set_routine_enabled(self, task_id, enabled, emit_event=True):
         task = self.get_routine_task(task_id)
         if not task:
             return
@@ -2941,7 +2941,7 @@ class AutoClicker:
         if group:
             self.groups[group] = bool(enabled)
         self.save_config()
-        if self.root:
+        if self.root and emit_event:
             self.root.event_generate("<<GroupsChanged>>")
 
     def clear_routine_selection(self):
