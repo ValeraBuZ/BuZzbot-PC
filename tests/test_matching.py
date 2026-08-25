@@ -323,6 +323,15 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertTrue(205 <= target[0] <= 215)
         self.assertTrue(128 <= target[1] <= 136)
 
+    def test_detects_wide_marked_alliance_project_ribbon(self):
+        frame = np.full((720, 1280, 3), (45, 50, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (343, 151), (499, 188), (20, 45, 210), thickness=-1)
+
+        self.assertEqual(
+            detect_alliance_marked_project_target(frame),
+            (326, 170),
+        )
+
     def test_detects_radar_notification_dots_and_targets_the_markers(self):
         frame = np.full((720, 1280, 3), (55, 70, 75), dtype=np.uint8)
         cv2.circle(frame, (700, 200), 8, (10, 20, 200), thickness=-1)

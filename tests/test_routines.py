@@ -392,7 +392,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(task["settings"]["max_donations"], 100)
         self.assertEqual(task["settings"]["max_project_checks"], 6)
         self.assertEqual(task["interval_minutes"], 20.0)
-        self.assertEqual(task["timeout_seconds"], 30.0)
+        self.assertEqual(task["timeout_seconds"], 45.0)
         self.assertEqual(task["completion_runtime_step"], "all_projects_checked")
 
     def test_repeatable_claims_guard_task_closing(self):
@@ -445,7 +445,7 @@ class RoutineTaskTests(unittest.TestCase):
         )
         self.assertEqual(donation_task["settings"]["max_donations"], 100)
         self.assertEqual(donation_task["settings"]["max_project_checks"], 6)
-        self.assertGreaterEqual(donation_task["timeout_seconds"], 30.0)
+        self.assertGreaterEqual(donation_task["timeout_seconds"], 45.0)
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")
 
     def test_donation_exhaustion_completes_only_after_project_close_and_timeout(self):

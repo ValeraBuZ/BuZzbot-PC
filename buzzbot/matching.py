@@ -471,12 +471,23 @@ def detect_alliance_marked_project_target(frame_bgr):
     mask[:, :170] = 0
     mask[:, 1100:] = 0
 
-    candidates = []
+    compact_candidates = []
+    ribbon_candidates = []
     component_count, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
     for index in range(1, component_count):
         x, y, width, height, area = stats[index]
         aspect = width / float(height) if height else 0.0
         extent = area / float(width * height) if width and height else 0.0
+        if (
+            1200 <= area <= 6000
+            and 90 <= width <= 230
+            and 20 <= height <= 70
+            and 2.0 <= aspect <= 8.0
+            and extent >= 0.35
+        ):
+            center_x, center_y = centroids[index]
+            ribbon_candidates.append((int(area), float(center_x), float(center_y)))
+            continue
         if not (
             70 <= area <= 220
             and 9 <= width <= 18
@@ -486,12 +497,19 @@ def detect_alliance_marked_project_target(frame_bgr):
         ):
             continue
         center_x, center_y = centroids[index]
-        candidates.append((int(area), float(center_x), float(center_y)))
+        compact_candidates.append((int(area), float(center_x), float(center_y)))
 
-    if not candidates:
+    if ribbon_candidates:
+        _area, marker_x, marker_y = max(ribbon_candidates)
+        # The wide "Marked" ribbon starts above the right half of the card.
+        target_x = (marker_x - 95.0) * scale_x
+        target_y = marker_y * scale_y
+        return int(round(target_x)), int(round(target_y))
+
+    if not compact_candidates:
         return None
 
-    _area, marker_x, marker_y = max(candidates)
+    _area, marker_x, marker_y = max(compact_candidates)
     # The marker is attached to the right edge of the project card.
     target_x = (marker_x - 55.0) * scale_x
     target_y = marker_y * scale_y

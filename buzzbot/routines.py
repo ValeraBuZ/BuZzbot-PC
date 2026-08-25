@@ -265,7 +265,7 @@ DEFAULT_ROUTINE_TASKS = (
         "priority": 25,
         # One spent attempt is restored by the game roughly every 20 minutes.
         "interval_minutes": 20.0,
-        "timeout_seconds": 30.0,
+        "timeout_seconds": 45.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
         # Completion is driven by the project-check limit. This sentinel prevents
@@ -1281,8 +1281,8 @@ def upgrade_repeatable_claim_metadata(images, tasks):
                 int(settings.get("max_project_checks", 0) or 0),
             )
             task["timeout_seconds"] = max(
-                30.0,
-                float(task.get("timeout_seconds", 30.0) or 30.0),
+                45.0,
+                float(task.get("timeout_seconds", 45.0) or 45.0),
             )
             task["completion_runtime_step"] = "all_projects_checked"
         elif task.get("id") == "collective_mind":

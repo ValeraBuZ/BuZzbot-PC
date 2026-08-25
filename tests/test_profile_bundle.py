@@ -165,7 +165,7 @@ class ProfileBundleTests(unittest.TestCase):
         tasks = {task["id"]: task for task in manifest["routine_tasks"]}
         images = {image["uid"]: image for image in manifest["images"]}
         donation = tasks["alliance_donations"]
-        self.assertGreaterEqual(donation["timeout_seconds"], 30.0)
+        self.assertGreaterEqual(donation["timeout_seconds"], 45.0)
         self.assertEqual(donation["completion_runtime_step"], "all_projects_checked")
 
         project_uid = str(
