@@ -249,6 +249,14 @@ def _task_settings(task_id, research_branch, resource_level, collective_level):
     return {}
 
 
+def _activate_account_profile(bot, account_key):
+    """Apply per-account task state without persisting live-test changes."""
+    if bot.select_account_profile(account_key, save=False):
+        return True
+    bot.current_account_id = account_key
+    return False
+
+
 def run_task(
     serial,
     account_key,
@@ -284,7 +292,7 @@ def run_task(
             bot.minimize_on_start = False
             bot.input_backend = "adb"
             bot.adb_serial = serial
-            bot.current_account_id = account_key
+            _activate_account_profile(bot, account_key)
             bot.routine_march_context = f"adb:{serial}:{account_key}"
             bot.routine_march_deadlines = []
             bot._refresh_adb_client()

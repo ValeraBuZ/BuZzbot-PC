@@ -2,6 +2,7 @@ import random
 import unittest
 
 from tools.run_all_accounts_matrix import (
+    _activate_account_profile,
     _expected_adb_serials,
     _game_is_foreground,
     _routine_outcome_is_success,
@@ -19,6 +20,28 @@ from tools.run_random_program import (
 
 
 class RandomProgramTests(unittest.TestCase):
+    def test_live_runner_applies_account_specific_task_state(self):
+        class Bot:
+            def __init__(self, selected):
+                self.selected = selected
+                self.calls = []
+                self.current_account_id = "old"
+
+            def select_account_profile(self, account_id, save=True):
+                self.calls.append((account_id, save))
+                if self.selected:
+                    self.current_account_id = account_id
+                return self.selected
+
+        known = Bot(selected=True)
+        self.assertTrue(_activate_account_profile(known, "igg_3"))
+        self.assertEqual(known.calls, [("igg_3", False)])
+        self.assertEqual(known.current_account_id, "igg_3")
+
+        fallback = Bot(selected=False)
+        self.assertFalse(_activate_account_profile(fallback, "matrix_slot"))
+        self.assertEqual(fallback.current_account_id, "matrix_slot")
+
     def test_adb_wait_never_substitutes_a_neighboring_ldplayer(self):
         self.assertEqual(
             _expected_adb_serials("emulator-5562", instance_index=7),
