@@ -8,6 +8,7 @@ from buzzbot.routines import (
     RADAR_TASK_IDS,
     completed_runtime_steps_for_image,
     default_routine_tasks,
+    donation_exhaustion_is_complete,
     effective_active_marches,
     effective_task_group,
     format_wait_duration,
@@ -41,6 +42,7 @@ from buzzbot.routines import (
     training_queue_match_is_safe,
     unavailable_retry_delay,
     upgrade_prize_hunt_metadata,
+    upgrade_processing_runtime_metadata,
     upgrade_radar_runtime_metadata,
     upgrade_repeatable_claim_metadata,
     upgrade_resource_runtime_metadata,
@@ -426,6 +428,8 @@ class RoutineTaskTests(unittest.TestCase):
 
         self.assertTrue(by_uid[donate_uid]["allow_repeat"])
         self.assertIn(donate_uid, by_uid[donation_close_uid]["skip_if_visible_uids"])
+        self.assertEqual(by_uid[donation_close_uid]["runtime_step"], "project_closed")
+        self.assertTrue(by_uid[donation_close_uid]["repeat_runtime_step"])
         self.assertLessEqual(by_uid[donation_project_uid]["confidence"], 0.74)
         self.assertEqual(by_uid[donation_project_uid]["orb_match_threshold"], 3)
         self.assertEqual(by_uid[donation_marked_uid]["action"], "alliance_marked_project")
@@ -443,6 +447,48 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(donation_task["settings"]["max_project_checks"], 6)
         self.assertGreaterEqual(donation_task["timeout_seconds"], 30.0)
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")
+
+    def test_donation_exhaustion_completes_only_after_project_close_and_timeout(self):
+        task = {"id": "alliance_donations", "timeout_seconds": 30.0}
+
+        self.assertFalse(donation_exhaustion_is_complete(task, set(), 60.0))
+        self.assertFalse(
+            donation_exhaustion_is_complete(task, {"project_closed"}, 29.9)
+        )
+        self.assertTrue(
+            donation_exhaustion_is_complete(task, {"project_closed"}, 30.0)
+        )
+        self.assertFalse(
+            donation_exhaustion_is_complete(
+                {"id": "vip_rewards", "timeout_seconds": 30.0},
+                {"project_closed"},
+                30.0,
+            )
+        )
+
+    def test_processing_camera_upgrade_uses_two_incremental_swipes(self):
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        images = [
+            {
+                "uid": str(uuid.uuid5(namespace, f"{task_id}:pan_north")),
+                "swipe_repeat_count": 6,
+            }
+            for task_id in ("processing_factory", "processing_contest")
+        ]
+        tasks = default_routine_tasks()
+
+        upgraded = upgrade_processing_runtime_metadata(images, tasks)
+
+        self.assertEqual(upgraded, 2)
+        self.assertTrue(all(image["swipe_repeat_count"] == 2 for image in images))
+        processing_tasks = {
+            task["id"]: task
+            for task in tasks
+            if task["id"] in {"processing_factory", "processing_contest"}
+        }
+        self.assertTrue(
+            all(task["timeout_seconds"] >= 30.0 for task in processing_tasks.values())
+        )
 
     def test_next_run_uses_task_interval(self):
         task = {"interval_minutes": 2.5}

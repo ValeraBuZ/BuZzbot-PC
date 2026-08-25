@@ -1228,6 +1228,9 @@ def upgrade_repeatable_claim_metadata(images, tasks):
         if isinstance(existing, str):
             existing = [existing]
         image["skip_if_visible_uids"] = list(dict.fromkeys([*existing, *guard_uids]))
+        if uid == alliance_close_uid:
+            image["runtime_step"] = "project_closed"
+            image["repeat_runtime_step"] = True
         upgraded += 1
 
     donation_priorities = {
@@ -1287,6 +1290,37 @@ def upgrade_repeatable_claim_metadata(images, tasks):
             level = int(settings.get("level", 6) or 6)
             settings["level"] = 7 if level == 7 else 6
 
+    return upgraded
+
+
+def donation_exhaustion_is_complete(task, completed_steps, idle_seconds):
+    """Finish donation scans after an exhausted project yields no next target."""
+    if str(task.get("id") or "") != "alliance_donations":
+        return False
+    if "project_closed" not in {str(step) for step in completed_steps}:
+        return False
+    timeout = max(1.0, float(task.get("timeout_seconds", 30.0) or 30.0))
+    return float(idle_seconds) >= timeout
+
+
+def upgrade_processing_runtime_metadata(images, tasks):
+    """Keep refinery camera movement incremental across different settlements."""
+    images_by_uid = {str(image.get("uid") or ""): image for image in images}
+    upgraded = 0
+    for task_id in ("processing_factory", "processing_contest"):
+        pan_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:pan_north"))
+        pan_image = images_by_uid.get(pan_uid)
+        if pan_image is not None:
+            pan_image["swipe_repeat_count"] = 2
+            pan_image["swipe_repeat_pause"] = 0.2
+            upgraded += 1
+        for task in tasks:
+            if task.get("id") == task_id:
+                task["timeout_seconds"] = max(
+                    30.0,
+                    float(task.get("timeout_seconds", 25.0) or 25.0),
+                )
+                break
     return upgraded
 
 

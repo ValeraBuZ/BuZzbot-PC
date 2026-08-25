@@ -150,6 +150,16 @@ class RandomProgramTests(unittest.TestCase):
         )
         self.assertTrue(
             _routine_outcome_is_success(
+                "radar_marches",
+                {
+                    "task_id": "radar_marches",
+                    "outcome": "deferred_unavailable",
+                    "reason": "нет доступного отряда",
+                },
+            )
+        )
+        self.assertTrue(
+            _routine_outcome_is_success(
                 "research",
                 {
                     "task_id": "research",

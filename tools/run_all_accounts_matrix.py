@@ -54,7 +54,7 @@ TASK_TIMEOUTS = {
     "alliance_donations": 160.0,
     "radar_rewards": 180.0,
     "radar_quick": 360.0,
-    "radar_marches": 420.0,
+    "radar_marches": 540.0,
     "mail_rewards": 75.0,
     "research": 90.0,
     "train_infantry": 65.0,
@@ -155,6 +155,10 @@ def _routine_outcome_is_success(task_id, outcome):
     return bool(
         (normalized_task_id.startswith("train_") and reason == "max_queue_checks")
         or (normalized_task_id == "research" and reason == "max_lab_checks")
+        or (
+            normalized_task_id == "radar_marches"
+            and reason in {"no_squad", "нет доступного отряда"}
+        )
     )
 
 

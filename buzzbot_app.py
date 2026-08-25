@@ -103,6 +103,7 @@ from buzzbot.routines import (
     gathering_boost_active_until,
     gathering_boost_duration_hours,
     healing_pending_allows_image,
+    donation_exhaustion_is_complete,
     healing_repeat_delay,
     image_is_allowed_for_routine,
     is_radar_task_id,
@@ -132,6 +133,7 @@ from buzzbot.routines import (
     select_best_resource_result_level,
     upgrade_radar_runtime_metadata,
     upgrade_prize_hunt_metadata,
+    upgrade_processing_runtime_metadata,
     upgrade_repeatable_claim_metadata,
     upgrade_resource_runtime_metadata,
     upgrade_strict_runtime_metadata,
@@ -2495,6 +2497,7 @@ class AutoClicker:
         upgrade_prize_hunt_metadata(self.search_images, self.routine_tasks)
         upgrade_radar_runtime_metadata(self.search_images, self.routine_tasks)
         upgrade_repeatable_claim_metadata(self.search_images, self.routine_tasks)
+        upgrade_processing_runtime_metadata(self.search_images, self.routine_tasks)
         self.scale_enabled = bool(matching.get("scale_enabled", self.scale_enabled))
         self.scale_min = float(matching.get("scale_min", self.scale_min))
         self.scale_max = float(matching.get("scale_max", self.scale_max))
@@ -2694,6 +2697,15 @@ class AutoClicker:
                     )
                     if upgraded_claims:
                         logger.info("Repeatable reward guards upgraded for %s templates", upgraded_claims)
+                    upgraded_processing = upgrade_processing_runtime_metadata(
+                        self.search_images,
+                        self.routine_tasks,
+                    )
+                    if upgraded_processing:
+                        logger.info(
+                            "Processing camera movement upgraded for %s templates",
+                            upgraded_processing,
+                        )
 
                     self.stats = {img['path']: 0 for img in self.search_images}
                     logger.info(f"Загружено {len(self.search_images)} областей из конфига")
@@ -7083,6 +7095,17 @@ class AutoClicker:
                         )
                         continue
                     if not action_occurred and idle >= timeout:
+                        if donation_exhaustion_is_complete(
+                            current_routine_task,
+                            self.routine_completed_steps,
+                            idle,
+                        ):
+                            self.set_status_message(
+                                "Пожертвования: все доступные проекты проверены",
+                                force=True,
+                            )
+                            self._finish_current_routine(time.time())
+                            continue
                         if current_routine_task.get("manual_screen_required", False):
                             guard_uid = str(
                                 current_routine_task.get("idle_completion_guard_uid") or ""

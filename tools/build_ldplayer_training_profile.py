@@ -21,6 +21,7 @@ from buzzbot.routines import (
     is_radar_task_id,
     upgrade_radar_runtime_metadata,
     upgrade_prize_hunt_metadata,
+    upgrade_processing_runtime_metadata,
     upgrade_repeatable_claim_metadata,
     upgrade_resource_runtime_metadata,
     upgrade_strict_runtime_metadata,
@@ -1704,7 +1705,7 @@ def build_profile(destination):
                             "swipe_from": [650, 260],
                             "swipe_to": [650, 610],
                             "swipe_duration_ms": 350,
-                            "swipe_repeat_count": 6,
+                            "swipe_repeat_count": 2,
                             "swipe_repeat_pause": 0.2,
                             "home_screen_marker": True,
                             "confidence": 0.75,
@@ -2324,6 +2325,7 @@ def build_profile(destination):
     upgrade_prize_hunt_metadata(manifest["images"], tasks)
     upgrade_radar_runtime_metadata(manifest["images"], tasks)
     upgrade_repeatable_claim_metadata(manifest["images"], tasks)
+    upgrade_processing_runtime_metadata(manifest["images"], tasks)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("profile.json", json.dumps(manifest, ensure_ascii=False, indent=2))
