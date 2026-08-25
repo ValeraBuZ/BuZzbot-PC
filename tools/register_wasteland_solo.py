@@ -64,6 +64,28 @@ def _green_button_visible(frame):
     return int(cv2.countNonZero(mask)) >= max(250, int(roi.shape[0] * roi.shape[1] * 0.08))
 
 
+def _registration_phase_selected(frame):
+    """Return whether the event is currently on its registration phase."""
+    if frame is None:
+        return False
+    reference = cv2.resize(frame, (1280, 720), interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(reference, cv2.COLOR_BGR2HSV)
+
+    def orange_fraction(y1, y2):
+        roi = hsv[y1:y2, 35:300]
+        orange = (
+            (roi[:, :, 0] >= 5)
+            & (roi[:, :, 0] <= 35)
+            & (roi[:, :, 1] >= 90)
+            & (roi[:, :, 2] >= 110)
+        )
+        return float(np.mean(orange))
+
+    registration = orange_fraction(130, 230)
+    active_event = orange_fraction(230, 330)
+    return registration >= 0.08 and registration > active_event * 2.0
+
+
 def _event_target(frame):
     template = cv2.imread(str(EVENT_TEMPLATE), cv2.IMREAD_COLOR)
     if template is None or frame is None:
@@ -135,12 +157,14 @@ def _open_wasteland_registration(client, output_dir, label):
         client.tap(*target)
         time.sleep(3.0)
         frame = _capture(client, output_dir / f"{label}_event_{attempt + 1}.png")
-        if _green_button_visible(frame):
-            return frame, "create"
         if _registered_status_visible(frame):
             # This screen is alliance-wide and may show another member's team.
             # It does not prove that the account we just switched to is enrolled.
             return frame, "registered_unverified"
+        if not _registration_phase_selected(frame):
+            return frame, "registration_closed"
+        if _green_button_visible(frame):
+            return frame, "create"
         client.keyevent(4)
         time.sleep(1.0)
         frame = client.screenshot_bgr()
@@ -154,6 +178,10 @@ def _create_solo_team(client, output_dir, account_name):
         client.keyevent(4)
         time.sleep(1.0)
         return False, "registration status is visible, but current account membership is unverified"
+    if state == "registration_closed":
+        client.keyevent(4)
+        time.sleep(1.0)
+        return False, "registration phase is closed"
     if frame is None:
         return False, "registration prompt was not detected"
 

@@ -90,6 +90,76 @@ def normalize_account_profiles(raw_profiles, serial="emulator-5564"):
     return normalized or default_account_profiles(serial)
 
 
+def recover_account_profiles(raw_profiles, credential_keys, serial="emulator-5564"):
+    """Restore local profiles from DPAPI key names without exposing credentials."""
+    profiles = normalize_account_profiles(raw_profiles, serial)
+    keys = {str(key or "").strip() for key in credential_keys or ()}
+    methods_by_id = {}
+    for key in keys:
+        match = re.fullmatch(r"login:(igg|google):(.+)", key)
+        if match is None:
+            continue
+        method, account_id = match.groups()
+        password_keys = (
+            (f"igg:{account_id}",)
+            if method == "igg"
+            else (f"google:{account_id}", account_id)
+        )
+        if any(password_key in keys for password_key in password_keys):
+            methods_by_id.setdefault(account_id, set()).add(method)
+
+    def display_name(account_id):
+        special = {
+            "zzub1": "zZuB1",
+            "buzz": "BuZz",
+            "luckynoob": "LuckyNoob",
+        }
+        if account_id in special:
+            return special[account_id]
+        numbered = re.fullmatch(r"igg_(\d+)", account_id)
+        if numbered:
+            return f"IGG {numbered.group(1)}"
+        return account_id.replace("_", " ").strip().title() or "Account"
+
+    existing = {str(profile.get("id") or ""): profile for profile in profiles}
+    for account_id in sorted(methods_by_id):
+        methods = methods_by_id[account_id]
+        preferred_method = "google" if methods == {"google"} else "igg"
+        profile = existing.get(account_id)
+        if profile is not None:
+            current_method = str(profile.get("login_method") or "igg")
+            if current_method not in methods:
+                profile["login_method"] = preferred_method
+            profile["auto_login"] = True
+            if preferred_method == "igg":
+                profile["chooser_index"] = 1
+            if account_id.casefold() == "buzz":
+                profile["enabled"] = False
+            continue
+
+        profiles.append(
+            {
+                "id": account_id,
+                "name": display_name(account_id),
+                "enabled": account_id.casefold() != "buzz",
+                "ldplayer_index": 5,
+                "adb_serial": str(serial or "emulator-5564"),
+                "session_minutes": 30.0,
+                "login_method": preferred_method,
+                "chooser_index": 1,
+                "google_login": "",
+                "igg_login": "",
+                "auto_login": True,
+                "switch_group": f"Аккаунт: {display_name(account_id)}",
+                "switch_completion_uid": "",
+                "task_enabled": {},
+                "task_settings": {},
+                "routine_next_run": {},
+            }
+        )
+    return profiles
+
+
 def find_account(profiles, account_id):
     return next((profile for profile in profiles if profile.get("id") == account_id), None)
 

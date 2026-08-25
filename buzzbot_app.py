@@ -30,6 +30,7 @@ from buzzbot.accounts import (
     mask_google_account,
     requires_manual_google_verification,
     requires_google_reauthentication,
+    recover_account_profiles,
     next_enabled_account,
     normalize_account_profiles,
     snapshot_tasks as snapshot_account_tasks,
@@ -76,6 +77,7 @@ from buzzbot.matching import (
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
     detect_radar_card_action_target,
+    detect_radar_deployment_prompt_target,
     detect_radar_notification_targets,
     detect_radar_world_action_target,
     detect_settings_close_target,
@@ -2585,6 +2587,14 @@ class AutoClicker:
                         self.adb_serial,
                     )
                     self._migrate_account_logins_to_credential_store()
+                    try:
+                        self.account_profiles = recover_account_profiles(
+                            self.account_profiles,
+                            self.credential_store.list_keys(),
+                            self.adb_serial,
+                        )
+                    except CredentialError as exc:
+                        logger.warning("Не удалось восстановить локальные профили: %s", exc)
                     self.current_account_id = str(
                         data.get('current_account_id') or self.account_profiles[0]['id']
                     )
@@ -4384,6 +4394,68 @@ class AutoClicker:
             )
         )
         radar_guard_visible = self._template_uid_is_visible(radar_guard_uid)
+        deployment_target = detect_radar_deployment_prompt_target(frame)
+        if deployment_target is not None:
+            task_id = str(task.get("id") or "")
+            if task_id == "radar_marches":
+                # Reaching this prompt proves the preceding world action was
+                # accepted, even when its transient button was missed.
+                self.routine_completed_steps.add("radar_action")
+                if self._tap_radar_fallback(
+                    deployment_target,
+                    "создаю отряд для задания",
+                    "radar_squad",
+                ):
+                    return True
+            else:
+                # Rewards and quick tasks must never deploy a squad. Defer the
+                # marker for this pass, return home and continue with another.
+                self._confirm_pending_radar_marker()
+                self.set_status_message(
+                    "Радар: карточка требует отряд, безопасно пропускаю",
+                    force=True,
+                )
+                returned = self._return_to_main_screen(
+                    max_back_steps=6,
+                    require_settlement=True,
+                )
+                if returned:
+                    self.routine_completed_steps.clear()
+                    self.routine_last_action_time = time.time()
+                    self.routine_idle_confirmation_count = 0
+                    self.routine_current_had_action = True
+                    return True
+                return False
+
+        card_target = detect_radar_card_action_target(frame)
+        if (
+            task.get("id") == "radar_rewards"
+            and card_target is not None
+            and "radar_marker" in self.routine_completed_steps
+        ):
+            # Known reward templates are evaluated before this fallback. A
+            # remaining Forward button therefore belongs to an unfinished or
+            # wrong-category card and must not be opened by the rewards pass.
+            self._confirm_pending_radar_marker()
+            try:
+                if self.uses_adb:
+                    self.adb_client.keyevent(4)
+                else:
+                    pyautogui.press("escape")
+            except Exception:
+                logger.exception("Radar rewards could not close a deferred card")
+                return False
+            self._invalidate_capture()
+            self.routine_completed_steps.clear()
+            self.routine_last_action_time = time.time()
+            self.routine_idle_confirmation_count = 0
+            self.routine_current_had_action = True
+            self.set_status_message(
+                "Радар: карточка не завершена, проверяю следующую",
+                force=True,
+            )
+            self._interruptible_sleep(0.6)
+            return True
         if (
             not radar_guard_visible
             and self.routine_completed_steps.issubset({"radar_open"})
@@ -4401,7 +4473,8 @@ class AutoClicker:
             ):
                 return True
 
-        card_target = detect_radar_card_action_target(frame)
+        if task.get("id") == "radar_rewards":
+            card_target = None
         if card_target and self._tap_radar_fallback(
             card_target,
             "нажата доступная кнопка карточки",
@@ -4419,7 +4492,10 @@ class AutoClicker:
                 ):
                     return True
 
-        if "radar_forward" in self.routine_completed_steps:
+        if (
+            task.get("id") != "radar_rewards"
+            and "radar_forward" in self.routine_completed_steps
+        ):
             action_target = detect_radar_world_action_target(frame)
             if action_target and self._tap_radar_fallback(
                 action_target,
@@ -4586,6 +4662,21 @@ class AutoClicker:
             return False
 
         target = detect_igg_game_login_ok_target(frame)
+        if (
+            target is None
+            and "account_switch_igg_game_confirmed" in self.routine_completed_steps
+        ):
+            if self._is_main_screen_visible():
+                return False
+            overlay_target = detect_game_event_overlay_close_target(frame)
+            if overlay_target is not None and self._tap_routine_fallback(
+                overlay_target,
+                ("account_switch_post_login_overlay", *overlay_target),
+                "Вход IGG завершён: закрываю игровой баннер",
+            ):
+                logger.info("Account switch closed a post-login game event overlay")
+                self._interruptible_sleep(3.0)
+                return True
         if target is None or not self._tap_routine_fallback(
             target,
             ("account_switch_igg_game_confirm", *target),
@@ -4618,7 +4709,12 @@ class AutoClicker:
             return False
         settings = task.get("settings", {})
         if settings.get("login_method") == "igg":
-            return "account_switch_igg_game_confirmed" in self.routine_completed_steps
+            if "account_switch_igg_game_confirmed" in self.routine_completed_steps:
+                return True
+            return {
+                "account_switch_igg_login_submitted",
+                "account_switch_igg_id_selected",
+            }.issubset(self.routine_completed_steps)
         return True
 
     def _try_account_switch_igg_rejected_login(self, task):
@@ -4681,16 +4777,23 @@ class AutoClicker:
         except Exception:
             logger.exception("Account switch fallback could not capture the screen")
             return False
-        event_close_target = detect_game_event_overlay_close_target(frame)
-        if event_close_target is not None and self._tap_routine_fallback(
-            event_close_target,
-            ("account_switch_event_close", *event_close_target),
-            "Переключение аккаунта: закрываю игровой баннер",
-        ):
-            logger.info("Account switch closed a blocking game event overlay")
-            self._interruptible_sleep(3.0)
-            return True
         if not self._is_main_screen_visible():
+            # Once account navigation has started, non-main screens are expected
+            # (profile, settings and the IGG web view). Do not back out of them.
+            if "account_switch_navigation_started" in getattr(
+                self,
+                "routine_completed_steps",
+                (),
+            ):
+                return False
+            self.set_status_message(
+                "Переключение аккаунта: возвращаюсь на главный экран",
+                force=True,
+            )
+            if self._return_to_main_screen(max_back_steps=6, require_settlement=True):
+                self.routine_last_action_time = time.time()
+                logger.info("Account switch recovered from an inner game screen")
+                return True
             return False
         scale_x = frame.shape[1] / 1280.0
         scale_y = frame.shape[0] / 720.0
@@ -4866,6 +4969,9 @@ class AutoClicker:
         self.account_switch_selected_at = time.time()
         self.routine_last_action_time = time.time()
         self.click_count += 1
+        if not hasattr(self, "routine_completed_steps"):
+            self.routine_completed_steps = set()
+        self.routine_completed_steps.add("account_switch_igg_login_submitted")
         logger.info("IGG credentials submitted for account profile %s", account_id)
         self._interruptible_sleep(4.0)
         return True
@@ -4971,46 +5077,27 @@ class AutoClicker:
             or not self.account_switch_selected_at
         ):
             return False
-        try:
-            frame, _origin = self._capture_screen_bgr(force=True)
-        except Exception:
-            logger.exception("Account switch completion fallback could not capture the screen")
+        if time.time() - self.account_switch_selected_at < 8.0:
+            return False
+        if self._is_main_screen_visible():
             return False
 
-        if "account_switch_profile_closed" in self.routine_completed_steps:
+        self.set_status_message(
+            "Аккаунт выбран; возвращаюсь на главный экран",
+            force=True,
+        )
+        if not self._return_to_main_screen(max_back_steps=8, require_settlement=True):
             return False
-        if "account_switch_login_methods_closed" not in self.routine_completed_steps:
-            target = detect_account_settings_back_target(frame)
-            step = "login_methods_back"
-            marker = "account_switch_login_methods_closed"
-            message = "Аккаунт выбран; возвращаюсь из способов входа"
-        elif "account_switch_details_closed" not in self.routine_completed_steps:
-            target = detect_account_details_close_target(frame)
-            step = "account_close"
-            marker = "account_switch_details_closed"
-            message = "Аккаунт выбран; закрываю страницу аккаунта"
-        elif "account_switch_settings_closed" not in self.routine_completed_steps:
-            target = detect_settings_close_target(frame)
-            step = "settings_close"
-            marker = "account_switch_settings_closed"
-            message = "Аккаунт выбран; закрываю настройки"
-        else:
-            target = detect_commander_profile_back_target(frame)
-            step = "profile_back"
-            marker = "account_switch_profile_closed"
-            message = "Аккаунт выбран; возвращаюсь из профиля на карту"
-        if target is None:
-            return False
-        if not self._tap_routine_fallback(
-            target,
-            ("account_switch_return_main", step, *target),
-            message,
-        ):
-            return False
-        self.routine_completed_steps.add(marker)
+        self.routine_completed_steps.update(
+            {
+                "account_switch_login_methods_closed",
+                "account_switch_details_closed",
+                "account_switch_settings_closed",
+                "account_switch_profile_closed",
+            }
+        )
         self.account_switch_selected_at = time.time()
-        logger.info("Account switch completed settings step %s at %s", step, target)
-        self._interruptible_sleep(3.0)
+        logger.info("Account switch returned to the main screen through Android Back")
         return True
 
     def _tap_routine_fallback(self, target, coord_key, status_message):
@@ -7161,7 +7248,7 @@ class AutoClicker:
             ", ".join(f"{level}={confidence:.3f}" for level, confidence in scores),
             ", ".join(f"{level}={confidence:.3f}" for level, confidence in matches) or "none",
         )
-        return select_best_resource_result_level(matches)
+        return select_best_resource_result_level(matches, raw_matches=scores)
 
     def _resource_result_level_rejected(self, img_config):
         setting_key = str(img_config.get("expected_result_level_setting") or "")
@@ -7434,6 +7521,8 @@ class AutoClicker:
             self._invalidate_capture()
             self.routine_completed_steps.clear()
             self.routine_last_action_time = time.time()
+            self.routine_idle_outside_since = 0.0
+            self.routine_idle_recovery_attempted = False
             img_config["last_used"] = self.routine_last_action_time
             self.set_status_message(
                 "Радар: задание уже выполняется, проверяю следующую карточку",
@@ -7460,6 +7549,10 @@ class AutoClicker:
             self._confirm_pending_radar_marker()
             reset_radar_card_runtime_steps(self.routine_completed_steps)
             self.routine_last_action_time = time.time()
+            # Each card is an independent flow. A recovery used by an earlier
+            # card must not prevent us from escaping a later transient screen.
+            self.routine_idle_outside_since = 0.0
+            self.routine_idle_recovery_attempted = False
             img_config["last_used"] = self.routine_last_action_time
             self.set_status_message(
                 "Радар: задание обработано, возвращаюсь к следующей карточке",
@@ -8556,6 +8649,13 @@ class AutoClicker:
             elif action == "right_click":
                 pyautogui.rightClick()
 
+        current_routine_task_id = getattr(self, "current_routine_task_id", None)
+        if (
+            current_routine_task_id == "__account_switch__"
+            and img_config.get("group") == ACCOUNT_SWITCH_TEMPLATE_GROUP
+        ):
+            self.routine_completed_steps.add("account_switch_navigation_started")
+
         self._invalidate_capture()
 
         if action == "observe":
@@ -8584,7 +8684,11 @@ class AutoClicker:
             configured_amount = str(settings.get("stamina_item_amount", "auto") or "auto")
             refill_attempts = 0
             max_refill_attempts = 8
-            while stamina_dialog_is_visible(stamina_frame):
+            stamina_enabled = current_routine_task_id is None or current_routine_task_id in {
+                "zombie_hunt",
+                "wasteland_exploration",
+            }
+            while stamina_enabled and stamina_dialog_is_visible(stamina_frame):
                 if not bool(settings.get("use_stamina_items", True)):
                     self.routine_action_failure_reason = "stamina"
                     logger.warning("Недостаточно выносливости; автоматическое пополнение отключено")
@@ -8769,7 +8873,7 @@ class AutoClicker:
                     logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
                     return True
                 confirmation_frame, _confirmation_origin = self._capture_screen_bgr(force=True)
-                if stamina_dialog_is_visible(confirmation_frame):
+                if stamina_enabled and stamina_dialog_is_visible(confirmation_frame):
                     self.routine_action_failure_reason = "stamina"
                     self.set_status_message(
                         "Недостаточно выносливости: повторю попытку позже",

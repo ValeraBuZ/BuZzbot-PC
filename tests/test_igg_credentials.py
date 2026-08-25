@@ -208,8 +208,53 @@ class IggCredentialTests(unittest.TestCase):
 
         self.assertFalse(bot._account_switch_main_screen_confirmed(task))
 
+        bot.routine_completed_steps.add("account_switch_igg_login_submitted")
+        self.assertTrue(bot._account_switch_main_screen_confirmed(task))
+
+        bot.routine_completed_steps.remove("account_switch_igg_login_submitted")
         bot.routine_completed_steps.add("account_switch_igg_game_confirmed")
         self.assertTrue(bot._account_switch_main_screen_confirmed(task))
+
+    @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
+    @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
+    def test_post_login_event_overlay_is_closed(self, _confirm, _overlay):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 10.0
+        bot.routine_completed_steps = {
+            "account_switch_igg_id_selected",
+            "account_switch_igg_game_confirmed",
+        }
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        tapped = []
+        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+        bot._interruptible_sleep = lambda _seconds: None
+
+        handled = bot._try_account_switch_igg_game_confirmation(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(tapped, [(1152, 112)])
+
+    @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
+    @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
+    def test_post_login_overlay_detector_does_not_click_main_screen(self, _confirm, _overlay):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 10.0
+        bot.routine_completed_steps = {
+            "account_switch_igg_id_selected",
+            "account_switch_igg_game_confirmed",
+        }
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: True
+        bot._tap_routine_fallback = lambda *_args: self.fail("main screen must not be tapped")
+
+        self.assertFalse(bot._try_account_switch_igg_game_confirmation(self.task()))
 
     def test_delayed_igg_confirmation_does_not_complete_google_switch(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -252,40 +297,30 @@ class IggCredentialTests(unittest.TestCase):
         self.assertTrue(bot._try_account_switch_igg_rejected_login(self.task()))
         self.assertIn("не зарегистрирован", bot.account_switch_error)
 
-    def test_igg_completion_closes_each_nested_screen_once(self):
+    @patch("buzzbot_app.time.time", return_value=20.0)
+    def test_igg_completion_returns_to_main_screen_safely(self, _time):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 1.0
         bot.routine_completed_steps = {"account_switch_igg_id_selected"}
-        bot._interruptible_sleep = lambda _seconds: None
-        tapped = []
-        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+        bot._is_main_screen_visible = lambda: False
+        recovered = []
+        bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
 
-        login_methods = np.full((720, 1280, 3), 160, dtype=np.uint8)
-        login_methods[86:668, 133:1147] = (35, 35, 35)
-        login_methods[594:643, 507:773] = (45, 180, 235)
+        self.assertTrue(bot._try_account_switch_return_to_main(self.task()))
 
-        account_details = np.full((720, 1280, 3), (35, 35, 35), dtype=np.uint8)
-        for top, bottom in ((158, 191), (229, 263), (371, 406)):
-            account_details[top:bottom, 950:1130] = (45, 180, 235)
-
-        settings = np.full((720, 1280, 3), (25, 25, 25), dtype=np.uint8)
-        for left, right in ((188, 387), (430, 629), (670, 869), (910, 1110)):
-            settings[118:263, left:right] = (65, 80, 95)
-
-        profile = np.full((720, 1280, 3), (130, 130, 130), dtype=np.uint8)
-        profile[26:286, 808:1274] = (35, 35, 35)
-        import cv2
-        cv2.circle(profile, (47, 45), 28, (30, 150, 220), thickness=-1)
-
-        frames = iter((login_methods, account_details, settings, profile, profile))
-        bot._capture_screen_bgr = lambda force=False: (next(frames), (0, 0))
-
-        for _index in range(4):
-            self.assertTrue(bot._try_account_switch_return_to_main(self.task()))
-        self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
-
-        self.assertEqual(tapped, [(640, 618), (1133, 43), (1133, 43), (47, 45)])
+        self.assertEqual(recovered, [{"max_back_steps": 8, "require_settlement": True}])
         self.assertIn("account_switch_profile_closed", bot.routine_completed_steps)
+
+    @patch("buzzbot_app.time.time", return_value=20.0)
+    def test_igg_completion_waits_when_main_screen_is_already_visible(self, _time):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 1.0
+        bot.routine_completed_steps = {"account_switch_igg_id_selected"}
+        bot._is_main_screen_visible = lambda: True
+        bot._return_to_main_screen = lambda **_kwargs: self.fail("recovery should not run")
+
+        self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
 
     def test_completed_switch_keeps_success_flag_for_ui(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -341,6 +376,58 @@ class IggCredentialTests(unittest.TestCase):
         self.assertTrue(handled)
         self.assertEqual(bot.adb_client.launched, [GAME_PACKAGE])
 
+    def test_account_switch_returns_from_inner_game_screen(self):
+        class GameAdb:
+            def current_foreground_package(self):
+                return GAME_PACKAGE
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 0.0
+        bot.routine_last_action_time = 0.0
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        recovered = []
+        bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+
+        handled = bot._try_account_switch_visual_fallback(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(
+            recovered,
+            [{"max_back_steps": 6, "require_settlement": True}],
+        )
+
+    def test_account_switch_does_not_leave_expected_navigation_screen(self):
+        class GameAdb:
+            def current_foreground_package(self):
+                return GAME_PACKAGE
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 0.0
+        bot.routine_last_action_time = 0.0
+        bot.routine_completed_steps = {"account_switch_navigation_started"}
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        recovered = []
+        bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+
+        handled = bot._try_account_switch_visual_fallback(self.task())
+
+        self.assertFalse(handled)
+        self.assertEqual(recovered, [])
+
     def test_fill_igg_credentials_uses_verified_xml_targets(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
@@ -376,6 +463,9 @@ class MemoryCredentialStore:
 
     def delete_password(self, key):
         return self.values.pop(key, None) is not None
+
+    def list_keys(self):
+        return tuple(sorted(self.values))
 
 
 class LocalCredentialTests(unittest.TestCase):

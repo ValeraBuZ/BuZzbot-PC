@@ -14,7 +14,10 @@ test_runs/
 tmp/
 build/
 dist/
-android_samsung_mvp/
+android_samsung_mvp/.gradle/
+android_samsung_mvp/local.properties
+android_samsung_mvp/**/build/
+android_samsung_mvp/debug_frames/
 *.generated.spec
 BuZzbotPortable.spec
 

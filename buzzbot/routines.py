@@ -1037,7 +1037,7 @@ def zombie_fallback_levels(settings, maximum=10):
     return min(int(maximum), max(0, configured))
 
 
-def radar_marker_was_confirmed(uid, x, y, confirmed_keys, radius=12):
+def radar_marker_was_confirmed(uid, x, y, confirmed_keys, radius=32):
     """Match an animated radar marker to a previously confirmed deployment."""
     marker_uid = str(uid or "")
     radius_squared = float(radius) ** 2
@@ -1129,17 +1129,30 @@ def upgrade_resource_runtime_metadata(images, tasks):
     return upgraded
 
 
-def select_best_resource_result_level(matches):
-    """Return the level with the strongest validated template match."""
+def select_best_resource_result_level(matches, raw_matches=None):
+    """Return the strongest safe level match, including an unambiguous fallback."""
     candidates = []
     for level, confidence in matches:
         try:
             candidates.append((float(confidence), int(level)))
         except (TypeError, ValueError):
             continue
-    if not candidates:
+    if candidates:
+        return max(candidates)[1]
+
+    fallback = []
+    for level, confidence in raw_matches or ():
+        try:
+            fallback.append((float(confidence), int(level)))
+        except (TypeError, ValueError):
+            continue
+    fallback.sort(reverse=True)
+    if not fallback or fallback[0][0] < 0.62:
         return None
-    return max(candidates)[1]
+    runner_up = fallback[1][0] if len(fallback) > 1 else -1.0
+    if fallback[0][0] - runner_up < 0.12:
+        return None
+    return fallback[0][1]
 
 
 def upgrade_repeatable_claim_metadata(images, tasks):
@@ -1727,6 +1740,8 @@ def upgrade_radar_runtime_metadata(images, tasks):
             image["routine_priority"] = priority
             if step_id == "open_radar":
                 image["enabled"] = False
+            if task_id == "radar_rewards" and step_id == "open_any_task":
+                image["enabled"] = False
             if step_id == "wait_in_progress":
                 image["action"] = "radar_defer_in_progress"
                 image["delay"] = 0.5
@@ -1762,6 +1777,8 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image["repeat_runtime_step"] = True
                 image["requires_runtime_steps"] = ["radar_forward"]
                 image["delay"] = max(1.5, float(image.get("delay", 0.0) or 0.0))
+                if task_id == "radar_rewards" and step_id == "collect_completed":
+                    image["requires_runtime_steps"] = ["radar_marker"]
             elif step_id == "create_squad":
                 image["runtime_step"] = "radar_squad"
                 image["requires_runtime_steps"] = ["radar_action"]

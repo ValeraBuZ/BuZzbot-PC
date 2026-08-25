@@ -12,6 +12,7 @@ from buzzbot.accounts import (
     mask_google_account,
     next_enabled_account,
     normalize_account_profiles,
+    recover_account_profiles,
     requires_google_reauthentication,
     requires_manual_google_verification,
     snapshot_tasks,
@@ -20,6 +21,37 @@ from buzzbot.routines import default_routine_tasks
 
 
 class AccountProfileTests(unittest.TestCase):
+    def test_local_credential_keys_restore_profiles_without_logins(self):
+        profiles = recover_account_profiles(
+            [{"id": "phoenix675", "name": "Phoenix675"}],
+            {
+                "login:igg:zzub1",
+                "igg:zzub1",
+                "login:igg:buzz",
+                "igg:buzz",
+                "login:google:luckynoob",
+                "google:luckynoob",
+                "login:igg:igg_7",
+                "igg:igg_7",
+            },
+        )
+        by_id = {profile["id"]: profile for profile in profiles}
+
+        self.assertEqual(by_id["zzub1"]["name"], "zZuB1")
+        self.assertEqual(by_id["luckynoob"]["login_method"], "google")
+        self.assertTrue(by_id["luckynoob"]["auto_login"])
+        self.assertFalse(by_id["buzz"]["enabled"])
+        self.assertEqual(by_id["igg_7"]["chooser_index"], 1)
+        self.assertEqual(by_id["zzub1"]["igg_login"], "")
+
+    def test_local_keys_repair_existing_login_method(self):
+        profiles = recover_account_profiles(
+            [{"id": "luckynoob", "name": "LuckyNoob", "login_method": "igg"}],
+            {"login:google:luckynoob", "luckynoob"},
+        )
+
+        self.assertEqual(profiles[0]["login_method"], "google")
+        self.assertTrue(profiles[0]["auto_login"])
     def test_extracts_safe_cancel_from_unregistered_igg_dialog(self):
         xml = """
         <hierarchy>

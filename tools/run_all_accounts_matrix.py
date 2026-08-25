@@ -53,8 +53,8 @@ TASK_TIMEOUTS = {
     "vip_rewards": 60.0,
     "alliance_donations": 160.0,
     "radar_rewards": 180.0,
-    "radar_quick": 180.0,
-    "radar_marches": 240.0,
+    "radar_quick": 360.0,
+    "radar_marches": 420.0,
     "mail_rewards": 75.0,
     "research": 90.0,
     "train_infantry": 65.0,
@@ -70,6 +70,7 @@ TASK_TIMEOUTS = {
     "oil": 75.0,
     "collective_mind": 100.0,
     "prize_hunt": 300.0,
+    "wasteland_exploration": 480.0,
 }
 
 

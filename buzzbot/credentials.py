@@ -129,6 +129,10 @@ class CredentialStore:
             return False
         return bool(self._load()["credentials"].get(account_key))
 
+    def list_keys(self):
+        """Return credential identifiers without decrypting secret values."""
+        return tuple(sorted(self._load()["credentials"]))
+
     def set_password(self, account_id, password):
         account_key = str(account_id or "").strip()
         value = str(password or "")

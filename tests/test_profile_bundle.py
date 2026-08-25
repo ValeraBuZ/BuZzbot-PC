@@ -72,6 +72,8 @@ class ProfileBundleTests(unittest.TestCase):
             reload_uid = str(uuid.uuid5(namespace, "system:loading_error_reload"))
             self.assertTrue(images[reload_uid]["startup_only"])
             self.assertGreaterEqual(images[reload_uid]["delay"], 8.0)
+            limited_trial_uid = str(uuid.uuid5(namespace, "system:limited_trial_forward"))
+            self.assertTrue(images[limited_trial_uid]["startup_only"])
 
     def test_march_templates_require_screen_change_confirmation(self):
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
@@ -84,6 +86,18 @@ class ProfileBundleTests(unittest.TestCase):
         ]
         self.assertTrue(march_images)
         self.assertTrue(all(image.get("confirm_disappears") for image in march_images))
+
+    def test_radar_marches_defer_when_no_squad_can_be_deployed(self):
+        profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        uid = str(uuid.uuid5(namespace, "radar_marches:no_deployable_squad"))
+
+        with zipfile.ZipFile(profile_path) as archive:
+            manifest = json.loads(archive.read("profile.json"))
+        images = {image["uid"]: image for image in manifest["images"]}
+
+        self.assertEqual(images[uid]["action"], "observe")
+        self.assertIn("нет доступного отряда", images[uid]["defer_routine_reason"])
 
     def test_collective_no_result_is_observed_but_never_clicked(self):
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
@@ -104,6 +118,7 @@ class ProfileBundleTests(unittest.TestCase):
         namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
         steps = {
             "event_entry",
+            "unavailable",
             "intro_map",
             "attack",
             "bypass",
@@ -129,6 +144,9 @@ class ProfileBundleTests(unittest.TestCase):
         }
         self.assertTrue(all(image["use_orb"] for image in wasteland_images.values()))
         self.assertTrue(all(image["orb_match_threshold"] == 3 for image in wasteland_images.values()))
+        self.assertEqual(wasteland_images["event_entry"]["search_region"], [350, 20, 650, 260])
+        self.assertEqual(wasteland_images["unavailable"]["action"], "observe")
+        self.assertTrue(wasteland_images["unavailable"]["defer_routine_reason"])
         self.assertEqual(wasteland_images["reward_close"]["limit_key"], "max_encounters")
         self.assertTrue(wasteland_images["stamina_empty"]["completes_routine"])
 

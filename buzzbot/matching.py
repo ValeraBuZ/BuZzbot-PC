@@ -391,7 +391,7 @@ def detect_commander_profile_back_target(frame_bgr):
         & (back[:, :, 1] >= 70)
         & (back[:, :, 2] >= 110)
     )
-    if float(np.mean(gold_back)) < 0.11 or float(np.mean(right_panel < 95)) < 0.75:
+    if float(np.mean(gold_back)) < 0.06 or float(np.mean(right_panel < 95)) < 0.75:
         return None
     return int(round(47 * scale_x)), int(round(45 * scale_y))
 
@@ -658,6 +658,39 @@ def detect_radar_world_action_target(frame_bgr):
         return None
     _area, target_x, target_y = max(candidates)
     return int(round(target_x * scale_x)), int(round(target_y * scale_y))
+
+
+def detect_radar_deployment_prompt_target(frame_bgr):
+    """Return the safe Create squad button from the radar deployment prompt."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    panel = hsv[40:310, 835:1105]
+    neutral_panel = (
+        (panel[:, :, 1] <= 120)
+        & (panel[:, :, 2] >= 110)
+    )
+    if float(np.count_nonzero(neutral_panel)) / float(neutral_panel.size) < 0.45:
+        return None
+
+    def enabled_button_fraction(top, bottom):
+        button = hsv[top:bottom, 860:1085]
+        mask = cv2.inRange(
+            button,
+            np.array([8, 80, 140], dtype=np.uint8),
+            np.array([45, 255, 255], dtype=np.uint8),
+        )
+        return float(np.count_nonzero(mask)) / float(mask.size)
+
+    # Requiring both stacked buttons prevents a generic world-map action from
+    # being mistaken for the deployment prompt.
+    if enabled_button_fraction(180, 235) < 0.20:
+        return None
+    if enabled_button_fraction(240, 295) < 0.20:
+        return None
+    return int(round(970 * scale_x)), int(round(210 * scale_y))
 
 
 def zombie_camp_checkbox_is_checked(frame_bgr):

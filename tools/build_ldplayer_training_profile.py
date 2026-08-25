@@ -169,7 +169,18 @@ WASTELAND_STEPS = (
         (775, 138, 865, 230),
         (0, 0),
         5.0,
-        (450, 110, 520, 180),
+        # Event tiles are reflowed as promotions appear and disappear. Keep
+        # the search within the top event tray, but cover both observed rows.
+        (350, 20, 650, 260),
+    ),
+    (
+        "unavailable",
+        "Аккаунт не допущен к исследованию пустоши",
+        "wasteland_unavailable.png",
+        (420, 485, 860, 530),
+        (0, 0),
+        0.5,
+        (350, 430, 580, 130),
     ),
     (
         "intro_map",
@@ -1049,6 +1060,14 @@ DAILY_TASK_STEPS = {
             False,
         ),
         (
+            "no_deployable_squad",
+            "Нет доступного отряда для задания радара",
+            "radar_no_deployable_squad_live.png",
+            (862, 614, 1065, 668),
+            (0, 0),
+            True,
+        ),
+        (
             "close_region_search",
             "Закрыть поиск региона после задания радара",
             "Phoenix675_radar_region_search_stuck.png",
@@ -1106,7 +1125,6 @@ _RADAR_COMMON_STEP_IDS = {
     "radar_screen_guard",
     "card_guard",
     "forward_guard",
-    "open_any_task",
     "wait_in_progress",
     "close_region_search",
     "return_shelter",
@@ -1134,6 +1152,7 @@ _RADAR_QUICK_STEP_IDS = {
     "task_car_unstarted_final",
     "task_car_generic_shape",
     "task_special_generic_shape",
+    "open_any_task",
     "open_supply",
     "open_car",
     "collect_supply",
@@ -1149,11 +1168,13 @@ _RADAR_MARCH_STEP_IDS = {
     "task_survivor_current_live",
     "task_special_current",
     "task_fist_current",
+    "open_any_task",
     "open_zombie",
     "attack_zombie",
     "rescue_survivors",
     "create_squad",
     "march",
+    "no_deployable_squad",
 }
 
 
@@ -1402,6 +1423,7 @@ def build_profile(destination):
             "glory_league_close",
             "beast_taming_close",
             "limited_quantity_offer_close",
+            "limited_trial_forward",
             "google_play_cancel",
         }:
             system_image["startup_only"] = True
@@ -1497,6 +1519,11 @@ def build_profile(destination):
             configured_image["limit_key"] = "max_encounters"
         elif step_id == "stamina_empty":
             configured_image["completes_routine"] = True
+        elif step_id == "unavailable":
+            configured_image["action"] = "observe"
+            configured_image["defer_routine_reason"] = (
+                "аккаунт не зарегистрирован в исследовании пустоши"
+            )
         manifest["images"].append(configured_image)
         payloads.append((output_path, entry_name))
         print(
@@ -1602,6 +1629,8 @@ def build_profile(destination):
                 }:
                     configured_image["requires_runtime_steps"] = ["radar_forward"]
                     configured_image["delay"] = 1.5
+                    if task_id == "radar_rewards" and step_id == "collect_completed":
+                        configured_image["requires_runtime_steps"] = ["radar_marker"]
                 if step_id == "create_squad":
                     configured_image["runtime_step"] = "radar_squad"
                     configured_image["requires_runtime_steps"] = ["radar_action"]
@@ -1614,6 +1643,12 @@ def build_profile(destination):
                     ]
                     configured_image["runtime_step_mode"] = "any"
                     configured_image["allow_runtime_resume"] = True
+                if step_id == "no_deployable_squad":
+                    configured_image["action"] = "observe"
+                    configured_image["defer_routine_reason"] = (
+                        "нет доступного отряда для задания радара"
+                    )
+                    configured_image["confidence"] = 0.80
                 if step_id == "close_region_search":
                     configured_image["requires_runtime_steps"] = [
                         "radar_action",

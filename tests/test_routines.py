@@ -823,6 +823,25 @@ class RoutineTaskTests(unittest.TestCase):
             6,
         )
         self.assertIsNone(select_best_resource_result_level([]))
+        self.assertEqual(
+            select_best_resource_result_level(
+                [],
+                raw_matches=[("6", 0.413), ("7", 0.646)],
+            ),
+            7,
+        )
+        self.assertIsNone(
+            select_best_resource_result_level(
+                [],
+                raw_matches=[("6", 0.59), ("7", 0.646)],
+            )
+        )
+        self.assertIsNone(
+            select_best_resource_result_level(
+                [],
+                raw_matches=[("6", 0.50), ("7", 0.61)],
+            )
+        )
 
     def test_resource_search_retries_only_before_gather_and_within_limit(self):
         task = {"id": "metal"}
@@ -835,7 +854,8 @@ class RoutineTaskTests(unittest.TestCase):
     def test_confirmed_radar_marker_allows_small_animation_offset(self):
         keys = {("marker-1", 415, 507)}
         self.assertTrue(radar_marker_was_confirmed("marker-1", 421, 512, keys))
-        self.assertFalse(radar_marker_was_confirmed("marker-1", 440, 512, keys))
+        self.assertTrue(radar_marker_was_confirmed("marker-1", 440, 512, keys))
+        self.assertFalse(radar_marker_was_confirmed("marker-1", 450, 512, keys))
         self.assertFalse(radar_marker_was_confirmed("marker-2", 415, 507, keys))
 
     def test_new_radar_card_forgets_previous_card_steps(self):

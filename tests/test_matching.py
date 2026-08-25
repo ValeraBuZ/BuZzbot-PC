@@ -24,6 +24,7 @@ from buzzbot.matching import (
     detect_login_session_expired_ok_target,
     detect_prize_hunt_squad_confirmation_target,
     detect_radar_card_action_target,
+    detect_radar_deployment_prompt_target,
     detect_radar_notification_targets,
     detect_radar_world_action_target,
     detect_lowest_stamina_refill_target,
@@ -227,6 +228,11 @@ class DynamicGameControlTests(unittest.TestCase):
         frame[26:286, 808:1274] = (130, 130, 130)
         self.assertIsNone(detect_commander_profile_back_target(frame))
 
+        frame[26:286, 808:1274] = (35, 35, 35)
+        frame[12:82, 12:90] = (25, 25, 25)
+        cv2.circle(frame, (47, 45), 28, (24, 105, 145), thickness=-1)
+        self.assertEqual(detect_commander_profile_back_target(frame), (47, 45))
+
     def test_detects_blank_login_webview_close_button_only(self):
         blank_webview = np.full((720, 1280, 3), 255, dtype=np.uint8)
         cv2.line(blank_webview, (1234, 22), (1258, 46), (115, 115, 115), 3)
@@ -358,6 +364,25 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertIsNotNone(world_target)
         self.assertTrue(940 <= world_target[0] <= 990)
         self.assertTrue(510 <= world_target[1] <= 535)
+
+    def test_detects_radar_deployment_prompt_create_squad(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (835, 40), (1105, 310), (190, 190, 190), thickness=-1)
+        cv2.rectangle(frame, (860, 180), (1085, 235), (20, 180, 240), thickness=-1)
+        cv2.rectangle(frame, (860, 240), (1085, 295), (20, 180, 240), thickness=-1)
+
+        self.assertEqual(detect_radar_deployment_prompt_target(frame), (970, 210))
+        self.assertEqual(
+            detect_radar_deployment_prompt_target(cv2.resize(frame, (640, 360))),
+            (485, 105),
+        )
+
+    def test_rejects_single_radar_world_button_as_deployment_prompt(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (835, 40), (1105, 310), (190, 190, 190), thickness=-1)
+        cv2.rectangle(frame, (860, 180), (1085, 235), (20, 180, 240), thickness=-1)
+
+        self.assertIsNone(detect_radar_deployment_prompt_target(frame))
 
     def test_detects_only_checked_game_options(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
