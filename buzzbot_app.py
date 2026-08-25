@@ -7071,7 +7071,11 @@ class AutoClicker:
                         unavailable_reason = (
                             "boost_item_unavailable"
                             if current_routine_task.get("id") == "gathering_boost"
-                            else "событие конкурса сейчас не проводится"
+                            else (
+                                "исследование пустоши недоступно или аккаунт не зарегистрирован"
+                                if current_routine_task.get("id") == "wasteland_exploration"
+                                else "событие конкурса сейчас не проводится"
+                            )
                         )
                         self._defer_current_routine_unavailable(
                             unavailable_reason,

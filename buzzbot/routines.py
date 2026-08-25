@@ -492,7 +492,8 @@ DEFAULT_ROUTINE_TASKS = (
         "timeout_seconds": 120.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
-        "empty_home_is_success": True,
+        "completion_runtime_step": "stamina_empty",
+        "empty_home_is_success": False,
         "settings": {
             # The live event starts at 04:00 Moscow time (01:00 UTC).
             "fixed_utc_hours": [1],
@@ -910,6 +911,7 @@ def routine_home_recovery_due(task, had_action, attempted, idle_seconds):
         "radar_quick",
         "radar_marches",
         "research",
+        "wasteland_exploration",
         "train_infantry",
         "train_riders",
         "train_shooters",
@@ -959,6 +961,13 @@ def routine_missing_followup_is_unavailable(task, completed_steps, idle_seconds)
         has_category = "boost_category" in completed
         has_item = bool({"boost_8h", "boost_24h", "use"}.intersection(completed))
         return has_category and not has_item and float(idle_seconds) >= timeout
+    if task_id == "wasteland_exploration":
+        followup_steps = completed.difference({"event_entry"})
+        return (
+            "event_entry" in completed
+            and not followup_steps
+            and float(idle_seconds) >= min(20.0, timeout)
+        )
     return False
 
 
@@ -1462,6 +1471,16 @@ def upgrade_strict_runtime_metadata(images, tasks):
         boost_24h.pop("allow_higher_setting_fallback", None)
         upgraded += 1
 
+    for step_id in ("event_entry", "intro_map", "unavailable"):
+        image = images_by_uid.get(
+            str(uuid.uuid5(PROFILE_NAMESPACE, f"wasteland_exploration:{step_id}"))
+        )
+        if image is None:
+            continue
+        image["repeat_runtime_step"] = False
+        image["allow_repeat"] = False
+        upgraded += 1
+
     mail_requirements = {
         "open_mail": (),
         "select_system": ("open_mail",),
@@ -1518,6 +1537,11 @@ def upgrade_strict_runtime_metadata(images, tasks):
                 2,
                 int(settings.get("max_lab_checks", 0) or 0),
             )
+        if task.get("id") == "wasteland_exploration":
+            # Opening the event tile can return directly to the settlement for
+            # an ineligible account. That is not a successful exploration run.
+            task["empty_home_is_success"] = False
+            task["completion_runtime_step"] = "stamina_empty"
         if task.get("id") == "mail_rewards":
             task["completion_runtime_step"] = "claim_reports"
 
@@ -1887,12 +1911,16 @@ def _normalize_task(source, default):
             1.0,
         ),
         "completion_uid": str(source.get("completion_uid", "") or ""),
-        "completion_runtime_step": str(
-            source.get(
-                "completion_runtime_step",
-                default.get("completion_runtime_step", ""),
+        "completion_runtime_step": (
+            "stamina_empty"
+            if task_id == "wasteland_exploration"
+            else str(
+                source.get(
+                    "completion_runtime_step",
+                    default.get("completion_runtime_step", ""),
+                )
+                or ""
             )
-            or ""
         ),
         "march_completion_runtime_step": (
             "march"
@@ -1914,11 +1942,14 @@ def _normalize_task(source, default):
         "complete_when_idle": bool(
             source.get("complete_when_idle", default.get("complete_when_idle", False))
         ),
-        "empty_home_is_success": task_id in {
+        "empty_home_is_success": False
+        if task_id == "wasteland_exploration"
+        else task_id in {
             "fence_survivors",
             "vip_rewards",
             "research",
-        } or bool(
+        }
+        or bool(
             source.get(
                 "empty_home_is_success",
                 default.get("empty_home_is_success", False),

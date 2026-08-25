@@ -488,12 +488,28 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(task["settings"]["fixed_utc_hours"], [1])
         self.assertEqual(task["settings"]["max_encounters"], 40)
         self.assertEqual(task["settings"]["stamina_retry_minutes"], 12)
-        self.assertTrue(task["empty_home_is_success"])
+        self.assertFalse(task["empty_home_is_success"])
+        self.assertEqual(task["completion_runtime_step"], "stamina_empty")
         self.assertFalse(task["uses_march"])
         self.assertEqual(
             {spec["key"] for spec in task_setting_specs(task["id"])},
             {"max_encounters", "stamina_retry_minutes"},
         )
+
+        migrated = normalize_routine_tasks(
+            [
+                {
+                    "id": "wasteland_exploration",
+                    "empty_home_is_success": True,
+                    "completion_runtime_step": "",
+                }
+            ]
+        )
+        migrated_task = next(
+            item for item in migrated if item["id"] == "wasteland_exploration"
+        )
+        self.assertFalse(migrated_task["empty_home_is_success"])
+        self.assertEqual(migrated_task["completion_runtime_step"], "stamina_empty")
 
     def test_radar_next_run_uses_fixed_game_reset(self):
         task = next(task for task in default_routine_tasks() if task["id"] == "radar_quick")
@@ -555,6 +571,18 @@ class RoutineTaskTests(unittest.TestCase):
                     "id": "radar_quick",
                     "uses_march": False,
                     "timeout_seconds": 12.0,
+                },
+                False,
+                False,
+                12.0,
+            )
+        )
+        self.assertTrue(
+            routine_home_recovery_due(
+                {
+                    "id": "wasteland_exploration",
+                    "uses_march": False,
+                    "timeout_seconds": 120.0,
                 },
                 False,
                 False,
@@ -631,6 +659,22 @@ class RoutineTaskTests(unittest.TestCase):
                 task,
                 {"boost_category", "boost_8h"},
                 60.0,
+            )
+        )
+
+    def test_wasteland_entry_requires_a_real_event_followup(self):
+        task = {"id": "wasteland_exploration", "timeout_seconds": 120.0}
+        self.assertFalse(
+            routine_missing_followup_is_unavailable(task, {"event_entry"}, 19.9)
+        )
+        self.assertTrue(
+            routine_missing_followup_is_unavailable(task, {"event_entry"}, 20.0)
+        )
+        self.assertFalse(
+            routine_missing_followup_is_unavailable(
+                task,
+                {"event_entry", "explore"},
+                120.0,
             )
         )
 
@@ -982,6 +1026,25 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(images[2]["block_seconds"], 0.5)
         self.assertEqual(tasks[0]["interval_minutes"], 0.1)
         self.assertEqual(tasks[0]["timeout_seconds"], 8.0)
+
+    def test_wasteland_entry_metadata_is_one_shot(self):
+        images = [
+            {
+                "uid": str(
+                    uuid.uuid5(
+                        PROFILE_NAMESPACE,
+                        f"wasteland_exploration:{step}",
+                    )
+                ),
+                "allow_repeat": True,
+                "repeat_runtime_step": True,
+            }
+            for step in ("event_entry", "intro_map", "unavailable")
+        ]
+
+        self.assertEqual(upgrade_strict_runtime_metadata(images, []), 3)
+        self.assertTrue(all(not image["allow_repeat"] for image in images))
+        self.assertTrue(all(not image["repeat_runtime_step"] for image in images))
 
     def test_healing_start_uses_short_verified_settle_delay(self):
         import uuid

@@ -136,6 +136,8 @@ class ProfileBundleTests(unittest.TestCase):
         tasks = {task["id"]: task for task in manifest["routine_tasks"]}
         task = tasks["wasteland_exploration"]
         self.assertEqual(task["settings"]["fixed_utc_hours"], [1])
+        self.assertFalse(task["empty_home_is_success"])
+        self.assertEqual(task["completion_runtime_step"], "stamina_empty")
         self.assertEqual(task["settings"]["stamina_retry_minutes"], 12)
 
         wasteland_images = {
@@ -145,6 +147,9 @@ class ProfileBundleTests(unittest.TestCase):
         self.assertTrue(all(image["use_orb"] for image in wasteland_images.values()))
         self.assertTrue(all(image["orb_match_threshold"] == 3 for image in wasteland_images.values()))
         self.assertEqual(wasteland_images["event_entry"]["search_region"], [350, 20, 650, 260])
+        self.assertFalse(wasteland_images["event_entry"]["repeat_runtime_step"])
+        self.assertFalse(wasteland_images["intro_map"]["repeat_runtime_step"])
+        self.assertTrue(wasteland_images["reward_close"]["repeat_runtime_step"])
         self.assertEqual(wasteland_images["unavailable"]["action"], "observe")
         self.assertTrue(wasteland_images["unavailable"]["defer_routine_reason"])
         self.assertEqual(wasteland_images["reward_close"]["limit_key"], "max_encounters")

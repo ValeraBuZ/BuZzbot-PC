@@ -1506,8 +1506,8 @@ def build_profile(destination):
         configured_image.update(
             {
                 "runtime_step": step_id,
-                "repeat_runtime_step": True,
-                "allow_repeat": True,
+                "repeat_runtime_step": step_id not in {"event_entry", "intro_map", "unavailable"},
+                "allow_repeat": step_id not in {"event_entry", "intro_map", "unavailable"},
                 "block_seconds": max(0.8, min(3.0, delay)),
                 "confidence": 0.82,
                 "search_region": list(search_region),
