@@ -38,6 +38,7 @@ from buzzbot.accounts import (
 from buzzbot.adb import AdbClient, AdbError, find_adb_executable
 from buzzbot.compact_ui import build_compact_ui
 from buzzbot.credentials import CredentialError, CredentialStore
+from buzzbot.device_lock import DeviceLease
 from buzzbot.diagnostics import create_diagnostic_report
 from buzzbot.display import make_display_profile, matching_scales
 from buzzbot.grouping import build_group_iteration_plan, parse_click_sequence, parse_time_to_minutes, validate_hour_min
@@ -755,6 +756,7 @@ class AutoClicker:
         self.multi_emulator_workers = {}
         self.multi_emulator_command_sequence = 0
         self.multi_emulator_total = 1
+        self.device_lease = None
         self.search_images = []
         self.groups = {}
         self.group_schedules = {}
@@ -4386,6 +4388,9 @@ class AutoClicker:
         if marker:
             self.routine_radar_pending_marker_key = coord_key
         self.routine_completed_steps.add(runtime_step)
+        if runtime_step == "radar_open":
+            self.routine_idle_outside_since = 0.0
+            self.routine_idle_recovery_attempted = False
         self.routine_current_had_action = True
         self.routine_last_action_time = time.time()
         self.routine_idle_confirmation_count = 0
@@ -6223,6 +6228,10 @@ class AutoClicker:
     def start(self):
         if not self.stop_event.is_set():
             return True
+        running_thread = getattr(self, "_thread", None)
+        if running_thread is not None and running_thread.is_alive():
+            self.set_status_message("Ожидаю завершения предыдущего запуска", force=True)
+            return False
         if self.uses_adb and not self.check_runtime_environment(notify=False, wait_seconds=8.0):
             self.set_status_message(self.tr('adb_required', serial=self.adb_serial), force=True)
             self._show_notification('error', 'adb_required', serial=self.adb_serial)
@@ -6266,6 +6275,16 @@ class AutoClicker:
             logger.error(f"Файлы не найдены: {missing}")
             self._show_notification('error', 'error', message=f"Файлы не найдены: {missing}")
             return False
+
+        if self.uses_adb:
+            lease = DeviceLease(self.adb_serial)
+            if not lease.acquire():
+                message = f"Эмулятор {self.adb_serial} уже обслуживается другим BuZzbot"
+                logger.warning(message)
+                self.set_status_message(message, force=True)
+                self._show_notification('warning', 'warning', message=message)
+                return False
+            self.device_lease = lease
 
         self.stop_event.clear()
         self._set_state(BotState.RUNNING)
@@ -7233,6 +7252,10 @@ class AutoClicker:
                 time.sleep(self.sleep_error)
 
         self._set_state(BotState.STOPPED)
+        device_lease = getattr(self, "device_lease", None)
+        if device_lease is not None:
+            device_lease.release()
+            self.device_lease = None
         logger.info("Цикл кликера завершён")
         self.set_status_message(self.tr('state_stopped'), force=True)
         if self.root:
@@ -8707,6 +8730,12 @@ class AutoClicker:
                 pyautogui.rightClick()
 
         current_routine_task_id = getattr(self, "current_routine_task_id", None)
+        if (
+            is_radar_task_id(current_routine_task_id)
+            and img_config.get("requires_settlement_screen")
+        ):
+            self.routine_idle_outside_since = 0.0
+            self.routine_idle_recovery_attempted = False
         if (
             current_routine_task_id == "__account_switch__"
             and img_config.get("group") == ACCOUNT_SWITCH_TEMPLATE_GROUP

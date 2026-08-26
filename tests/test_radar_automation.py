@@ -312,6 +312,32 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertFalse(bot.routine_idle_recovery_attempted)
         self.assertEqual(bot.routine_idle_outside_since, 0.0)
 
+    def test_opening_radar_rearms_idle_screen_recovery(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.player_width = 1280
+        bot.player_height = 720
+        bot.adb_client = SimpleNamespace(tap=lambda *_args: None)
+        bot.current_routine_task_id = "radar_marches"
+        bot.routine_idle_outside_since = 25.0
+        bot.routine_idle_recovery_attempted = True
+        bot.routine_action_failure_reason = ""
+        bot.cycle_mode = False
+        bot.sleep_found = 0.0
+        bot._invalidate_capture = lambda: None
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        image = {
+            "action": "click",
+            "description": "Открыть радарную станцию",
+            "requires_settlement_screen": True,
+            "last_used": 0.0,
+            "delay": 0.0,
+        }
+
+        self.assertTrue(bot._execute_action(image, SimpleNamespace(x=110, y=448)))
+        self.assertFalse(bot.routine_idle_recovery_attempted)
+        self.assertEqual(bot.routine_idle_outside_since, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

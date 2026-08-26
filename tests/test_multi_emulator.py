@@ -1,5 +1,7 @@
 import unittest
+from tempfile import TemporaryDirectory
 
+from buzzbot.device_lock import DeviceLease
 from buzzbot.multi_emulator import prepare_worker_config, runtime_dir_for_instance
 from buzzbot_app import should_autostart_all_emulators, should_run_multi_worker
 
@@ -47,6 +49,27 @@ class MultiEmulatorTests(unittest.TestCase):
         self.assertTrue(should_autostart_all_emulators(["--autostart-all"]))
         self.assertFalse(should_autostart_all_emulators(["--autostart"]))
         self.assertTrue(should_run_multi_worker(["--worker", "--autostart"]))
+
+    def test_only_one_process_can_lease_an_adb_device(self):
+        with TemporaryDirectory() as temp_dir:
+            first = DeviceLease("emulator-5556", temp_dir)
+            second = DeviceLease("emulator-5556", temp_dir)
+
+            self.assertTrue(first.acquire())
+            self.assertFalse(second.acquire())
+            first.release()
+            self.assertTrue(second.acquire())
+            second.release()
+
+    def test_different_adb_devices_can_run_in_parallel(self):
+        with TemporaryDirectory() as temp_dir:
+            first = DeviceLease("emulator-5556", temp_dir)
+            second = DeviceLease("127.0.0.1:5557", temp_dir)
+
+            self.assertTrue(first.acquire())
+            self.assertTrue(second.acquire())
+            first.release()
+            second.release()
 
 
 if __name__ == "__main__":
