@@ -1600,8 +1600,12 @@ def build_profile(destination):
                 configured_image["block_seconds"] = 2.0
                 configured_image["confidence"] = 0.82
                 configured_image["orb_match_threshold"] = 5
-                card_guard_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "radar:card_guard"))
-                forward_guard_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "radar:forward_guard"))
+                card_guard_uid = str(
+                    uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:card_guard")
+                )
+                forward_guard_uid = str(
+                    uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:forward_guard")
+                )
                 if step_id in {"radar_screen_guard", "card_guard", "forward_guard"}:
                     configured_image["guard_only"] = True
                 if step_id == "open_radar":

@@ -1054,7 +1054,7 @@ def radar_marker_was_confirmed(uid, x, y, confirmed_keys, radius=32):
         if not isinstance(key, (tuple, list)) or len(key) != 3:
             continue
         key_uid, key_x, key_y = key
-        if str(key_uid or "") != marker_uid:
+        if str(key_uid or "") not in {marker_uid, "*"}:
             continue
         if (float(key_x) - float(x)) ** 2 + (float(key_y) - float(y)) ** 2 <= radius_squared:
             return True
@@ -1790,6 +1790,8 @@ def upgrade_radar_runtime_metadata(images, tasks):
     radar_tasks = [task for task in tasks if is_radar_task_id(task.get("id"))]
     for task in radar_tasks:
         task_id = str(task.get("id") or "")
+        card_guard_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:card_guard"))
+        forward_guard_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:forward_guard"))
         for step_id, priority in RADAR_STEP_PRIORITIES.items():
             uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:{step_id}"))
             image = images_by_uid.get(uid)
@@ -1812,6 +1814,7 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image["runtime_step"] = "radar_marker"
                 image["repeat_runtime_step"] = True
                 image["prevents_idle_completion"] = True
+                image["skip_if_uid_visible"] = card_guard_uid
                 image["requires_radar_notification"] = False
                 image["confidence"] = min(0.68, float(image.get("confidence", 0.82)))
                 image["orb_match_threshold"] = min(
@@ -1824,6 +1827,9 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image["runtime_step"] = "radar_forward"
                 image["repeat_runtime_step"] = True
                 image["requires_runtime_steps"] = ["radar_marker"]
+                image["requires_visible_uid"] = (
+                    card_guard_uid if step_id == "open_any_task" else forward_guard_uid
+                )
             elif step_id in {
                 "collect_completed",
                 "collect_supply",

@@ -980,6 +980,9 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(radar_marker_was_confirmed("marker-1", 440, 512, keys))
         self.assertFalse(radar_marker_was_confirmed("marker-1", 450, 512, keys))
         self.assertFalse(radar_marker_was_confirmed("marker-2", 415, 507, keys))
+        self.assertTrue(
+            radar_marker_was_confirmed("marker-2", 421, 512, {("*", 415, 507)})
+        )
 
     def test_new_radar_card_forgets_previous_card_steps(self):
         completed = {
@@ -1448,6 +1451,30 @@ class RoutineTaskTests(unittest.TestCase):
         upgrade_radar_runtime_metadata(images, tasks)
 
         self.assertFalse(images[0]["requires_radar_notification"])
+
+    def test_radar_upgrade_replaces_legacy_shared_card_guards(self):
+        task_id = "radar_marches"
+        marker_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:task_zombie"))
+        open_any_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:open_any_task"))
+        open_zombie_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:open_zombie"))
+        legacy_card_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "radar:card_guard"))
+        legacy_forward_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "radar:forward_guard"))
+        expected_card_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:card_guard"))
+        expected_forward_uid = str(
+            uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:forward_guard")
+        )
+        images = [
+            {"uid": marker_uid, "skip_if_uid_visible": legacy_card_uid},
+            {"uid": open_any_uid, "requires_visible_uid": legacy_card_uid},
+            {"uid": open_zombie_uid, "requires_visible_uid": legacy_forward_uid},
+        ]
+        tasks = [{"id": task_id, "timeout_seconds": 12.0}]
+
+        upgrade_radar_runtime_metadata(images, tasks)
+
+        self.assertEqual(images[0]["skip_if_uid_visible"], expected_card_uid)
+        self.assertEqual(images[1]["requires_visible_uid"], expected_card_uid)
+        self.assertEqual(images[2]["requires_visible_uid"], expected_forward_uid)
 
 
 if __name__ == "__main__":

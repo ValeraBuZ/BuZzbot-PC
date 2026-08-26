@@ -162,6 +162,7 @@ class RadarAutomationTests(unittest.TestCase):
         )
         bot._invalidate_capture = lambda: None
         bot._interruptible_sleep = lambda _seconds: None
+        bot.routine_completed_steps = {"radar_open"}
         bot.routine_radar_in_progress_seen = True
         bot.routine_tasks = [
             {"id": "radar_rewards", "enabled": True},
@@ -198,6 +199,35 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertEqual(bot.routine_next_run["radar_marches"], 43300.0)
         self.assertEqual(bot.routine_next_run["vip_rewards"], 900.0)
         self.assertIn("покупка пропуска отменена", statuses[-1])
+
+    def test_radar_does_not_treat_an_unrelated_dialog_as_pass_purchase(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._template_uid_is_visible = lambda _uid: False
+        bot._is_settlement_screen_visible = lambda: False
+        bot._tap_radar_fallback = lambda *_args, **_kwargs: False
+        task = {
+            "id": "radar_marches",
+            "settings": {"visual_fallback": True},
+        }
+
+        with patch(
+            "buzzbot_app.detect_radar_pass_purchase_cancel_target",
+            return_value=(496, 508),
+        ) as detector, patch(
+            "buzzbot_app.detect_radar_deployment_prompt_target",
+            return_value=None,
+        ), patch(
+            "buzzbot_app.detect_radar_card_action_target",
+            return_value=None,
+        ):
+            self.assertFalse(bot._try_radar_visual_fallback(task))
+
+        detector.assert_not_called()
 
     def test_rewards_mode_returns_home_instead_of_deploying_squad(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -318,6 +348,7 @@ class RadarAutomationTests(unittest.TestCase):
             "radar_forward",
         }
         bot.routine_radar_pending_marker_key = ("marker", 640, 360)
+        bot.routine_radar_marker_failure_counts = {}
         bot.routine_idle_guard_visible = False
         bot.routine_idle_outside_since = 20.0
         bot.routine_last_action_time = 0.0
@@ -331,6 +362,34 @@ class RadarAutomationTests(unittest.TestCase):
         )
         self.assertEqual(bot.routine_completed_steps, set())
         self.assertIsNone(bot.routine_radar_pending_marker_key)
+        self.assertEqual(bot.routine_radar_marker_failure_counts[(20, 11)], 1)
+        self.assertEqual(bot.blocked_coords, {})
+
+    def test_radar_idle_recovery_defers_a_marker_after_two_failed_attempts(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        marker_key = ("marker", 640, 360)
+        bot.routine_idle_recovery_attempted = False
+        bot.routine_completed_steps = {"radar_open", "radar_marker", "radar_forward"}
+        bot.routine_radar_pending_marker_key = marker_key
+        bot.routine_radar_confirmed_marker_keys = set()
+        bot.routine_radar_marker_failure_counts = {(20, 11): 1}
+        bot.routine_idle_guard_visible = False
+        bot.routine_idle_outside_since = 20.0
+        bot.routine_last_action_time = 0.0
+        bot.blocked_coords = {marker_key: 999.0}
+        bot.anti_loop_enabled = True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        bot.get_routine_task_name = lambda _task: "Радар"
+        bot._return_to_main_screen = lambda **_kwargs: True
+
+        self.assertTrue(
+            bot._try_recover_current_routine_idle_screen({"id": "radar_marches"})
+        )
+
+        self.assertIsNone(bot.routine_radar_pending_marker_key)
+        self.assertIn(marker_key, bot.routine_radar_confirmed_marker_keys)
+        self.assertIn(("*", 640, 360), bot.routine_radar_confirmed_marker_keys)
+        self.assertNotIn((20, 11), bot.routine_radar_marker_failure_counts)
         self.assertEqual(bot.blocked_coords, {})
 
     def test_rejected_radar_marker_does_not_block_idle_completion(self):

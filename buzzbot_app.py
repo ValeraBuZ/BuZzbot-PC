@@ -815,6 +815,7 @@ class AutoClicker:
         self.zombie_level_restore_pending = {}
         self.routine_radar_pending_marker_key = None
         self.routine_radar_confirmed_marker_keys = set()
+        self.routine_radar_marker_failure_counts = {}
         self.routine_radar_in_progress_seen = False
         self.routine_collective_tutorial_taps = 0
         self.routine_healing_pan_route = []
@@ -3887,6 +3888,7 @@ class AutoClicker:
         self.routine_resource_retry_count = 0
         self.routine_radar_pending_marker_key = None
         self.routine_radar_confirmed_marker_keys = set()
+        self.routine_radar_marker_failure_counts = {}
         self.routine_radar_in_progress_seen = False
         self.routine_collective_tutorial_taps = 0
         self.routine_healing_pan_route = []
@@ -4267,10 +4269,32 @@ class AutoClicker:
             require_settlement=routine_requires_settlement(task),
         ):
             return False
-        self.blocked_coords.clear()
         if is_radar_task_id(task.get("id")):
+            marker_key = self.routine_radar_pending_marker_key
+            if marker_key is not None:
+                _marker_uid, marker_x, marker_y = marker_key
+                retry_key = (round(float(marker_x) / 32.0), round(float(marker_y) / 32.0))
+                failure_counts = getattr(self, "routine_radar_marker_failure_counts", None)
+                if not isinstance(failure_counts, dict):
+                    failure_counts = {}
+                    self.routine_radar_marker_failure_counts = failure_counts
+                failure_count = failure_counts.get(retry_key, 0) + 1
+                failure_counts[retry_key] = failure_count
+                if failure_count >= 2:
+                    self._confirm_pending_radar_marker()
+                    logger.warning(
+                        "Radar marker did not produce a supported action twice; deferred: %s",
+                        marker_key,
+                    )
+                    self.set_status_message(
+                        "Радар: карточка дважды не ответила, перехожу к следующей",
+                        force=True,
+                    )
+                else:
+                    logger.info("Radar marker will receive one controlled retry: %s", marker_key)
+                    self.routine_radar_pending_marker_key = None
             self.routine_completed_steps.clear()
-            self.routine_radar_pending_marker_key = None
+        self.blocked_coords.clear()
         self.routine_idle_guard_visible = False
         self.routine_idle_outside_since = 0.0
         self.routine_last_action_time = time.time()
@@ -4340,6 +4364,10 @@ class AutoClicker:
         if marker_key is None:
             return
         self.routine_radar_confirmed_marker_keys.add(marker_key)
+        _marker_uid, marker_x, marker_y = marker_key
+        self.routine_radar_confirmed_marker_keys.add(("*", marker_x, marker_y))
+        retry_key = (round(float(marker_x) / 32.0), round(float(marker_y) / 32.0))
+        getattr(self, "routine_radar_marker_failure_counts", {}).pop(retry_key, None)
         if self.anti_loop_enabled:
             self.blocked_coords[marker_key] = time.time() + 900.0
         logger.info("Radar marker deferred for the current pass: %s", marker_key)
@@ -4413,7 +4441,9 @@ class AutoClicker:
             logger.exception("Radar fallback could not capture the screen")
             return False
 
-        purchase_cancel_target = detect_radar_pass_purchase_cancel_target(frame)
+        purchase_cancel_target = None
+        if "radar_open" in self.routine_completed_steps:
+            purchase_cancel_target = detect_radar_pass_purchase_cancel_target(frame)
         if purchase_cancel_target is not None:
             try:
                 if self.uses_adb:
@@ -6623,6 +6653,15 @@ class AutoClicker:
                 if self.uses_adb:
                     with self._adb_capture_lock:
                         self._adb_iteration_frame = self._capture_adb_frame(force=True)
+                radar_card_visible = False
+                if self.routine_mode and is_radar_task_id(current_routine_task.get("id")):
+                    try:
+                        radar_frame, _radar_origin = self._capture_screen_bgr()
+                        radar_card_visible = (
+                            detect_radar_card_action_target(radar_frame) is not None
+                        )
+                    except Exception:
+                        logger.exception("Radar card guard could not inspect the current screen")
                 iteration_plan = build_group_iteration_plan(
                     active_images,
                     self.group_execution,
@@ -6640,6 +6679,17 @@ class AutoClicker:
                     for image_index, img_config in enumerate(group_images):
                         if self.stop_event.is_set() or self.stop_hotkey_pressed or self.is_paused:
                             break
+
+                        if (
+                            radar_card_visible
+                            and is_radar_task_id(current_routine_task.get("id"))
+                            and img_config.get("runtime_step") == "radar_marker"
+                        ):
+                            logger.debug(
+                                "Radar marker skipped while a task card is open: %s",
+                                img_config.get("description"),
+                            )
+                            continue
 
                         if img_config["group"] and img_config["group"] in self.groups:
                             if not self.groups[img_config["group"]]:
