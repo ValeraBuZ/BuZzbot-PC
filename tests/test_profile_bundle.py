@@ -279,7 +279,10 @@ class ProfileBundleTests(unittest.TestCase):
         self.assertTrue(radar_tasks["radar_marches"]["uses_march"])
         for task_id in radar_tasks:
             open_uid = str(uuid.uuid5(namespace, f"{task_id}:open_radar"))
-            self.assertNotIn(open_uid, images)
+            self.assertIn(open_uid, images)
+            self.assertTrue(images[open_uid]["enabled"])
+            self.assertTrue(images[open_uid]["requires_settlement_screen"])
+            self.assertEqual(images[open_uid]["routine_priority"], 2)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1410,7 +1410,7 @@ class RoutineTaskTests(unittest.TestCase):
 
         self.assertEqual(upgrade_radar_runtime_metadata(images, tasks), 7)
         self.assertLess(images[4]["routine_priority"], images[2]["routine_priority"])
-        self.assertFalse(images[4]["enabled"])
+        self.assertTrue(images[4]["enabled"])
         self.assertLess(images[2]["routine_priority"], images[1]["routine_priority"])
         self.assertLess(images[1]["routine_priority"], images[0]["routine_priority"])
         self.assertNotIn("limit_key", images[1])

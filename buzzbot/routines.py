@@ -1797,7 +1797,7 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 continue
             image["routine_priority"] = priority
             if step_id == "open_radar":
-                image["enabled"] = False
+                image["enabled"] = True
             if task_id == "radar_rewards" and step_id == "open_any_task":
                 image["enabled"] = False
             if step_id == "wait_in_progress":

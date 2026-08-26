@@ -1123,6 +1123,7 @@ DAILY_TASK_STEPS = {
 
 _RADAR_ALL_STEPS = DAILY_TASK_STEPS.pop("radar")
 _RADAR_COMMON_STEP_IDS = {
+    "open_radar",
     "radar_screen_guard",
     "card_guard",
     "forward_guard",
