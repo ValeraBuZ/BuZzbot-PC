@@ -1414,6 +1414,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertLess(images[2]["routine_priority"], images[1]["routine_priority"])
         self.assertLess(images[1]["routine_priority"], images[0]["routine_priority"])
         self.assertNotIn("limit_key", images[1])
+        self.assertEqual(images[1]["requires_runtime_steps"], ["radar_marker"])
         self.assertTrue(images[0]["prevents_idle_completion"])
         self.assertEqual(tasks[0]["timeout_seconds"], 15.0)
         self.assertTrue(tasks[0]["complete_when_idle"])

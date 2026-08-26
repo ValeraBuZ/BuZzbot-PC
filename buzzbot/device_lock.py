@@ -6,11 +6,40 @@ import re
 import tempfile
 
 
+def canonical_device_key(serial, ldplayer_index=None):
+    """Return one lock identity for every ADB alias of an LDPlayer instance."""
+    index = None
+    value = str(serial or "").strip().lower()
+    match = re.fullmatch(r"emulator-(\d+)", value)
+    if match:
+        port = int(match.group(1))
+        offset = port - 5554
+        if offset >= 0 and offset % 2 == 0:
+            index = offset // 2
+    else:
+        match = re.fullmatch(r"127\.0\.0\.1:(\d+)", value)
+        if match:
+            port = int(match.group(1))
+            offset = port - 5555
+            if offset >= 0 and offset % 2 == 0:
+                index = offset // 2
+    if index is None:
+        index = ldplayer_index
+    if index is not None:
+        try:
+            normalized_index = int(index)
+        except (TypeError, ValueError):
+            normalized_index = -1
+        if normalized_index >= 0:
+            return f"ldplayer_{normalized_index}"
+    return re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(serial or "adb"))
+
+
 class DeviceLease:
     """Hold an OS-level lock while one process controls an ADB device."""
 
-    def __init__(self, serial, lock_root=None):
-        safe_serial = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(serial or "adb"))
+    def __init__(self, serial, lock_root=None, *, ldplayer_index=None):
+        safe_serial = canonical_device_key(serial, ldplayer_index)
         root = Path(lock_root or Path(tempfile.gettempdir()) / "BuZzbot" / "device-locks")
         self.path = root / f"{safe_serial}.lock"
         self._handle = None

@@ -643,6 +643,34 @@ def detect_radar_card_action_target(frame_bgr):
     return int(round(244 * scale_x)), int(round(621 * scale_y))
 
 
+def detect_radar_pass_purchase_cancel_target(frame_bgr):
+    """Return only the Cancel button from the radar-pass purchase dialog."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    dialog_body = hsv[210:470, 335:945]
+    cancel_button = hsv[480:535, 360:630]
+    ok_button = hsv[480:535, 650:920]
+
+    neutral_body = (
+        (dialog_body[:, :, 1] <= 65)
+        & (dialog_body[:, :, 2] >= 130)
+    )
+    yellow_lower = np.array([10, 80, 120], dtype=np.uint8)
+    yellow_upper = np.array([42, 255, 255], dtype=np.uint8)
+    cancel_yellow = cv2.inRange(cancel_button, yellow_lower, yellow_upper)
+    ok_yellow = cv2.inRange(ok_button, yellow_lower, yellow_upper)
+
+    body_fraction = float(np.count_nonzero(neutral_body)) / float(neutral_body.size)
+    cancel_yellow_fraction = float(np.count_nonzero(cancel_yellow)) / float(cancel_yellow.size)
+    ok_yellow_fraction = float(np.count_nonzero(ok_yellow)) / float(ok_yellow.size)
+    if body_fraction < 0.70 or ok_yellow_fraction < 0.45 or cancel_yellow_fraction > 0.08:
+        return None
+    return int(round(496 * scale_x)), int(round(508 * scale_y))
+
+
 def detect_radar_world_action_target(frame_bgr):
     """Find a yellow action button shown after a radar card sends us to the map."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)

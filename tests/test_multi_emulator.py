@@ -1,7 +1,7 @@
 import unittest
 from tempfile import TemporaryDirectory
 
-from buzzbot.device_lock import DeviceLease
+from buzzbot.device_lock import DeviceLease, canonical_device_key
 from buzzbot.multi_emulator import prepare_worker_config, runtime_dir_for_instance
 from buzzbot_app import should_autostart_all_emulators, should_run_multi_worker
 
@@ -61,15 +61,38 @@ class MultiEmulatorTests(unittest.TestCase):
             self.assertTrue(second.acquire())
             second.release()
 
-    def test_different_adb_devices_can_run_in_parallel(self):
+    def test_adb_aliases_of_one_ldplayer_share_the_same_lease(self):
         with TemporaryDirectory() as temp_dir:
             first = DeviceLease("emulator-5556", temp_dir)
             second = DeviceLease("127.0.0.1:5557", temp_dir)
 
             self.assertTrue(first.acquire())
+            self.assertFalse(second.acquire())
+            first.release()
+            self.assertTrue(second.acquire())
+            second.release()
+
+    def test_different_ldplayers_can_run_in_parallel(self):
+        with TemporaryDirectory() as temp_dir:
+            first = DeviceLease("emulator-5556", temp_dir)
+            second = DeviceLease("127.0.0.1:5559", temp_dir)
+
+            self.assertTrue(first.acquire())
             self.assertTrue(second.acquire())
             first.release()
             second.release()
+
+    def test_bridged_serial_uses_known_ldplayer_index(self):
+        self.assertEqual(
+            canonical_device_key("192.168.0.53:5555", ldplayer_index=5),
+            "ldplayer_5",
+        )
+
+    def test_standard_serial_wins_over_stale_saved_index(self):
+        self.assertEqual(
+            canonical_device_key("emulator-5556", ldplayer_index=5),
+            "ldplayer_1",
+        )
 
 
 if __name__ == "__main__":

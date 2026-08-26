@@ -116,6 +116,89 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertEqual(calls[0][2], "radar_open")
         self.assertFalse(calls[0][3])
 
+    def test_radar_does_not_press_card_button_before_selecting_marker(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = {"radar_open"}
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._template_uid_is_visible = lambda _uid: True
+        bot._is_settlement_screen_visible = lambda: False
+        calls = []
+        bot._tap_radar_fallback = (
+            lambda target, label, runtime_step, marker=False:
+            calls.append((target, runtime_step, marker)) or True
+        )
+        task = {
+            "id": "radar_quick",
+            "settings": {"visual_fallback": True},
+        }
+
+        with patch(
+            "buzzbot_app.detect_radar_deployment_prompt_target",
+            return_value=None,
+        ), patch(
+            "buzzbot_app.detect_radar_card_action_target",
+            return_value=(244, 621),
+        ), patch(
+            "buzzbot_app.detect_radar_notification_targets",
+            return_value=[],
+        ):
+            self.assertFalse(bot._try_radar_visual_fallback(task))
+
+        self.assertEqual(calls, [])
+
+    def test_radar_cancels_pass_purchase_and_defers_all_radar_modes(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        taps = []
+        finishes = []
+        statuses = []
+        bot.input_backend = "adb"
+        bot.adb_client = SimpleNamespace(tap=lambda *target: taps.append(target))
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._invalidate_capture = lambda: None
+        bot._interruptible_sleep = lambda _seconds: None
+        bot.routine_radar_in_progress_seen = True
+        bot.routine_tasks = [
+            {"id": "radar_rewards", "enabled": True},
+            {"id": "radar_quick", "enabled": True},
+            {"id": "radar_marches", "enabled": True},
+            {"id": "vip_rewards", "enabled": True},
+        ]
+        bot.routine_next_run = {
+            "radar_rewards": 0.0,
+            "radar_quick": 0.0,
+            "radar_marches": 0.0,
+            "vip_rewards": 900.0,
+        }
+        bot._finish_current_routine = lambda now=None: finishes.append(now)
+        bot.save_config = lambda: None
+        bot.set_status_message = lambda message, **_kwargs: statuses.append(message)
+        task = {
+            "id": "radar_quick",
+            "enabled": True,
+            "interval_minutes": 720.0,
+            "settings": {"visual_fallback": True},
+        }
+
+        with patch(
+            "buzzbot_app.detect_radar_pass_purchase_cancel_target",
+            return_value=(496, 508),
+        ), patch("buzzbot_app.time.time", return_value=100.0):
+            self.assertTrue(bot._try_radar_visual_fallback(task))
+
+        self.assertEqual(taps, [(496, 508)])
+        self.assertEqual(finishes, [100.0])
+        self.assertEqual(bot.routine_next_run["radar_rewards"], 43300.0)
+        self.assertEqual(bot.routine_next_run["radar_quick"], 43300.0)
+        self.assertEqual(bot.routine_next_run["radar_marches"], 43300.0)
+        self.assertEqual(bot.routine_next_run["vip_rewards"], 900.0)
+        self.assertIn("покупка пропуска отменена", statuses[-1])
+
     def test_rewards_mode_returns_home_instead_of_deploying_squad(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.routine_completed_steps = {

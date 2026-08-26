@@ -26,6 +26,7 @@ from buzzbot.matching import (
     detect_radar_card_action_target,
     detect_radar_deployment_prompt_target,
     detect_radar_notification_targets,
+    detect_radar_pass_purchase_cancel_target,
     detect_radar_world_action_target,
     detect_lowest_stamina_refill_target,
     detect_march_retreat_target,
@@ -373,6 +374,21 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertIsNotNone(world_target)
         self.assertTrue(940 <= world_target[0] <= 990)
         self.assertTrue(510 <= world_target[1] <= 535)
+
+    def test_detects_only_cancel_on_radar_pass_purchase_dialog(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.rectangle(frame, (335, 210), (945, 470), (205, 205, 205), thickness=-1)
+        cv2.rectangle(frame, (360, 480), (630, 535), (95, 100, 110), thickness=-1)
+        cv2.rectangle(frame, (650, 480), (920, 535), (25, 185, 245), thickness=-1)
+
+        self.assertEqual(detect_radar_pass_purchase_cancel_target(frame), (496, 508))
+        self.assertEqual(
+            detect_radar_pass_purchase_cancel_target(cv2.resize(frame, (640, 360))),
+            (248, 254),
+        )
+
+        cv2.rectangle(frame, (650, 480), (920, 535), (95, 100, 110), thickness=-1)
+        self.assertIsNone(detect_radar_pass_purchase_cancel_target(frame))
 
     def test_detects_radar_deployment_prompt_create_squad(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)

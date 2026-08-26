@@ -80,6 +80,7 @@ from buzzbot.matching import (
     detect_radar_card_action_target,
     detect_radar_deployment_prompt_target,
     detect_radar_notification_targets,
+    detect_radar_pass_purchase_cancel_target,
     detect_radar_world_action_target,
     detect_settings_close_target,
     detect_lowest_stamina_refill_target,
@@ -4412,6 +4413,36 @@ class AutoClicker:
             logger.exception("Radar fallback could not capture the screen")
             return False
 
+        purchase_cancel_target = detect_radar_pass_purchase_cancel_target(frame)
+        if purchase_cancel_target is not None:
+            try:
+                if self.uses_adb:
+                    self.adb_client.tap(*purchase_cancel_target)
+                else:
+                    pyautogui.click(*purchase_cancel_target)
+            except Exception:
+                logger.exception("Radar pass purchase dialog could not be cancelled")
+                return False
+            self._invalidate_capture()
+            self._interruptible_sleep(0.6)
+            now = time.time()
+            next_cycle = next_run_after_radar_pass(task, now, has_in_progress=False)
+            self.routine_radar_in_progress_seen = False
+            self._finish_current_routine(now=now)
+            for radar_task in self.routine_tasks:
+                if is_radar_task_id(radar_task.get("id")) and is_task_effectively_enabled(radar_task):
+                    self.routine_next_run[radar_task["id"]] = next_cycle
+            self.save_config()
+            self.set_status_message(
+                "Радар: покупка пропуска отменена, следующий проход по расписанию",
+                force=True,
+            )
+            logger.warning(
+                "Radar pass purchase dialog cancelled; all radar tasks deferred until %.0f",
+                next_cycle,
+            )
+            return True
+
         radar_guard_uid = str(
             uuid.uuid5(
                 PROFILE_NAMESPACE,
@@ -4500,10 +4531,14 @@ class AutoClicker:
 
         if task.get("id") == "radar_rewards":
             card_target = None
-        if card_target and self._tap_radar_fallback(
-            card_target,
-            "нажата доступная кнопка карточки",
-            "radar_forward",
+        if (
+            card_target
+            and "radar_marker" in self.routine_completed_steps
+            and self._tap_radar_fallback(
+                card_target,
+                "нажата доступная кнопка карточки",
+                "radar_forward",
+            )
         ):
             return True
 
@@ -6277,7 +6312,10 @@ class AutoClicker:
             return False
 
         if self.uses_adb:
-            lease = DeviceLease(self.adb_serial)
+            lease = DeviceLease(
+                self.adb_serial,
+                ldplayer_index=self.player_index,
+            )
             if not lease.acquire():
                 message = f"Эмулятор {self.adb_serial} уже обслуживается другим BuZzbot"
                 logger.warning(message)
@@ -6672,17 +6710,23 @@ class AutoClicker:
                                 (image for image in group_images if image.get("uid") == required_visible_uid),
                                 None,
                             )
-                            if required_image:
-                                required_location, _required_bbox, _required_confidence = self._locate_image(
-                                    required_image
+                            if required_image is None:
+                                logger.warning(
+                                    "Пропуск %s: обязательный защитный шаблон %s отсутствует",
+                                    img_config.get("description"),
+                                    required_visible_uid,
                                 )
-                                if not required_location:
-                                    logger.debug(
-                                        "Пропуск %s: обязательный шаблон %s не виден",
-                                        img_config.get("description"),
-                                        required_image.get("description"),
-                                    )
-                                    continue
+                                continue
+                            required_location, _required_bbox, _required_confidence = self._locate_image(
+                                required_image
+                            )
+                            if not required_location:
+                                logger.debug(
+                                    "Пропуск %s: обязательный шаблон %s не виден",
+                                    img_config.get("description"),
+                                    required_image.get("description"),
+                                )
+                                continue
 
                         last_used = img_config.get("last_used", 0)
                         cooldown = img_config.get("cooldown", 1.5)

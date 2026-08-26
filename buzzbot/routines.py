@@ -1823,6 +1823,7 @@ def upgrade_radar_runtime_metadata(images, tasks):
             elif step_id in {"open_any_task", "open_supply", "open_car", "open_zombie"}:
                 image["runtime_step"] = "radar_forward"
                 image["repeat_runtime_step"] = True
+                image["requires_runtime_steps"] = ["radar_marker"]
             elif step_id in {
                 "collect_completed",
                 "collect_supply",
