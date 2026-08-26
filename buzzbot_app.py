@@ -5737,11 +5737,13 @@ class AutoClicker:
                     "Healing camera route rejected after replay for %s",
                     route_key,
                 )
-            # First probe both sides of the current view. This recovers quickly
-            # when the hospital is just outside the viewport after a collection.
-            # Then reach one map corner and cover the shelter in horizontal rows.
+            # Probe below the top HUD before moving horizontally. A hospital
+            # marker can be visible but clipped by the resource bar; one downward
+            # swipe reveals the complete icon so the normal template can match it.
+            # The matching upward swipe restores the original view when no
+            # hospital is found, then the systematic map scan continues.
             scan_pattern = (
-                ("right", "left")
+                ("down", "up", "right", "left")
                 + ("left",) * 5
                 + ("up",) * 4
                 + ("right",) * 9

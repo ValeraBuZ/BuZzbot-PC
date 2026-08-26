@@ -1022,7 +1022,9 @@ def healing_troop_form_is_visible(frame_bgr):
     ) / float(form_header.shape[0] * form_header.shape[1])
     stable_form_chrome = (
         dark_header_ratio >= 0.75
-        and yellow_ratio(auto_fill_bar) >= 0.45
+        # The auto-fill strip is partially covered by dark caption text and
+        # can fall below 0.45 on the current hospital skin.
+        and yellow_ratio(auto_fill_bar) >= 0.30
     )
     colored_heal = (
         (ordinary_heal[:, :, 1] >= 45)

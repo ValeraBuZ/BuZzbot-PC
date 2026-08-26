@@ -942,7 +942,7 @@ class HealingTests(unittest.TestCase):
         )
         self.assertEqual(
             bot.adb_client.swipes,
-            [(360, 420, 980, 420, 400)],
+            [(640, 250, 640, 570, 400)],
         )
         self.assertEqual(saves, [True])
 
@@ -952,9 +952,9 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "main"
         bot.routine_completed_steps = {"healing_overview"}
-        bot.routine_healing_pan_route = ["left"] * 54
+        bot.routine_healing_pan_route = ["left"] * 56
         bot.routine_healing_replay_index = 0
-        bot.routine_healing_scan_index = 54
+        bot.routine_healing_scan_index = 56
         bot.routine_healing_settle_checks = 2
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True
@@ -988,9 +988,9 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "main"
         bot.routine_completed_steps = {"healing_overview"}
-        bot.routine_healing_pan_route = ["left"] * 54
+        bot.routine_healing_pan_route = ["left"] * 56
         bot.routine_healing_replay_index = 0
-        bot.routine_healing_scan_index = 54
+        bot.routine_healing_scan_index = 56
         bot.routine_healing_settle_checks = 0
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True

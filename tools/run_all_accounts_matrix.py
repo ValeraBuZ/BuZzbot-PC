@@ -248,6 +248,12 @@ def _task_settings(task_id, research_branch, resource_level, collective_level):
         return {"resource_level": resource_level}
     if task_id == "collective_mind":
         return {"level": collective_level}
+    if task_id == "heal":
+        return {
+            "troop_count": 1,
+            "collect_finished": True,
+            "repeat": False,
+        }
     if task_id.startswith("train_"):
         return {"highest_tier": True, "collect_finished": True}
     return {}

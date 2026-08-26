@@ -555,6 +555,11 @@ class DynamicGameControlTests(unittest.TestCase):
         selected[592:642, 900:1155] = (30, 180, 240)
         self.assertTrue(healing_troop_form_is_visible(selected))
 
+        dark_caption_strip = selected.copy()
+        dark_caption_strip[658:705, 575:1160] = (30, 180, 240)
+        dark_caption_strip[658:705, 575:985] = (45, 45, 45)
+        self.assertTrue(healing_troop_form_is_visible(dark_caption_strip))
+
         unrelated = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
         cv2.rectangle(
             unrelated,
