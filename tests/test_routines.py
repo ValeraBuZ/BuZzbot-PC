@@ -482,14 +482,18 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")
 
     def test_donation_exhaustion_completes_only_after_project_close_and_timeout(self):
-        task = {"id": "alliance_donations", "timeout_seconds": 30.0}
+        task = {
+            "id": "alliance_donations",
+            "timeout_seconds": 45.0,
+            "exhaustion_idle_seconds": 15.0,
+        }
 
         self.assertFalse(donation_exhaustion_is_complete(task, set(), 60.0))
         self.assertFalse(
-            donation_exhaustion_is_complete(task, {"project_closed"}, 29.9)
+            donation_exhaustion_is_complete(task, {"project_closed"}, 14.9)
         )
         self.assertTrue(
-            donation_exhaustion_is_complete(task, {"project_closed"}, 30.0)
+            donation_exhaustion_is_complete(task, {"project_closed"}, 15.0)
         )
         self.assertFalse(
             donation_exhaustion_is_complete(
@@ -701,6 +705,7 @@ class RoutineTaskTests(unittest.TestCase):
         }
         self.assertFalse(routine_idle_screen_recovery_due(task, True, False, False, 11.9))
         self.assertTrue(routine_idle_screen_recovery_due(task, True, False, False, 12.0))
+        self.assertTrue(routine_idle_screen_recovery_due(task, False, False, False, 12.0))
 
     def test_processing_contest_defers_when_event_entry_is_absent(self):
         task = {"id": "processing_contest", "timeout_seconds": 25.0}

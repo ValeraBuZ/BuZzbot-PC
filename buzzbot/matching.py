@@ -573,6 +573,36 @@ def detect_radar_notification_targets(frame_bgr):
     return sorted(set(targets), key=lambda point: (point[1], point[0]))
 
 
+def radar_overview_is_visible(frame_bgr):
+    """Recognize the radar map without relying on one animated template."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    def color_ratio(region, low, high):
+        if region.size == 0:
+            return 0.0
+        mask = cv2.inRange(
+            region,
+            np.array(low, dtype=np.uint8),
+            np.array(high, dtype=np.uint8),
+        )
+        return float(np.count_nonzero(mask)) / float(mask.size)
+
+    back_button = hsv[0:90, 0:90]
+    energy_bar = hsv[15:65, 960:1245]
+    execute_all = hsv[510:710, 15:190]
+    gold_low = (8, 70, 80)
+    gold_high = (42, 255, 255)
+    return bool(
+        color_ratio(back_button, gold_low, gold_high) >= 0.06
+        and color_ratio(energy_bar, (35, 75, 70), (95, 255, 255)) >= 0.08
+        and color_ratio(execute_all, gold_low, gold_high) >= 0.05
+    )
+
+
 def radar_marker_has_notification(frame_bgr, bbox, padding=24):
     """Return whether a radar marker match contains a nearby red notification dot."""
     if not bbox or len(bbox) != 4:
@@ -1153,6 +1183,10 @@ def detect_finished_healing_target(frame_bgr):
         # square icons that resemble a single finished-healing portrait.
         marker_mask[:, :230] = 0
         marker_mask[:, 1100:] = 0
+        # Rotating event tiles permanently occupy this upper-right strip.
+        # Their red frames and character art can look like a medic portrait,
+        # while a shelter marker underneath the strip would not be clickable.
+        marker_mask[120:240, 750:1100] = 0
 
         contours, _hierarchy = cv2.findContours(
             marker_mask,
@@ -1206,6 +1240,7 @@ def detect_finished_healing_target(frame_bgr):
     bronze_mask[520:, :] = 0
     bronze_mask[:, :230] = 0
     bronze_mask[:, 1100:] = 0
+    bronze_mask[120:240, 750:1100] = 0
     contours, _hierarchy = cv2.findContours(
         bronze_mask,
         cv2.RETR_LIST,

@@ -99,6 +99,7 @@ class RadarAutomationTests(unittest.TestCase):
         )
         bot._template_uid_is_visible = lambda _uid: False
         bot._is_settlement_screen_visible = lambda: True
+        bot._is_main_screen_visible = lambda: True
         calls = []
 
         def tap_radar(target, label, runtime_step, marker=False):
@@ -115,6 +116,28 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertEqual(calls[0][0], (110, 448))
         self.assertEqual(calls[0][2], "radar_open")
         self.assertFalse(calls[0][3])
+
+    def test_radar_does_not_reopen_from_false_settlement_match(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._template_uid_is_visible = lambda _uid: False
+        bot._is_settlement_screen_visible = lambda: True
+        bot._is_main_screen_visible = lambda: False
+        calls = []
+        bot._tap_radar_fallback = (
+            lambda *args, **kwargs: calls.append((args, kwargs)) or True
+        )
+        task = {
+            "id": "radar_rewards",
+            "settings": {"visual_fallback": True},
+        }
+
+        self.assertFalse(bot._try_radar_visual_fallback(task))
+        self.assertEqual(calls, [])
 
     def test_radar_does_not_press_card_button_before_selecting_marker(self):
         bot = AutoClicker.__new__(AutoClicker)

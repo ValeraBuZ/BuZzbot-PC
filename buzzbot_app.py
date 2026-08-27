@@ -90,6 +90,7 @@ from buzzbot.matching import (
     healing_number_editor_is_open,
     healing_selection_is_empty,
     healing_troop_form_is_visible,
+    radar_overview_is_visible,
     radar_marker_has_notification,
     stamina_dialog_is_visible,
     zombie_camp_checkbox_is_checked,
@@ -1830,6 +1831,39 @@ class AutoClicker:
             if self._is_settlement_screen_visible():
                 logger.info("Переход с карты мира в убежище подтверждён")
                 return True
+
+        # A full-screen chat can leave base markers visible around its edges,
+        # so the screen looks like the world map while the region button is
+        # actually covered. Close that overlay once and re-check before giving
+        # up; this is safer than repeating a blind region-button tap.
+        if self._is_main_screen_visible():
+            try:
+                if self.uses_adb:
+                    self.adb_client.keyevent(4)
+                else:
+                    pyautogui.press("escape")
+            except Exception:
+                logger.exception("Не удалось закрыть перекрывающее окно перед убежищем")
+            else:
+                self._invalidate_capture()
+                self._interruptible_sleep(0.8)
+                try:
+                    frame, origin = self._capture_screen_bgr(force=True)
+                    cancel_target = detect_back_confirmation_cancel_target(frame)
+                except Exception:
+                    cancel_target = None
+                if cancel_target is not None:
+                    cancel_x, cancel_y = cancel_target
+                    if self.uses_adb:
+                        self.adb_client.tap(cancel_x, cancel_y)
+                    else:
+                        pyautogui.click(origin[0] + cancel_x, origin[1] + cancel_y)
+                    self._invalidate_capture()
+                    logger.warning("Отменено окно выхода после попытки закрыть перекрытие")
+                    return False
+                if self._is_settlement_screen_visible():
+                    logger.info("Перекрывающее окно закрыто; убежище подтверждено")
+                    return True
         logger.warning("Переход с карты мира в убежище не подтверждён")
         return False
 
@@ -3200,9 +3234,28 @@ class AutoClicker:
         enter_verified(targets["login"], login, "логин", exact=True)
         enter_verified(targets["password"], password, "пароль", exact=False)
 
-        refreshed_targets = extract_igg_login_form(self.adb_client.ui_xml())
+        # LDPlayer keeps the soft keyboard open after the password field. The
+        # WebView may temporarily omit the submit button from UIAutomator until
+        # the keyboard is hidden and the page has completed one layout pass.
+        self.adb_client.keyevent(4)
+        time.sleep(0.45)
+        refreshed_targets = None
+        for _attempt in range(3):
+            refreshed_targets = extract_igg_login_form(self.adb_client.ui_xml())
+            if refreshed_targets:
+                break
+            time.sleep(0.5)
         if not refreshed_targets:
-            raise CredentialError("Кнопка входа IGG исчезла после заполнения формы.")
+            # Some IGG WebView versions submit automatically after the keyboard
+            # closes. Continue with screen verification instead of restarting
+            # the credential flow and risking a loop.
+            self._invalidate_capture()
+            self.set_status_message(
+                "Данные IGG введены; форма закрылась, проверяю вход",
+                force=True,
+            )
+            logger.info("IGG login form advanced after credential entry")
+            return True
         self.adb_client.tap(*refreshed_targets["submit"])
         self._invalidate_capture()
         self.set_status_message("Данные IGG введены; проверяю главный экран", force=True)
@@ -4479,7 +4532,10 @@ class AutoClicker:
                 f"{task.get('id')}:radar_screen_guard",
             )
         )
-        radar_guard_visible = self._template_uid_is_visible(radar_guard_uid)
+        radar_guard_visible = (
+            self._template_uid_is_visible(radar_guard_uid)
+            or radar_overview_is_visible(frame)
+        )
         deployment_target = detect_radar_deployment_prompt_target(frame)
         if deployment_target is not None:
             task_id = str(task.get("id") or "")
@@ -4546,6 +4602,7 @@ class AutoClicker:
             not radar_guard_visible
             and self.routine_completed_steps.issubset({"radar_open"})
             and self._is_settlement_screen_visible()
+            and self._is_main_screen_visible()
         ):
             height, width = frame.shape[:2]
             open_target = (
@@ -4867,7 +4924,13 @@ class AutoClicker:
         except Exception:
             logger.exception("Account switch fallback could not capture the screen")
             return False
-        if not self._is_main_screen_visible():
+        main_screen_visible = self._is_main_screen_visible()
+        settlement_visible = (
+            self._is_settlement_screen_visible()
+            if main_screen_visible
+            else False
+        )
+        if not main_screen_visible or not settlement_visible:
             # Once account navigation has started, non-main screens are expected
             # (profile, settings and the IGG web view). Do not back out of them.
             if "account_switch_navigation_started" in getattr(
@@ -5432,7 +5495,13 @@ class AutoClicker:
 
         if not self._is_main_screen_visible():
             return False
-        if not self._is_settlement_screen_visible():
+        settlement_visible = self._is_settlement_screen_visible()
+        continuing_confirmed_scan = bool(
+            getattr(self, "routine_healing_search_started", False)
+            and getattr(self, "routine_healing_pan_route", ())
+            and not task.get("settings", {}).get("_collection_pending", False)
+        )
+        if not settlement_visible and not continuing_confirmed_scan:
             self.set_status_message(
                 "Лечение: возвращаюсь с карты мира в убежище",
                 force=True,
@@ -5450,6 +5519,15 @@ class AutoClicker:
             self.routine_healing_search_started = False
             logger.info("Healing search returned from the world map to the settlement")
             return True
+        if not settlement_visible and continuing_confirmed_scan:
+            # Chat text and notifications can cover the bottom-left shelter
+            # marker after a camera pan. This route only uses map swipes, so it
+            # remains safe to continue the already-confirmed settlement scan.
+            logger.info(
+                "Healing settlement marker is covered; continuing confirmed "
+                "camera route at step %s",
+                len(self.routine_healing_pan_route),
+            )
 
         height, width = frame.shape[:2]
         settings = task.setdefault("settings", {})
@@ -5746,13 +5824,13 @@ class AutoClicker:
                 ("down", "up", "right", "left")
                 + ("left",) * 5
                 + ("up",) * 4
-                + ("right",) * 9
+                + ("right",) * 5
                 + ("down",) * 2
-                + ("left",) * 9
+                + ("left",) * 5
                 + ("down",) * 2
-                + ("right",) * 9
+                + ("right",) * 5
                 + ("down",) * 2
-                + ("left",) * 9
+                + ("left",) * 5
                 + ("right",)
             )
             scan_index = self.routine_healing_scan_index
@@ -5786,6 +5864,7 @@ class AutoClicker:
                 self._defer_current_routine_unavailable(
                     "госпиталь не найден после полного обхода карты",
                     time.time(),
+                    retry_delay=max(300.0, healing_repeat_delay(task)),
                 )
                 return True
             direction = scan_pattern[scan_index]

@@ -35,6 +35,7 @@ class FormAdbClient(FakeAdbClient):
         self.taps = []
         self.inputs = []
         self.clear_calls = 0
+        self.keyevents = []
 
     def is_responsive(self):
         return True
@@ -50,6 +51,9 @@ class FormAdbClient(FakeAdbClient):
 
     def focused_edit_text_value(self):
         return self.inputs[-1] if self.inputs else ""
+
+    def keyevent(self, keycode):
+        self.keyevents.append(keycode)
 
 
 class FakeCredentialStore:
@@ -403,6 +407,35 @@ class IggCredentialTests(unittest.TestCase):
             [{"max_back_steps": 6, "require_settlement": True}],
         )
 
+    def test_account_switch_closes_chat_before_tapping_profile(self):
+        class GameAdb:
+            def current_foreground_package(self):
+                return GAME_PACKAGE
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 0.0
+        bot.routine_last_action_time = 0.0
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: False
+        recovered = []
+        bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+
+        handled = bot._try_account_switch_visual_fallback(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(
+            recovered,
+            [{"max_back_steps": 6, "require_settlement": True}],
+        )
+
     def test_account_switch_does_not_leave_expected_navigation_screen(self):
         class GameAdb:
             def current_foreground_package(self):
@@ -446,6 +479,28 @@ class IggCredentialTests(unittest.TestCase):
         )
         self.assertEqual(bot.adb_client.inputs, ["user@example.com", "safe-password"])
         self.assertEqual(bot.adb_client.clear_calls, 2)
+        self.assertEqual(bot.adb_client.keyevents, [4])
+
+    def test_fill_igg_credentials_accepts_webview_auto_advance(self):
+        class AutoAdvanceAdbClient(FormAdbClient):
+            def keyevent(self, keycode):
+                super().keyevent(keycode)
+                self._ui_xml = '<hierarchy><node text="Loading" /></hierarchy>'
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = AutoAdvanceAdbClient()
+        bot.account_profiles = [
+            {"id": "main", "login_method": "igg", "igg_login": ""}
+        ]
+        bot.credential_store = FakeCredentialStore()
+        bot._invalidate_capture = lambda: None
+        statuses = []
+        bot.set_status_message = lambda message, **_kwargs: statuses.append(message)
+
+        self.assertTrue(bot.fill_igg_credentials("main"))
+        self.assertEqual(bot.adb_client.taps, [(640, 122), (640, 207)])
+        self.assertIn("форма закрылась", statuses[-1])
 
 
 class MemoryCredentialStore:

@@ -89,6 +89,11 @@ def main():
                 )
                 continue
 
+            # An explicit live-test invocation authorizes switching the listed
+            # local profiles. Enable it only in this in-memory runner; the
+            # user's saved auto-login preference is never overwritten.
+            profile["auto_login"] = True
+
             switched, detail = _switch_account(switcher, account_id, timeout_seconds=300.0)
             account_result["switch_detail"] = detail
             account_result["switched"] = bool(

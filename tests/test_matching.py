@@ -26,6 +26,7 @@ from buzzbot.matching import (
     detect_radar_card_action_target,
     detect_radar_deployment_prompt_target,
     detect_radar_notification_targets,
+    radar_overview_is_visible,
     detect_radar_pass_purchase_cancel_target,
     detect_radar_world_action_target,
     detect_lowest_stamina_refill_target,
@@ -342,6 +343,15 @@ class DynamicGameControlTests(unittest.TestCase):
             detect_radar_notification_targets(frame),
             [(676, 230), (696, 356)],
         )
+
+    def test_detects_radar_overview_from_stable_chrome(self):
+        frame = np.full((720, 1280, 3), (45, 55, 65), dtype=np.uint8)
+        cv2.rectangle(frame, (10, 10), (75, 75), (20, 180, 240), thickness=-1)
+        cv2.rectangle(frame, (980, 25), (1230, 55), (40, 190, 70), thickness=-1)
+        cv2.rectangle(frame, (30, 535), (170, 695), (20, 180, 240), thickness=-1)
+
+        self.assertTrue(radar_overview_is_visible(frame))
+        self.assertFalse(radar_overview_is_visible(np.zeros_like(frame)))
 
     def test_radar_marker_requires_a_notification_dot(self):
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -735,6 +745,33 @@ class DynamicGameControlTests(unittest.TestCase):
                 (35, 80, 145),
                 thickness=-1,
             )
+
+        self.assertIsNone(detect_finished_healing_target(frame))
+
+    def test_finished_healing_target_rejects_upper_event_tile(self):
+        frame = np.full((720, 1280, 3), (70, 70, 70), dtype=np.uint8)
+        cv2.rectangle(
+            frame,
+            (830, 136),
+            (872, 178),
+            (35, 80, 145),
+            thickness=-1,
+        )
+        cv2.circle(frame, (851, 157), 16, (225, 225, 225), thickness=-1)
+        cv2.rectangle(
+            frame,
+            (848, 142),
+            (854, 172),
+            (20, 25, 220),
+            thickness=-1,
+        )
+        cv2.rectangle(
+            frame,
+            (839, 154),
+            (863, 160),
+            (20, 25, 220),
+            thickness=-1,
+        )
 
         self.assertIsNone(detect_finished_healing_target(frame))
 

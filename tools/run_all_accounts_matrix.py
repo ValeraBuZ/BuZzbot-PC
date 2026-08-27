@@ -21,6 +21,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from buzzbot_app import AutoClicker, CONFIG_FILE, GAME_PACKAGE, logger
 from buzzbot.adb import AdbClient, AdbError
 from buzzbot.ldplayer import (
+    bridged_adb_serial_for_index,
     find_ldconsole,
     index_from_serial,
     list_instances,
@@ -64,6 +65,9 @@ TASK_TIMEOUTS = {
     "processing_factory": 100.0,
     "completed_tasks": 100.0,
     "gathering_boost": 60.0,
+    # A first-time hospital search may traverse the whole shelter map. Later
+    # runs reuse the remembered route and complete much faster.
+    "heal": 210.0,
     "food": 75.0,
     "wood": 75.0,
     "metal": 75.0,
@@ -200,11 +204,14 @@ def _expected_adb_serials(configured_serial, instance_index=None):
 
 def _wait_for_adb(client, instance_index=None, timeout_seconds=150.0):
     configured_serial = client.serial
-    candidates = _expected_adb_serials(configured_serial, instance_index)
-    tcp_serial = next((item for item in candidates if item.startswith("127.0.0.1:")), None)
+    candidates = list(_expected_adb_serials(configured_serial, instance_index))
     deadline = time.monotonic() + timeout_seconds
     next_connect_at = 0.0
     while time.monotonic() < deadline:
+        if instance_index is not None:
+            bridged_serial = bridged_adb_serial_for_index(instance_index)
+            if bridged_serial and bridged_serial not in candidates:
+                candidates.append(bridged_serial)
         for serial in candidates:
             client.serial = serial
             if not client.is_available():
@@ -219,11 +226,14 @@ def _wait_for_adb(client, instance_index=None, timeout_seconds=150.0):
             except Exception:
                 pass
         now = time.monotonic()
-        if tcp_serial and now >= next_connect_at:
-            try:
-                AdbClient(client.adb_path, "").connect(tcp_serial)
-            except AdbError:
-                pass
+        if now >= next_connect_at:
+            for tcp_serial in (
+                serial for serial in candidates if ":" in serial
+            ):
+                try:
+                    AdbClient(client.adb_path, "").connect(tcp_serial)
+                except AdbError:
+                    pass
             next_connect_at = now + 8.0
         time.sleep(2.0)
     client.serial = candidates[0] if candidates else configured_serial

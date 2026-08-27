@@ -897,6 +897,47 @@ class HealingTests(unittest.TestCase):
         self.assertEqual(bot.routine_healing_pan_route, ["left"])
         self.assertEqual(bot.routine_healing_replay_index, 1)
 
+    def test_continues_confirmed_scan_when_settlement_marker_is_covered(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient()
+        bot.current_account_id = "main"
+        bot.routine_completed_steps = {"healing_overview"}
+        bot.routine_healing_pan_route = ["down"]
+        bot.routine_healing_replay_index = 0
+        bot.routine_healing_scan_index = 1
+        bot.routine_healing_search_started = True
+        bot.routine_current_had_action = False
+        bot.routine_last_action_time = 0.0
+        bot.routine_idle_confirmation_count = 0
+        bot.click_count = 0
+        bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: False
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._invalidate_capture = lambda: None
+        bot._interruptible_sleep = lambda _seconds: None
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        task = {
+            "id": "heal",
+            "settings": {
+                "_camera_route_version": 2,
+                "_camera_routes": {},
+            },
+        }
+
+        result = bot._try_healing_visual_fallback(task)
+
+        self.assertTrue(result)
+        self.assertEqual(
+            bot.adb_client.swipes,
+            [(640, 570, 640, 250, 400)],
+        )
+        self.assertEqual(bot.routine_healing_pan_route, ["down", "up"])
+        self.assertEqual(bot.routine_healing_scan_index, 2)
+
     def test_rejects_stale_route_before_systematic_scan(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
@@ -952,9 +993,9 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "main"
         bot.routine_completed_steps = {"healing_overview"}
-        bot.routine_healing_pan_route = ["left"] * 56
+        bot.routine_healing_pan_route = ["left"] * 40
         bot.routine_healing_replay_index = 0
-        bot.routine_healing_scan_index = 56
+        bot.routine_healing_scan_index = 40
         bot.routine_healing_settle_checks = 2
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True
@@ -966,7 +1007,9 @@ class HealingTests(unittest.TestCase):
         )
         deferred = []
         bot._defer_current_routine_unavailable = (
-            lambda reason, now=None: deferred.append(reason)
+            lambda reason, now=None, retry_delay=None: deferred.append(
+                (reason, retry_delay)
+            )
         )
         task = {
             "id": "heal",
@@ -978,7 +1021,7 @@ class HealingTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(
             deferred,
-            ["госпиталь не найден после полного обхода карты"],
+            [("госпиталь не найден после полного обхода карты", 300.0)],
         )
         self.assertEqual(bot.adb_client.swipes, [])
 
@@ -988,9 +1031,9 @@ class HealingTests(unittest.TestCase):
         bot.adb_client = FakeAdbClient()
         bot.current_account_id = "main"
         bot.routine_completed_steps = {"healing_overview"}
-        bot.routine_healing_pan_route = ["left"] * 56
+        bot.routine_healing_pan_route = ["left"] * 40
         bot.routine_healing_replay_index = 0
-        bot.routine_healing_scan_index = 56
+        bot.routine_healing_scan_index = 40
         bot.routine_healing_settle_checks = 0
         bot.routine_healing_saved_route_rejected = False
         bot.routine_healing_search_started = True

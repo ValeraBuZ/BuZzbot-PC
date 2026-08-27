@@ -935,13 +935,16 @@ def routine_idle_screen_recovery_due(
 ):
     """Recover an idle-completion task that became stuck on another screen."""
     timeout = max(1.0, float(task.get("timeout_seconds", 8.0) or 8.0))
-    if str(task.get("id") or "") in RADAR_TASK_IDS:
+    is_radar_task = str(task.get("id") or "") in RADAR_TASK_IDS
+    if is_radar_task:
         recovery_delay = max(8.0, min(20.0, timeout))
     else:
         recovery_delay = max(45.0, min(90.0, timeout * 3.0))
     return bool(
         task.get("complete_when_idle")
-        and had_action
+        # Radar may inherit an unrelated overlay before its first card is
+        # opened. Requiring a recorded action here made that state permanent.
+        and (had_action or is_radar_task)
         and not guard_visible
         and not attempted
         and float(outside_seconds) >= recovery_delay
@@ -1284,6 +1287,16 @@ def upgrade_repeatable_claim_metadata(images, tasks):
                 45.0,
                 float(task.get("timeout_seconds", 45.0) or 45.0),
             )
+            # A closed project without a resource donation means the shared
+            # attempt pool is exhausted. Finish before the marked coordinate
+            # becomes available again and reopens the same project.
+            task["exhaustion_idle_seconds"] = min(
+                15.0,
+                max(
+                    5.0,
+                    float(task.get("exhaustion_idle_seconds", 15.0) or 15.0),
+                ),
+            )
             task["completion_runtime_step"] = "all_projects_checked"
         elif task.get("id") == "collective_mind":
             settings = task.setdefault("settings", {})
@@ -1299,7 +1312,16 @@ def donation_exhaustion_is_complete(task, completed_steps, idle_seconds):
         return False
     if "project_closed" not in {str(step) for step in completed_steps}:
         return False
-    timeout = max(1.0, float(task.get("timeout_seconds", 30.0) or 30.0))
+    timeout = max(
+        1.0,
+        float(
+            task.get(
+                "exhaustion_idle_seconds",
+                task.get("timeout_seconds", 30.0),
+            )
+            or 15.0
+        ),
+    )
     return float(idle_seconds) >= timeout
 
 
