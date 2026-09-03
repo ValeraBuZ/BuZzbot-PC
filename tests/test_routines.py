@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 import time
 import uuid
 
@@ -26,14 +27,19 @@ from buzzbot.routines import (
     normalize_routine_tasks,
     pick_due_task_index,
     prize_hunt_branch_allows_image,
+    processing_restart_stall_should_defer,
     radar_marker_requires_notification,
     radar_marker_was_confirmed,
+    reset_manual_run_deadlines,
     reset_radar_card_runtime_steps,
     reorder_routine_tasks,
     reconcile_march_deadlines,
+    research_queue_match_is_safe,
     resource_search_retry_due,
     setting_requirement_matches,
     routine_home_recovery_due,
+    routine_idle_check_timeout,
+    routine_idle_screen_abort_due,
     routine_idle_screen_recovery_due,
     routine_missing_followup_is_unavailable,
     routine_requires_settlement,
@@ -43,6 +49,8 @@ from buzzbot.routines import (
     training_queue_match_is_safe,
     unavailable_retry_delay,
     upgrade_prize_hunt_metadata,
+    upgrade_mysterious_merchant_metadata,
+    upgrade_truck_metadata,
     upgrade_processing_runtime_metadata,
     upgrade_radar_runtime_metadata,
     upgrade_repeatable_claim_metadata,
@@ -53,6 +61,13 @@ from buzzbot.routines import (
 
 
 class RoutineTaskTests(unittest.TestCase):
+    def test_idle_completion_aborts_after_failed_recovery_timeout(self):
+        task = {"complete_when_idle": True, "timeout_seconds": 60.0}
+
+        self.assertFalse(routine_idle_screen_abort_due(task, False, 120.0))
+        self.assertFalse(routine_idle_screen_abort_due(task, True, 59.9))
+        self.assertTrue(routine_idle_screen_abort_due(task, True, 60.0))
+
     def test_defaults_cover_requested_routines(self):
         tasks = default_routine_tasks()
         ids = {task["id"] for task in tasks}
@@ -60,6 +75,8 @@ class RoutineTaskTests(unittest.TestCase):
             {
                 "game_login",
                 "vip_rewards",
+                "mysterious_merchant",
+                "trucks",
                 "alliance_donations",
                 "radar_rewards",
                 "radar_quick",
@@ -103,15 +120,22 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(all(not by_id[task_id]["manual_screen_required"] for task_id in RADAR_TASK_IDS))
         self.assertTrue(all(by_id[task_id]["settings"]["visual_fallback"] for task_id in RADAR_TASK_IDS))
         self.assertFalse(by_id["game_login"]["enabled"])
+        self.assertFalse(by_id["mysterious_merchant"]["enabled"])
+        self.assertTrue(by_id["mysterious_merchant"]["settings"]["avoid_gems"])
+        self.assertFalse(by_id["trucks"]["enabled"])
+        self.assertTrue(by_id["trucks"]["settings"]["collect_ready"])
+        self.assertTrue(by_id["trucks"]["settings"]["dispatch_available"])
+        self.assertTrue(by_id["trucks"]["settings"]["avoid_gems"])
         self.assertEqual(by_id["game_login"]["priority"], 1)
         self.assertEqual(by_id["game_login"]["timeout_seconds"], 330.0)
         self.assertEqual(by_id["mail_rewards"]["completion_runtime_step"], "claim_reports")
         self.assertEqual(by_id["completed_tasks"]["completion_runtime_step"], "scroll_top_4")
         self.assertEqual(by_id["fence_survivors"]["interval_minutes"], 15.0)
-        self.assertTrue(by_id["fence_survivors"]["empty_home_is_success"])
+        self.assertFalse(by_id["fence_survivors"]["empty_home_is_success"])
         self.assertTrue(by_id["vip_rewards"]["empty_home_is_success"])
         self.assertTrue(by_id["alliance_help"]["empty_home_is_success"])
-        self.assertTrue(by_id["research"]["empty_home_is_success"])
+        self.assertFalse(by_id["research"]["empty_home_is_success"])
+        self.assertEqual(by_id["research"]["completion_runtime_step"], "confirm")
         self.assertEqual(by_id["processing_factory"]["interval_minutes"], 180.0)
         self.assertTrue(by_id["processing_factory"]["complete_when_idle"])
         self.assertTrue(by_id["processing_contest"]["complete_when_idle"])
@@ -139,7 +163,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual([task["id"] for task in resources], ["food", "wood", "metal", "oil"])
         self.assertTrue(all(not task["enabled"] and task["uses_march"] for task in resources))
 
-    def test_legacy_research_config_keeps_busy_lab_as_safe_completion(self):
+    def test_legacy_research_config_requires_a_confirmed_new_research(self):
         research = next(
             task
             for task in normalize_routine_tasks(
@@ -147,7 +171,7 @@ class RoutineTaskTests(unittest.TestCase):
             )
             if task["id"] == "research"
         )
-        self.assertTrue(research["empty_home_is_success"])
+        self.assertFalse(research["empty_home_is_success"])
 
     def test_legacy_game_login_timeout_allows_automatic_restart(self):
         login = next(
@@ -220,7 +244,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(food["timeout_seconds"], 30.0)
         self.assertEqual(food["settings"]["resource_level"], 8)
         self.assertTrue(alliance_help["empty_home_is_success"])
-        self.assertTrue(fence_survivors["empty_home_is_success"])
+        self.assertFalse(fence_survivors["empty_home_is_success"])
         self.assertTrue(vip_rewards["empty_home_is_success"])
         self.assertEqual(custom["name"], "Ежедневная награда")
 
@@ -231,7 +255,95 @@ class RoutineTaskTests(unittest.TestCase):
             {"id": "food", "enabled": True},
         ])
 
-        self.assertEqual([task["id"] for task in tasks[:3]], ["oil", "vip_rewards", "food"])
+        existing_ids = [
+            task["id"]
+            for task in tasks
+            if task["id"] in {"oil", "vip_rewards", "food"}
+        ]
+        self.assertEqual(existing_ids, ["oil", "vip_rewards", "food"])
+
+    def test_new_merchant_is_inserted_immediately_after_vip(self):
+        tasks = normalize_routine_tasks([
+            {"id": "game_login", "enabled": True},
+            {"id": "vip_rewards", "enabled": True},
+            {"id": "alliance_help", "enabled": True},
+        ])
+
+        ids = [task["id"] for task in tasks]
+        vip_index = ids.index("vip_rewards")
+        self.assertEqual(ids[vip_index + 1], "mysterious_merchant")
+        merchant = tasks[vip_index + 1]
+        self.assertTrue(merchant["enabled"])
+        self.assertTrue(merchant["settings"]["buy_free"])
+        self.assertTrue(merchant["settings"]["buy_resources"])
+        self.assertTrue(merchant["settings"]["avoid_gems"])
+        trucks = tasks[vip_index + 2]
+        self.assertEqual(trucks["id"], "trucks")
+        self.assertTrue(trucks["enabled"])
+        self.assertTrue(trucks["settings"]["avoid_gems"])
+
+    def test_merchant_metadata_is_strict_and_gem_aware(self):
+        step_ids = (
+            "open_event",
+            "open_supply_station",
+            "buy_free",
+            "buy_resources",
+            "buy_gems",
+            "confirm_purchase",
+            "finish",
+        )
+        images = [
+            {
+                "uid": str(uuid.uuid5(PROFILE_NAMESPACE, f"mysterious_merchant:{step_id}")),
+                "group": "Таинственный торговец",
+            }
+            for step_id in step_ids
+        ]
+        tasks = default_routine_tasks()
+
+        self.assertEqual(upgrade_mysterious_merchant_metadata(images, tasks), len(images))
+
+        by_uid = {image["uid"]: image for image in images}
+        gem_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "mysterious_merchant:buy_gems"))
+        finish_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "mysterious_merchant:finish"))
+        self.assertEqual(by_uid[gem_uid]["merchant_currency"], "gems")
+        self.assertEqual(by_uid[gem_uid]["limit_key"], "max_purchases")
+        self.assertTrue(by_uid[gem_uid]["premium_action"])
+        self.assertTrue(by_uid[finish_uid]["completes_routine"])
+        merchant = next(task for task in tasks if task["id"] == "mysterious_merchant")
+        self.assertEqual(merchant["completion_runtime_step"], "merchant_complete")
+
+    def test_truck_metadata_is_collect_then_dispatch_and_gem_safe(self):
+        step_ids = (
+            "open",
+            "collect",
+            "open_available",
+            "dispatch",
+            "confirm_dispatch",
+            "finish",
+        )
+        images = [
+            {
+                "uid": str(uuid.uuid5(PROFILE_NAMESPACE, f"trucks:{step_id}")),
+                "group": "Грузовики",
+            }
+            for step_id in step_ids
+        ]
+        tasks = default_routine_tasks()
+        trucks = next(task for task in tasks if task["id"] == "trucks")
+        trucks["settings"]["avoid_gems"] = False
+
+        self.assertEqual(upgrade_truck_metadata(images, tasks), len(images))
+
+        by_uid = {image["uid"]: image for image in images}
+        collect_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "trucks:collect"))
+        dispatch_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "trucks:dispatch"))
+        finish_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "trucks:finish"))
+        self.assertEqual(by_uid[collect_uid]["runtime_step"], "truck_collected")
+        self.assertEqual(by_uid[dispatch_uid]["limit_key"], "max_dispatches")
+        self.assertTrue(by_uid[finish_uid]["completes_routine"])
+        self.assertTrue(trucks["settings"]["avoid_gems"])
+        self.assertEqual(trucks["completion_runtime_step"], "trucks_complete")
 
     def test_reorder_keeps_unspecified_tasks_at_the_end(self):
         tasks = [
@@ -256,6 +368,52 @@ class RoutineTaskTests(unittest.TestCase):
 
         self.assertEqual(tasks[index]["id"], "radar")
 
+    def test_scheduler_waits_instead_of_overtaking_the_next_visible_task(self):
+        tasks = [
+            {"id": "radar", "enabled": True},
+            {"id": "gathering", "enabled": True},
+        ]
+        next_run = {"radar": 120.0, "gathering": 0.0}
+
+        index = pick_due_task_index(tasks, next_run, start_index=0, now=100.0)
+        next_task, wait = next_due_task(
+            tasks,
+            next_run,
+            now=100.0,
+            start_index=0,
+        )
+
+        self.assertIsNone(index)
+        self.assertEqual(next_task["id"], "radar")
+        self.assertEqual(wait, 20.0)
+
+    def test_busy_regular_march_is_skipped_so_non_march_work_can_continue(self):
+        tasks = [
+            {"id": "radar", "enabled": True, "uses_march": True},
+            {"id": "gathering", "enabled": True, "uses_march": False},
+        ]
+
+        index = pick_due_task_index(
+            tasks,
+            {},
+            start_index=0,
+            now=100.0,
+            active_marches=5,
+            max_marches=5,
+        )
+        next_task, wait = next_due_task(
+            tasks,
+            {},
+            now=100.0,
+            active_marches=5,
+            max_marches=5,
+            start_index=0,
+        )
+
+        self.assertEqual(index, 1)
+        self.assertEqual(next_task["id"], "gathering")
+        self.assertEqual(wait, 0.0)
+
     def test_healing_has_priority_when_selected(self):
         tasks = default_routine_tasks()
         heal = next(task for task in tasks if task["id"] == "heal")
@@ -271,7 +429,7 @@ class RoutineTaskTests(unittest.TestCase):
         index = pick_due_task_index(tasks, {}, start_index=wood_index, now=100.0, active_marches=0, max_marches=5)
         self.assertEqual(tasks[index]["id"], "wood")
 
-    def test_resource_rotation_finishes_never_run_resources_before_repeating(self):
+    def test_resource_rotation_preserves_visible_order_even_with_mixed_deadlines(self):
         tasks = default_routine_tasks()
         for task in tasks:
             task["enabled"] = task["id"] in {"food", "wood", "metal", "oil"}
@@ -287,9 +445,9 @@ class RoutineTaskTests(unittest.TestCase):
             max_marches=5,
         )
 
-        self.assertEqual(tasks[index]["id"], "metal")
+        self.assertEqual(tasks[index]["id"], "food")
 
-    def test_retried_training_does_not_starve_never_run_resources(self):
+    def test_retried_training_preserves_visible_order(self):
         tasks = default_routine_tasks()
         selected = {
             "train_infantry",
@@ -312,12 +470,30 @@ class RoutineTaskTests(unittest.TestCase):
 
         index = pick_due_task_index(tasks, next_run, 0, now=200.0)
 
-        self.assertEqual(tasks[index]["id"], "food")
+        self.assertEqual(tasks[index]["id"], "train_infantry")
+
+    def test_manual_start_resets_only_selected_tasks_in_visible_order(self):
+        tasks = [
+            {"id": "vip", "enabled": True},
+            {"id": "mail", "enabled": False},
+            {"id": "radar", "enabled": True},
+        ]
+        next_run = {"vip": 500.0, "mail": 600.0, "radar": 700.0}
+
+        reset_ids = reset_manual_run_deadlines(tasks, next_run)
+
+        self.assertEqual(reset_ids, ["vip", "radar"])
+        self.assertEqual(next_run, {"vip": 0.0, "mail": 600.0, "radar": 0.0})
 
     def test_training_queue_match_is_limited_to_left_hud_slot(self):
         self.assertTrue(training_queue_match_is_safe((12, 294, 75, 56), 1280, 720))
         self.assertFalse(training_queue_match_is_safe((500, 294, 75, 56), 1280, 720))
         self.assertFalse(training_queue_match_is_safe((12, 80, 75, 56), 1280, 720))
+
+    def test_research_queue_match_is_limited_to_left_hud_slot(self):
+        self.assertTrue(research_queue_match_is_safe((12, 218, 75, 60), 1280, 720))
+        self.assertFalse(research_queue_match_is_safe((500, 218, 75, 60), 1280, 720))
+        self.assertFalse(research_queue_match_is_safe((12, 330, 75, 60), 1280, 720))
 
     def test_only_checked_task_is_scheduled(self):
         tasks = default_routine_tasks()
@@ -503,7 +679,7 @@ class RoutineTaskTests(unittest.TestCase):
             )
         )
 
-    def test_processing_camera_upgrade_uses_two_incremental_swipes(self):
+    def test_processing_camera_upgrade_uses_small_initial_anchor(self):
         namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
         images = [
             {
@@ -526,6 +702,57 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(
             all(task["timeout_seconds"] >= 30.0 for task in processing_tasks.values())
         )
+
+    def test_processing_contest_open_requires_screen_confirmation(self):
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        open_uid = str(uuid.uuid5(namespace, "processing_contest:open_contest"))
+        guard_uid = str(uuid.uuid5(namespace, "processing_contest:contest_guard"))
+        images = [
+            {"uid": open_uid, "action": "click", "block_seconds": 0.8},
+            {"uid": guard_uid, "action": "click"},
+        ]
+
+        upgrade_processing_runtime_metadata(images, default_routine_tasks())
+
+        self.assertEqual(images[0]["action"], "open_processing_contest")
+        self.assertEqual(images[0]["confirmation_uid"], guard_uid)
+        self.assertEqual(images[0]["block_seconds"], 0.0)
+
+    def test_processing_upgrade_adds_bundled_completed_slot_template(self):
+        from tempfile import TemporaryDirectory
+
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        guard_uid = str(uuid.uuid5(namespace, "processing_factory:factory_guard"))
+        collect_uid = str(uuid.uuid5(namespace, "processing_factory:collect_reward"))
+        with TemporaryDirectory() as temp_dir:
+            guard_path = Path(temp_dir) / f"{guard_uid}.png"
+            collect_path = Path(temp_dir) / f"{collect_uid}.png"
+            guard_path.write_bytes(b"guard")
+            collect_path.write_bytes(b"completed")
+            images = [
+                {
+                    "uid": guard_uid,
+                    "path": str(guard_path),
+                    "group": "Завод по обработке",
+                }
+            ]
+
+            upgrade_processing_runtime_metadata(images, default_routine_tasks())
+
+        collect = next(image for image in images if image["uid"] == collect_uid)
+        self.assertEqual(collect["path"], str(collect_path))
+        self.assertEqual(collect["runtime_step"], "collect_reward")
+        self.assertEqual(collect["action"], "collect_processing_factory_reward")
+        self.assertEqual(collect["requires_runtime_steps"], ["open_refinery"])
+        self.assertEqual(collect["click_offset"], [0, -135])
+        self.assertTrue(collect["repeat_runtime_step"])
+        self.assertTrue(collect["prevents_idle_completion"])
+
+        processing_task = next(
+            task for task in default_routine_tasks() if task["id"] == "processing_factory"
+        )
+        upgrade_processing_runtime_metadata(images, [processing_task])
+        self.assertEqual(processing_task["idle_completion_timeout_seconds"], 5.0)
 
     def test_next_run_uses_task_interval(self):
         task = {"interval_minutes": 2.5}
@@ -697,6 +924,16 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertFalse(routine_idle_screen_recovery_due(task, True, True, False, 60.0))
         self.assertFalse(routine_idle_screen_recovery_due(task, True, False, True, 60.0))
 
+    def test_processing_factory_checks_idle_completion_promptly_after_action(self):
+        task = {
+            "id": "processing_factory",
+            "complete_when_idle": True,
+            "timeout_seconds": 60.0,
+            "idle_completion_timeout_seconds": 5.0,
+        }
+        self.assertEqual(routine_idle_check_timeout(task, False), 60.0)
+        self.assertEqual(routine_idle_check_timeout(task, True), 5.0)
+
     def test_radar_idle_screen_recovery_uses_one_card_timeout(self):
         task = {
             "id": "radar_quick",
@@ -710,10 +947,10 @@ class RoutineTaskTests(unittest.TestCase):
     def test_processing_contest_defers_when_event_entry_is_absent(self):
         task = {"id": "processing_contest", "timeout_seconds": 25.0}
         self.assertFalse(
-            routine_missing_followup_is_unavailable(task, {"open_refinery"}, 24.9)
+            routine_missing_followup_is_unavailable(task, {"open_refinery"}, 14.9)
         )
         self.assertTrue(
-            routine_missing_followup_is_unavailable(task, {"open_refinery"}, 25.0)
+            routine_missing_followup_is_unavailable(task, {"open_refinery"}, 15.0)
         )
         self.assertFalse(
             routine_missing_followup_is_unavailable(
@@ -728,6 +965,63 @@ class RoutineTaskTests(unittest.TestCase):
                 {"open_refinery"},
                 60.0,
             )
+        )
+
+    def test_processing_tasks_recover_once_then_defer_without_false_completion(self):
+        for task_id in ("processing_factory", "processing_contest"):
+            task = {
+                "id": task_id,
+                "complete_when_idle": True,
+                "timeout_seconds": 60.0,
+            }
+            self.assertTrue(routine_home_recovery_due(task, False, False, 60.0))
+            self.assertFalse(
+                processing_restart_stall_should_defer(task, False, False, 60.0)
+            )
+            self.assertFalse(
+                processing_restart_stall_should_defer(task, False, True, 59.9)
+            )
+            self.assertTrue(
+                processing_restart_stall_should_defer(task, False, True, 60.0)
+            )
+            self.assertFalse(
+                processing_restart_stall_should_defer(task, True, True, 600.0)
+            )
+            self.assertFalse(
+                processing_restart_stall_should_defer(
+                    task,
+                    True,
+                    False,
+                    59.9,
+                    {"pan_north"},
+                )
+            )
+            self.assertTrue(
+                processing_restart_stall_should_defer(
+                    task,
+                    True,
+                    False,
+                    60.0,
+                    {"pan_north"},
+                )
+            )
+            self.assertFalse(
+                processing_restart_stall_should_defer(
+                    task,
+                    True,
+                    True,
+                    600.0,
+                    {"pan_north", "open_refinery"},
+                )
+            )
+
+        unrelated = {
+            "id": "vip_rewards",
+            "complete_when_idle": True,
+            "timeout_seconds": 10.0,
+        }
+        self.assertFalse(
+            processing_restart_stall_should_defer(unrelated, False, True, 600.0)
         )
 
     def test_gathering_boost_defers_when_selected_item_is_absent(self):
@@ -1059,6 +1353,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertTrue(tasks[0]["empty_home_is_success"])
         self.assertEqual(tasks[0]["interval_minutes"], 0.1)
         self.assertEqual(tasks[1]["settings"]["max_queue_checks"], 5)
+        self.assertEqual(tasks[1]["completion_runtime_step"], "train")
         self.assertEqual(
             by_uid[training_uids["train"]]["requires_runtime_steps"],
             ["building"],
@@ -1146,21 +1441,37 @@ class RoutineTaskTests(unittest.TestCase):
     def test_research_queue_allows_lab_selection_before_deferred(self):
         research_queue_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:queue"))
         research_lab_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:lab"))
-        research_lab_alt_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:lab_alt_1"))
+        research_lab_alt_uid = str(
+            uuid.uuid5(PROFILE_NAMESPACE, "research:lab_alternate_1")
+        )
+        research_select_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:select"))
+        research_confirm_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "research:confirm"))
         images = [
             {"uid": research_queue_uid, "allow_repeat": True},
             {"uid": research_lab_uid, "confidence": 0.88},
             {"uid": research_lab_alt_uid, "confidence": 0.88},
+            {"uid": research_select_uid},
+            {"uid": research_confirm_uid},
         ]
         tasks = [{"id": "research", "settings": {"branch": "economy"}}]
 
-        self.assertEqual(upgrade_strict_runtime_metadata(images, tasks), 3)
+        self.assertEqual(upgrade_strict_runtime_metadata(images, tasks), 5)
         self.assertEqual(images[0]["limit_key"], "max_lab_checks")
         self.assertEqual(images[0]["action"], "select_research_queue")
+        self.assertEqual(images[0]["runtime_step"], "lab")
         self.assertTrue(images[0]["defer_when_limit_reached"])
+        self.assertLessEqual(images[0]["confidence"], 0.70)
+        self.assertTrue(images[0]["research_queue_region"])
         self.assertLessEqual(images[1]["confidence"], 0.84)
         self.assertLessEqual(images[2]["confidence"], 0.84)
+        self.assertEqual(images[3]["runtime_step"], "select")
+        self.assertEqual(images[3]["requires_runtime_steps"], ["lab"])
+        self.assertEqual(images[4]["action"], "research_confirm")
+        self.assertEqual(images[4]["runtime_step"], "confirm")
+        self.assertEqual(images[4]["requires_runtime_steps"], ["select"])
         self.assertEqual(tasks[0]["settings"]["max_lab_checks"], 2)
+        self.assertFalse(tasks[0]["empty_home_is_success"])
+        self.assertEqual(tasks[0]["completion_runtime_step"], "confirm")
 
     def test_animated_active_boost_marker_completes_without_reapplying(self):
         import uuid
@@ -1175,7 +1486,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(images[0]["orb_match_threshold"], 3)
         self.assertTrue(images[0]["completes_routine"])
 
-    def test_old_profile_cannot_replace_eight_hour_boost_with_twenty_four(self):
+    def test_old_profile_can_use_twenty_four_hour_boost_when_eight_is_absent(self):
         boost_uid = str(
             uuid.uuid5(PROFILE_NAMESPACE, "gathering_boost:boost_24h")
         )
@@ -1183,7 +1494,7 @@ class RoutineTaskTests(unittest.TestCase):
 
         upgrade_strict_runtime_metadata(images, default_routine_tasks())
 
-        self.assertNotIn("allow_higher_setting_fallback", images[0])
+        self.assertTrue(images[0]["allow_higher_setting_fallback"])
 
     def test_mail_moves_to_the_next_category_when_claim_button_is_absent(self):
         steps = (
@@ -1436,6 +1747,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(marker["block_seconds"], 8.0)
         self.assertFalse(marker["requires_radar_notification"])
         self.assertTrue(march["confirms_radar_marker"])
+        self.assertTrue(marker["confirm_disappears"])
         self.assertEqual(march["runtime_step"], "radar_march")
         self.assertEqual(images[5]["requires_runtime_steps"], ["radar_forward"])
         self.assertEqual(images[5]["delay"], 1.5)

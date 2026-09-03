@@ -5,9 +5,17 @@ from tools.run_all_accounts_matrix import (
     _activate_account_profile,
     _expected_adb_serials,
     _game_is_foreground,
+    _new_read_only_bot,
     _routine_outcome_is_success,
     _task_blocked_by_march_capacity,
     _task_reached_live_checkpoint,
+)
+from tools.run_igg_profile_tasks import (
+    DEFAULT_ACCOUNTS,
+    DEFAULT_TASKS as DEFAULT_IGG_TASKS,
+    _configured_igg_account_ids,
+    _requested_account_ids,
+    _task_result_allows_next,
 )
 from tools.run_random_program import (
     MARCH_TASKS,
@@ -20,6 +28,55 @@ from tools.run_random_program import (
 
 
 class RandomProgramTests(unittest.TestCase):
+    def test_daily_igg_runner_selects_every_enabled_profile_with_credentials(self):
+        class Bot:
+            account_profiles = [
+                {"id": "igg_5", "enabled": True, "login_method": "igg"},
+                {"id": "zzub1", "enabled": True, "login_method": "igg"},
+                {"id": "incomplete", "enabled": True, "login_method": "igg"},
+                {"id": "google", "enabled": True, "login_method": "google"},
+                {"id": "disabled", "enabled": False, "login_method": "igg"},
+            ]
+
+            @staticmethod
+            def account_has_saved_login(account_id):
+                return account_id in {"zzub1", "igg_5", "incomplete", "disabled"}
+
+            @staticmethod
+            def account_has_saved_password(account_id):
+                return account_id in {"zzub1", "igg_5", "disabled"}
+
+        bot = Bot()
+        self.assertEqual(_configured_igg_account_ids(bot), ["zzub1", "igg_5"])
+        self.assertEqual(_requested_account_ids("all", bot), ["zzub1", "igg_5"])
+        self.assertEqual(_requested_account_ids("igg_5, zzub1", bot), ["igg_5", "zzub1"])
+        self.assertIn("igg_5", DEFAULT_ACCOUNTS)
+        self.assertIn("processing_factory", DEFAULT_IGG_TASKS)
+
+    def test_daily_igg_runner_advances_only_after_confirmed_success(self):
+        self.assertTrue(_task_result_allows_next({"settled": True, "error": ""}))
+        self.assertFalse(_task_result_allows_next({"settled": False, "error": ""}))
+        self.assertFalse(_task_result_allows_next({"settled": True, "error": "timeout"}))
+
+    def test_live_runner_never_writes_config_during_bot_construction(self):
+        class Bot:
+            writes = 0
+
+            def __init__(self, root=None):
+                self.root = root
+                self.save_config()
+
+            def save_config(self):
+                type(self).writes += 1
+
+        bot = _new_read_only_bot(Bot)
+
+        self.assertEqual(Bot.writes, 0)
+        bot.save_config()
+        self.assertEqual(Bot.writes, 0)
+        Bot(root=None)
+        self.assertEqual(Bot.writes, 1)
+
     def test_live_runner_applies_account_specific_task_state(self):
         class Bot:
             def __init__(self, selected):
@@ -160,11 +217,49 @@ class RandomProgramTests(unittest.TestCase):
         )
         self.assertTrue(
             _routine_outcome_is_success(
+                "radar_marches",
+                {
+                    "task_id": "radar_marches",
+                    "outcome": "deferred_unavailable",
+                    "reason": "нет доступного отряда для задания радара",
+                },
+            )
+        )
+        self.assertTrue(
+            _routine_outcome_is_success(
                 "research",
                 {
                     "task_id": "research",
                     "outcome": "deferred_unavailable",
                     "reason": "max_lab_checks",
+                },
+            )
+        )
+        self.assertTrue(
+            _routine_outcome_is_success(
+                "gathering_boost",
+                {
+                    "task_id": "gathering_boost",
+                    "outcome": "deferred_unavailable",
+                    "reason": "boost_item_unavailable",
+                },
+            )
+        )
+        self.assertTrue(
+            _routine_outcome_is_success(
+                "metal",
+                {
+                    "task_id": "metal",
+                    "outcome": "deferred_no_squad",
+                },
+            )
+        )
+        self.assertFalse(
+            _routine_outcome_is_success(
+                "vip_rewards",
+                {
+                    "task_id": "vip_rewards",
+                    "outcome": "deferred_no_squad",
                 },
             )
         )

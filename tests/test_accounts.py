@@ -3,6 +3,7 @@ import unittest
 from buzzbot.accounts import (
     apply_tasks,
     default_account_profiles,
+    ensure_account_task_defaults,
     extract_google_account_targets,
     extract_android_google_accounts,
     extract_google_accounts,
@@ -95,6 +96,36 @@ class AccountProfileTests(unittest.TestCase):
         apply_tasks(profile, tasks)
         self.assertFalse(next(task for task in tasks if task["id"] == "food")["enabled"])
 
+    def test_new_safe_daily_tasks_are_enabled_on_every_saved_account(self):
+        tasks = default_routine_tasks()
+        profiles = normalize_account_profiles([
+            {
+                "id": "a",
+                "name": "A",
+                "task_enabled": {"food": True},
+                "task_settings": {
+                    "mysterious_merchant": {"avoid_gems": False},
+                    "trucks": {"avoid_gems": False, "max_dispatches": 2},
+                },
+            },
+            {"id": "b", "name": "B"},
+        ])
+
+        ensure_account_task_defaults(
+            profiles,
+            tasks,
+            enabled_task_ids=("mysterious_merchant", "trucks"),
+        )
+
+        for profile in profiles:
+            self.assertTrue(profile["task_enabled"]["mysterious_merchant"])
+            self.assertTrue(profile["task_enabled"]["trucks"])
+            self.assertTrue(
+                profile["task_settings"]["mysterious_merchant"]["avoid_gems"]
+            )
+            self.assertTrue(profile["task_settings"]["trucks"]["avoid_gems"])
+        self.assertEqual(profiles[0]["task_settings"]["trucks"]["max_dispatches"], 2)
+
     def test_rotation_uses_one_enabled_profile_at_a_time(self):
         profiles = normalize_account_profiles([
             {"id": "a", "name": "A", "enabled": True},
@@ -102,6 +133,17 @@ class AccountProfileTests(unittest.TestCase):
         ])
         self.assertEqual(next_enabled_account(profiles, "a")["id"], "b")
         self.assertEqual(next_enabled_account(profiles, "b")["id"], "a")
+
+    def test_rotation_stays_on_the_current_ldplayer(self):
+        profiles = normalize_account_profiles([
+            {"id": "solo", "name": "Solo", "enabled": True, "ldplayer_index": 1},
+            {"id": "a", "name": "A", "enabled": True, "ldplayer_index": 5},
+            {"id": "b", "name": "B", "enabled": True, "ldplayer_index": 5},
+        ])
+
+        self.assertIsNone(next_enabled_account(profiles, "solo", 1))
+        self.assertEqual(next_enabled_account(profiles, "a", 5)["id"], "b")
+        self.assertEqual(next_enabled_account(profiles, "b", 5)["id"], "a")
 
     def test_google_chooser_index_is_normalized(self):
         profiles = normalize_account_profiles([

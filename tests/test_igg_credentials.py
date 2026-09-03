@@ -158,7 +158,7 @@ class IggCredentialTests(unittest.TestCase):
         bot.account_switch_auto_login_attempted = True
         bot.account_switch_error = "old error"
         bot.routine_completed_steps = {
-            "account_switch_igg_id_selected",
+            "account_switch_navigation_started",
             "unrelated_step",
         }
         bot.routine_current_had_action = True
@@ -181,6 +181,49 @@ class IggCredentialTests(unittest.TestCase):
         self.assertEqual(bot.account_switch_error, "")
         self.assertEqual(bot.routine_completed_steps, {"unrelated_step"})
         self.assertFalse(bot.routine_current_had_action)
+
+    @patch("buzzbot_app.time.time", return_value=456.0)
+    def test_interrupted_connection_after_saved_id_preserves_switch_progress(self, _time):
+        class GameAdb:
+            def __init__(self):
+                self.launched = []
+
+            def launch_package(self, package):
+                self.launched.append(package)
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 123.0
+        bot.account_switch_auto_login_attempted = True
+        bot.account_switch_error = "old error"
+        bot.routine_completed_steps = {
+            "account_switch_igg_id_selected",
+            "unrelated_step",
+        }
+        bot.routine_current_had_action = True
+        bot.routine_last_action_time = 0.0
+        bot.blocked_coords = {(100, 100): 999.0}
+        bot._interruptible_sleep = lambda _seconds: None
+        frame = np.full((720, 1280, 3), 35, dtype=np.uint8)
+        cv2.rectangle(frame, (321, 164), (959, 572), (210, 210, 210), thickness=-1)
+        cv2.rectangle(frame, (507, 482), (773, 534), (45, 190, 245), thickness=-1)
+        bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
+        bot._tap_routine_fallback = lambda *_args: True
+
+        handled = bot._try_account_switch_connection_recovery(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(bot.account_switch_selected_at, 456.0)
+        self.assertTrue(bot.account_switch_auto_login_attempted)
+        self.assertEqual(bot.account_switch_error, "")
+        self.assertIn("account_switch_igg_id_selected", bot.routine_completed_steps)
+        self.assertIn(
+            "account_switch_igg_interrupted_after_selection",
+            bot.routine_completed_steps,
+        )
+        self.assertFalse(bot.routine_current_had_action)
+        self.assertEqual(bot.adb_client.launched, [GAME_PACKAGE])
 
     def test_final_igg_game_confirmation_keeps_selected_account(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -227,6 +270,33 @@ class IggCredentialTests(unittest.TestCase):
         bot.routine_completed_steps = {
             "account_switch_igg_id_selected",
             "account_switch_igg_game_confirmed",
+        }
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        tapped = []
+        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+        bot._interruptible_sleep = lambda _seconds: None
+
+        handled = bot._try_account_switch_igg_game_confirmation(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(tapped, [(1152, 112)])
+
+    @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
+    @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
+    def test_post_login_event_overlay_is_closed_after_saved_id_without_final_dialog(
+        self,
+        _confirm,
+        _overlay,
+    ):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 10.0
+        bot.routine_completed_steps = {
+            "account_switch_igg_login_submitted",
+            "account_switch_igg_id_selected",
         }
         bot._capture_screen_bgr = lambda force=False: (
             np.zeros((720, 1280, 3), dtype=np.uint8),
@@ -302,10 +372,27 @@ class IggCredentialTests(unittest.TestCase):
         self.assertIn("не зарегистрирован", bot.account_switch_error)
 
     @patch("buzzbot_app.time.time", return_value=20.0)
-    def test_igg_completion_returns_to_main_screen_safely(self, _time):
+    def test_saved_igg_chooser_waits_before_returning_to_main(self, _time):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 1.0
         bot.routine_completed_steps = {"account_switch_igg_id_selected"}
+        bot._is_main_screen_visible = lambda: False
+        bot._return_to_main_screen = lambda **_kwargs: self.fail("recovery is premature")
+        bot.set_status_message = lambda *_args, **_kwargs: None
+
+        self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
+
+    @patch("buzzbot_app.time.time", return_value=40.0)
+    def test_stale_saved_igg_chooser_restarts_account_navigation(self, _time):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 1.0
+        bot.account_switch_auto_login_attempted = False
+        bot.routine_completed_steps = {
+            "account_switch_igg_id_selected",
+            "unrelated_step",
+        }
+        bot.routine_current_had_action = True
+        bot.routine_last_action_time = 0.0
         bot._is_main_screen_visible = lambda: False
         recovered = []
         bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
@@ -314,7 +401,10 @@ class IggCredentialTests(unittest.TestCase):
         self.assertTrue(bot._try_account_switch_return_to_main(self.task()))
 
         self.assertEqual(recovered, [{"max_back_steps": 8, "require_settlement": True}])
-        self.assertIn("account_switch_profile_closed", bot.routine_completed_steps)
+        self.assertEqual(bot.account_switch_selected_at, 0.0)
+        self.assertFalse(bot.account_switch_auto_login_attempted)
+        self.assertEqual(bot.routine_completed_steps, {"unrelated_step"})
+        self.assertFalse(bot.routine_current_had_action)
 
     @patch("buzzbot_app.time.time", return_value=20.0)
     def test_igg_completion_waits_when_main_screen_is_already_visible(self, _time):
@@ -344,7 +434,10 @@ class IggCredentialTests(unittest.TestCase):
         bot.routine_only_task_id = "__account_switch__"
         bot.account_switch_candidates = []
         bot.account_profiles = [{"id": "main", "name": "Main"}]
-        bot.select_account_profile = lambda _account_id: True
+        selected = []
+        bot.select_account_profile = lambda account_id, **kwargs: selected.append(
+            (account_id, kwargs)
+        ) or True
         bot.set_status_message = lambda *_args, **_kwargs: None
         bot.account_rotation_enabled = False
         bot.routine_mode = True
@@ -354,6 +447,10 @@ class IggCredentialTests(unittest.TestCase):
 
         self.assertTrue(bot.account_switch_confirmed)
         self.assertEqual(bot.account_switch_last_result, "Аккаунт переключён: Main")
+        self.assertEqual(
+            selected,
+            [("main", {"start_fresh_pass": True})],
+        )
 
     def test_account_switch_launches_game_from_android_desktop(self):
         class LauncherAdb:
@@ -375,10 +472,84 @@ class IggCredentialTests(unittest.TestCase):
         bot.set_status_message = lambda *_args, **_kwargs: None
         bot._interruptible_sleep = lambda _seconds: None
 
-        handled = bot._try_account_switch_visual_fallback(self.task())
+        task = self.task()
+        handled = bot._try_account_switch_visual_fallback(task)
 
         self.assertTrue(handled)
         self.assertEqual(bot.adb_client.launched, [GAME_PACKAGE])
+        self.assertGreater(task["settings"]["_game_launch_at"], 0.0)
+
+    def test_account_switch_resumes_saved_igg_login_from_title_screen(self):
+        class GameAdb:
+            def current_foreground_package(self):
+                return GAME_PACKAGE
+
+        class Point:
+            x = 640
+            y = 620
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 0.0
+        bot.routine_last_action_time = 0.0
+        bot.routine_completed_steps = set()
+        bot.search_images = [
+            {
+                "uid": "93b0417c-c8ce-5636-8f2d-8716f6c52bad",
+                "confidence": 0.88,
+            }
+        ]
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._locate_image = lambda image: (Point(), (600, 590, 680, 650), 0.91)
+        bot._validate_detected_match = lambda image, bbox: (True, "")
+        tapped = []
+        bot._tap_routine_fallback = (
+            lambda target, *_args: tapped.append(target) or True
+        )
+        bot._interruptible_sleep = lambda _seconds: None
+
+        task = self.task()
+        task["settings"]["_game_launch_at"] = 10.0
+        handled = bot._try_account_switch_visual_fallback(task)
+
+        self.assertTrue(handled)
+        self.assertEqual(tapped, [(640, 620)])
+        self.assertIn(
+            "account_switch_navigation_started",
+            bot.routine_completed_steps,
+        )
+        self.assertNotIn("_game_launch_at", task["settings"])
+
+    @patch("buzzbot_app.time.time", return_value=150.0)
+    def test_account_switch_waits_on_game_loading_screen(self, _time):
+        class GameAdb:
+            def current_foreground_package(self):
+                return GAME_PACKAGE
+
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = GameAdb()
+        bot.account_switch_selected_at = 0.0
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        recovered = []
+        bot._return_to_main_screen = lambda **kwargs: recovered.append(kwargs) or True
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        task = self.task()
+        task["settings"]["_game_launch_at"] = 100.0
+
+        handled = bot._try_account_switch_visual_fallback(task)
+
+        self.assertFalse(handled)
+        self.assertEqual(recovered, [])
 
     def test_account_switch_returns_from_inner_game_screen(self):
         class GameAdb:

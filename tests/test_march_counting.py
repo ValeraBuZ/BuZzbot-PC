@@ -121,6 +121,49 @@ class MarchCountingTests(unittest.TestCase):
             self.assertEqual(bot._detect_observed_marches(), 5)
             self.assertEqual(bot._detect_observed_marches(), 4)
 
+    def test_counter_denominator_updates_four_squad_account_capacity(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        templates = {}
+        observers = []
+        for digit in range(1, 6):
+            path = f"observer-{digit}.png"
+            template = np.zeros((38, 80, 3), dtype=np.uint8)
+            cv2.putText(
+                template,
+                str(digit),
+                (15, 26),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (225, 225, 225),
+                2,
+                cv2.LINE_AA,
+            )
+            templates[path] = template
+            observers.append({"path": path, "march_count": digit})
+
+        roi = np.zeros((38, 80, 3), dtype=np.uint8)
+        cv2.putText(
+            roi,
+            "4",
+            (32, 26),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.55,
+            (225, 225, 225),
+            2,
+            cv2.LINE_AA,
+        )
+
+        class Cache:
+            def get_color(self, path):
+                return templates[path]
+
+        bot.template_cache = Cache()
+
+        self.assertEqual(
+            bot._detect_observed_march_capacity(roi, observers),
+            4,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -104,6 +104,18 @@ def _write_json(path, payload):
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _new_read_only_bot(bot_class=AutoClicker):
+    """Construct a live-test bot without letting startup rewrite config.json."""
+    original_save_config = bot_class.save_config
+    try:
+        bot_class.save_config = lambda self: None
+        bot = bot_class(root=None)
+    finally:
+        bot_class.save_config = original_save_config
+    bot.save_config = lambda: None
+    return bot
+
+
 def _load_live_state():
     try:
         return json.loads(LIVE_STATE_FILE.read_text(encoding="utf-8"))
@@ -153,6 +165,16 @@ def _routine_outcome_is_success(task_id, outcome):
         return False
     if outcome.get("outcome") == "completed":
         return True
+    if outcome.get("outcome") == "deferred_no_squad":
+        return normalized_task_id in {
+            "food",
+            "wood",
+            "metal",
+            "oil",
+            "zombie_hunt",
+            "collective_mind",
+            "radar_marches",
+        }
     if outcome.get("outcome") != "deferred_unavailable":
         return False
     reason = str(outcome.get("reason") or "")
@@ -161,7 +183,16 @@ def _routine_outcome_is_success(task_id, outcome):
         or (normalized_task_id == "research" and reason == "max_lab_checks")
         or (
             normalized_task_id == "radar_marches"
-            and reason in {"no_squad", "нет доступного отряда"}
+            and reason
+            in {
+                "no_squad",
+                "нет доступного отряда",
+                "нет доступного отряда для задания радара",
+            }
+        )
+        or (
+            normalized_task_id == "gathering_boost"
+            and reason == "boost_item_unavailable"
         )
     )
 
@@ -304,10 +335,9 @@ def run_task(
     observed_steps = set()
 
     with _task_log(log_path):
-        bot = AutoClicker(root=None)
+        bot = _new_read_only_bot()
         bot.stop_schedule_thread()
         # Live tests must never alter task checkboxes or account settings.
-        bot.save_config = lambda: None
         try:
             bot.minimize_on_start = False
             bot.input_backend = "adb"

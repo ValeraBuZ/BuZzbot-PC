@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 import time
 import uuid
 
@@ -166,10 +167,10 @@ DEFAULT_ROUTINE_TASKS = (
         "uses_march": False,
         "priority": 12,
         "interval_minutes": 15.0,
-        "timeout_seconds": 8.0,
+        "timeout_seconds": 20.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
-        "empty_home_is_success": True,
+        "empty_home_is_success": False,
         "settings": {},
     },
     {
@@ -254,6 +255,51 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_uid": "",
         "empty_home_is_success": True,
         "settings": {},
+    },
+    {
+        "id": "mysterious_merchant",
+        "name": "Покупка у Таинственного торговца",
+        "group": "Таинственный торговец",
+        "category": "daily",
+        "enabled": False,
+        "uses_march": False,
+        "priority": 21,
+        "interval_minutes": 60.0,
+        "timeout_seconds": 20.0,
+        "march_duration_minutes": 30.0,
+        "completion_uid": "",
+        "completion_runtime_step": "merchant_complete",
+        "settings": {
+            "buy_free": True,
+            "buy_resources": True,
+            "avoid_gems": True,
+            "max_purchases": 20,
+            "arrival_retry_minutes": 60,
+            "visual_fallback": True,
+        },
+    },
+    {
+        "id": "trucks",
+        "name": "Грузовики",
+        "group": "Грузовики",
+        "category": "daily",
+        "enabled": False,
+        "uses_march": False,
+        "priority": 22,
+        "interval_minutes": 60.0,
+        "timeout_seconds": 45.0,
+        "march_duration_minutes": 30.0,
+        "completion_uid": "",
+        "completion_runtime_step": "trucks_complete",
+        "settings": {
+            "collect_ready": True,
+            "dispatch_available": True,
+            "max_collections": 8,
+            "max_dispatches": 4,
+            "retry_minutes": 60,
+            "avoid_gems": True,
+            "visual_fallback": True,
+        },
     },
     {
         "id": "alliance_donations",
@@ -347,6 +393,7 @@ DEFAULT_ROUTINE_TASKS = (
         "settings": {
             "fixed_utc_hours": [0, 12],
             "in_progress_retry_minutes": 5,
+            "dispatch_until_full": True,
             "visual_fallback": True,
         },
     },
@@ -359,10 +406,11 @@ DEFAULT_ROUTINE_TASKS = (
         "uses_march": False,
         "priority": 35,
         "interval_minutes": 5.0,
-        "timeout_seconds": 15.0,
+        "timeout_seconds": 30.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
-        "empty_home_is_success": True,
+        "completion_runtime_step": "confirm",
+        "empty_home_is_success": False,
         "settings": {
             "branch": "off",
             "use_speedups": False,
@@ -418,6 +466,7 @@ DEFAULT_ROUTINE_TASKS = (
         "timeout_seconds": 12.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
+        "completion_runtime_step": "train",
         "settings": {"highest_tier": True, "collect_finished": True, "max_queue_checks": 5},
     },
     {
@@ -432,6 +481,7 @@ DEFAULT_ROUTINE_TASKS = (
         "timeout_seconds": 12.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
+        "completion_runtime_step": "train",
         "settings": {"highest_tier": True, "collect_finished": True, "max_queue_checks": 5},
     },
     {
@@ -446,6 +496,7 @@ DEFAULT_ROUTINE_TASKS = (
         "timeout_seconds": 12.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
+        "completion_runtime_step": "train",
         "settings": {"highest_tier": True, "collect_finished": True, "max_queue_checks": 5},
     },
     {
@@ -460,6 +511,7 @@ DEFAULT_ROUTINE_TASKS = (
         "timeout_seconds": 12.0,
         "march_duration_minutes": 30.0,
         "completion_uid": "",
+        "completion_runtime_step": "train",
         "settings": {"highest_tier": True, "collect_finished": True, "max_queue_checks": 5},
     },
     {
@@ -597,6 +649,21 @@ DEFAULT_ROUTINE_TASKS = (
 
 
 TASK_SETTING_SPECS = {
+    "mysterious_merchant": (
+        {"key": "buy_free", "label": "Забирать бесплатные предложения", "kind": "bool"},
+        {"key": "buy_resources", "label": "Покупать за ресурсы", "kind": "bool"},
+        {"key": "avoid_gems", "label": "Не тратить алмазы", "kind": "bool"},
+        {"key": "max_purchases", "label": "Максимум покупок за проход", "kind": "int", "min": 1, "max": 100},
+        {"key": "arrival_retry_minutes", "label": "Повтор, если торговец не прибыл (мин)", "kind": "int", "min": 1, "max": 1440},
+    ),
+    "trucks": (
+        {"key": "collect_ready", "label": "Собирать вернувшиеся грузовики", "kind": "bool"},
+        {"key": "dispatch_available", "label": "Отправлять доступные грузовики", "kind": "bool"},
+        {"key": "max_collections", "label": "Максимум сборов за проход", "kind": "int", "min": 1, "max": 20},
+        {"key": "max_dispatches", "label": "Максимум отправок за проход", "kind": "int", "min": 1, "max": 20},
+        {"key": "retry_minutes", "label": "Повтор при недоступности (мин)", "kind": "int", "min": 1, "max": 1440},
+        {"key": "avoid_gems", "label": "Не тратить алмазы", "kind": "bool"},
+    ),
     "alliance_donations": (
         {"key": "max_donations", "label": "Максимум пожертвований", "kind": "int", "min": 1, "max": 100},
         {"key": "max_project_checks", "label": "Проектов за цикл", "kind": "int", "min": 1, "max": 20},
@@ -911,6 +978,8 @@ def routine_home_recovery_due(task, had_action, attempted, idle_seconds):
         "radar_quick",
         "radar_marches",
         "research",
+        "processing_factory",
+        "processing_contest",
         "wasteland_exploration",
         "train_infantry",
         "train_riders",
@@ -923,6 +992,49 @@ def routine_home_recovery_due(task, had_action, attempted, idle_seconds):
         and not had_action
         and not attempted
         and float(idle_seconds) >= recovery_delay
+    )
+
+
+def processing_restart_stall_should_defer(
+    task,
+    had_action,
+    recovery_attempted,
+    idle_seconds,
+    completed_steps=None,
+):
+    """Bound a processing task resumed inside the refinery after restart.
+
+    Runtime steps are intentionally scoped to one process.  If the application
+    restarts after opening the refinery, the resumed task can therefore be on
+    the refinery screen while waiting for its first settlement-only step.  One
+    return-home recovery is allowed; if that still yields no confirmed action,
+    defer the task instead of resetting the idle timer forever.
+    """
+    timeout = max(1.0, float(task.get("timeout_seconds", 8.0) or 8.0))
+    completed_steps = {
+        str(step or "") for step in (completed_steps or ()) if str(step or "")
+    }
+    # Camera positioning is only navigation.  In particular, a processing task
+    # resumed after an application restart can execute pan_north on an unrelated
+    # leftover screen and then wait forever because ``had_action`` became true.
+    # Treat a navigation-only attempt as an unconfirmed action and bound it by
+    # the same timeout, even when returning home could not be confirmed.
+    navigation_steps = {
+        "pan_north",
+        "pan_south",
+        "pan_east",
+        "pan_west",
+    }
+    navigation_only = bool(completed_steps) and completed_steps <= navigation_steps
+    no_confirmed_action = not had_action or navigation_only
+    recovery_exhausted = bool(recovery_attempted) or navigation_only
+    return bool(
+        str(task.get("id") or "")
+        in {"processing_factory", "processing_contest"}
+        and task.get("complete_when_idle")
+        and no_confirmed_action
+        and recovery_exhausted
+        and float(idle_seconds) >= timeout
     )
 
 
@@ -951,6 +1063,28 @@ def routine_idle_screen_recovery_due(
     )
 
 
+def routine_idle_screen_abort_due(task, attempted, outside_seconds):
+    """Stop an idle-completion task that stayed off its guard after recovery."""
+    timeout = max(1.0, float(task.get("timeout_seconds", 8.0) or 8.0))
+    return bool(
+        task.get("complete_when_idle")
+        and attempted
+        and float(outside_seconds) >= timeout
+    )
+
+
+def routine_idle_check_timeout(task, had_action):
+    """Use a short, explicit completion check after an idle task did work."""
+    timeout = max(1.0, float(task.get("timeout_seconds", 8.0) or 8.0))
+    if not had_action or not task.get("complete_when_idle"):
+        return timeout
+    idle_timeout = max(
+        1.0,
+        float(task.get("idle_completion_timeout_seconds", timeout) or timeout),
+    )
+    return min(timeout, idle_timeout)
+
+
 def routine_missing_followup_is_unavailable(task, completed_steps, idle_seconds):
     """Detect an opened feature whose optional event entry is not present."""
     task_id = str(task.get("id") or "")
@@ -959,7 +1093,11 @@ def routine_missing_followup_is_unavailable(task, completed_steps, idle_seconds)
     if task_id == "processing_contest":
         if "open_refinery" not in completed or "open_contest" in completed:
             return False
-        return float(idle_seconds) >= timeout
+        # Opening the event is an immediate UI transition.  Waiting for the
+        # full factory-search timeout here held the whole account on an event
+        # that was not running.  Five seconds are already spent confirming the
+        # click, so fifteen seconds is a conservative hard ceiling.
+        return float(idle_seconds) >= min(15.0, timeout)
     if task_id == "gathering_boost":
         has_category = "boost_category" in completed
         has_item = bool({"boost_8h", "boost_24h", "use"}.intersection(completed))
@@ -1306,6 +1444,118 @@ def upgrade_repeatable_claim_metadata(images, tasks):
     return upgraded
 
 
+def upgrade_mysterious_merchant_metadata(images, tasks):
+    """Prepare a strict, gem-safe merchant flow once live templates exist."""
+    images_by_uid = {str(image.get("uid") or ""): image for image in images}
+    step_specs = (
+        ("open_event", "open_event", (), False, ""),
+        ("open_supply_station", "open_supply_station", ("open_event",), False, ""),
+        ("buy_free", "merchant_purchase", ("open_supply_station",), True, "free"),
+        ("buy_resources", "merchant_purchase", ("open_supply_station",), True, "resources"),
+        ("buy_gems", "merchant_purchase", ("open_supply_station",), True, "gems"),
+        ("confirm_purchase", "merchant_confirm", ("merchant_purchase",), True, ""),
+        ("finish", "merchant_complete", ("open_supply_station",), False, ""),
+    )
+    upgraded = 0
+    purchase_uids = []
+    for step_id, runtime_step, required_steps, repeat, currency in step_specs:
+        uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"mysterious_merchant:{step_id}"))
+        image = images_by_uid.get(uid)
+        if image is None:
+            continue
+        image["runtime_step"] = runtime_step
+        image["requires_runtime_steps"] = list(required_steps)
+        image["repeat_runtime_step"] = repeat
+        image["allow_repeat"] = repeat
+        if repeat:
+            image["block_seconds"] = 0.8
+        if currency:
+            image["merchant_currency"] = currency
+        if currency == "gems":
+            image["premium_action"] = True
+        if step_id.startswith("buy_"):
+            image["limit_key"] = "max_purchases"
+            purchase_uids.append(uid)
+        if step_id == "finish":
+            image["completes_routine"] = True
+            image["skip_if_visible_uids"] = list(purchase_uids)
+        upgraded += 1
+
+    for task in tasks:
+        if task.get("id") != "mysterious_merchant":
+            continue
+        settings = task.setdefault("settings", {})
+        settings["buy_free"] = bool(settings.get("buy_free", True))
+        settings["buy_resources"] = bool(settings.get("buy_resources", True))
+        # Merchant automation never spends premium currency.  Keep this as a
+        # hard invariant so an old per-account value cannot re-enable gems.
+        settings["avoid_gems"] = True
+        settings["max_purchases"] = min(
+            100,
+            max(1, int(settings.get("max_purchases", 20) or 20)),
+        )
+        settings["arrival_retry_minutes"] = min(
+            1440,
+            max(1, int(settings.get("arrival_retry_minutes", 60) or 60)),
+        )
+        settings["visual_fallback"] = bool(settings.get("visual_fallback", True))
+        task["completion_runtime_step"] = "merchant_complete"
+    return upgraded
+
+
+def upgrade_truck_metadata(images, tasks):
+    """Prepare the collect-then-dispatch truck flow for every account."""
+    images_by_uid = {str(image.get("uid") or ""): image for image in images}
+    step_specs = (
+        ("open", "trucks_open", (), False, ""),
+        ("collect", "truck_collected", ("trucks_open",), True, "max_collections"),
+        ("open_available", "truck_slot_open", ("trucks_open",), True, ""),
+        ("dispatch", "truck_dispatched", ("truck_slot_open",), True, "max_dispatches"),
+        ("confirm_dispatch", "truck_dispatch_confirmed", ("truck_dispatched",), True, "max_dispatches"),
+        ("finish", "trucks_complete", ("trucks_open",), False, ""),
+    )
+    upgraded = 0
+    action_uids = []
+    for step_id, runtime_step, required_steps, repeat, limit_key in step_specs:
+        uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"trucks:{step_id}"))
+        image = images_by_uid.get(uid)
+        if image is None:
+            continue
+        image["runtime_step"] = runtime_step
+        image["requires_runtime_steps"] = list(required_steps)
+        image["repeat_runtime_step"] = repeat
+        image["allow_repeat"] = repeat
+        if repeat:
+            image["block_seconds"] = 0.8
+            action_uids.append(uid)
+        if limit_key:
+            image["limit_key"] = limit_key
+        if step_id == "finish":
+            image["completes_routine"] = True
+            image["skip_if_visible_uids"] = list(action_uids)
+        upgraded += 1
+
+    for task in tasks:
+        if task.get("id") != "trucks":
+            continue
+        settings = task.setdefault("settings", {})
+        settings["collect_ready"] = bool(settings.get("collect_ready", True))
+        settings["dispatch_available"] = bool(settings.get("dispatch_available", True))
+        settings["max_collections"] = min(
+            20, max(1, int(settings.get("max_collections", 8) or 8))
+        )
+        settings["max_dispatches"] = min(
+            20, max(1, int(settings.get("max_dispatches", 4) or 4))
+        )
+        settings["retry_minutes"] = min(
+            1440, max(1, int(settings.get("retry_minutes", 60) or 60))
+        )
+        settings["avoid_gems"] = True
+        settings["visual_fallback"] = bool(settings.get("visual_fallback", True))
+        task["completion_runtime_step"] = "trucks_complete"
+    return upgraded
+
+
 def donation_exhaustion_is_complete(task, completed_steps, idle_seconds):
     """Finish donation scans after an exhausted project yields no next target."""
     if str(task.get("id") or "") != "alliance_donations":
@@ -1326,22 +1576,101 @@ def donation_exhaustion_is_complete(task, completed_steps, idle_seconds):
 
 
 def upgrade_processing_runtime_metadata(images, tasks):
-    """Keep refinery camera movement incremental across different settlements."""
+    """Keep refinery navigation safe and collect every finished processing slot."""
     images_by_uid = {str(image.get("uid") or ""): image for image in images}
     upgraded = 0
     for task_id in ("processing_factory", "processing_contest"):
         pan_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:pan_north"))
         pan_image = images_by_uid.get(pan_uid)
         if pan_image is not None:
+            # Use a small first move.  A task-specific visual fallback scans
+            # from there because the preceding fence task can leave the camera
+            # at any settlement edge; one fixed long drag is not reliable.
             pan_image["swipe_repeat_count"] = 2
             pan_image["swipe_repeat_pause"] = 0.2
             upgraded += 1
+        guard_uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:factory_guard"))
+        if task_id == "processing_contest":
+            guard_uid = str(
+                uuid.uuid5(PROFILE_NAMESPACE, "processing_factory:factory_guard")
+            )
+        for step_id in ("open_refinery", "open_refinery_boundary"):
+            open_image = images_by_uid.get(
+                str(uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:{step_id}"))
+            )
+            if open_image is not None:
+                open_image["action"] = "open_processing_factory"
+                open_image["confirmation_uid"] = guard_uid
+                upgraded += 1
+        if task_id == "processing_factory":
+            collect_uid = str(
+                uuid.uuid5(PROFILE_NAMESPACE, "processing_factory:collect_reward")
+            )
+            collect_image = images_by_uid.get(collect_uid)
+            guard_image = images_by_uid.get(guard_uid)
+            if collect_image is None and guard_image is not None:
+                guard_path = Path(str(guard_image.get("path") or ""))
+                collect_path = guard_path.with_name(f"{collect_uid}.png")
+                if collect_path.is_file():
+                    collect_image = {
+                        "uid": collect_uid,
+                        "path": str(collect_path),
+                        "action": "click",
+                        "delay": 0.8,
+                        "confidence": 0.80,
+                        "grayscale": True,
+                        "description": "Собрать завершённую обработку",
+                        "enabled": True,
+                        "click_offset": [0, -135],
+                        "numbers": [],
+                        "click_sequence": [],
+                        "last_used": 0,
+                        "cooldown": 0.5,
+                        "group": guard_image.get("group"),
+                        "use_scaling": False,
+                    }
+                    images.append(collect_image)
+                    images_by_uid[collect_uid] = collect_image
+            if collect_image is not None:
+                collect_image.update(
+                    {
+                        "action": "collect_processing_factory_reward",
+                        "confidence": 0.80,
+                        "grayscale": True,
+                        "search_region": [500, 175, 760, 465],
+                        "runtime_step": "collect_reward",
+                        "requires_runtime_steps": ["open_refinery"],
+                        "routine_priority": 35,
+                        "repeat_runtime_step": True,
+                        "allow_repeat": True,
+                        "block_seconds": 0.6,
+                        "prevents_idle_completion": True,
+                        "confirmation_uid": guard_uid,
+                    }
+                )
+                upgraded += 1
+        else:
+            contest_open = images_by_uid.get(
+                str(uuid.uuid5(PROFILE_NAMESPACE, "processing_contest:open_contest"))
+            )
+            contest_guard = images_by_uid.get(
+                str(uuid.uuid5(PROFILE_NAMESPACE, "processing_contest:contest_guard"))
+            )
+            if contest_open is not None:
+                contest_open["action"] = "open_processing_contest"
+                contest_open["confirmation_uid"] = (
+                    str(contest_guard.get("uid") or "") if contest_guard else ""
+                )
+                contest_open["block_seconds"] = 0.0
+                upgraded += 1
         for task in tasks:
             if task.get("id") == task_id:
                 task["timeout_seconds"] = max(
-                    30.0,
+                    60.0,
                     float(task.get("timeout_seconds", 25.0) or 25.0),
                 )
+                if task_id == "processing_factory":
+                    task["idle_completion_timeout_seconds"] = 5.0
                 break
     return upgraded
 
@@ -1487,13 +1816,28 @@ def upgrade_strict_runtime_metadata(images, tasks):
         research_queue.update(
             {
                 "action": "select_research_queue",
+                "runtime_step": "lab",
+                "routine_priority": 5,
                 "limit_key": "max_lab_checks",
                 "defer_when_limit_reached": True,
+                # The finished 1/1 badge and green ready arrow partly cover the
+                # telescope.  On the live IGG 3 HUD this lowers the grayscale
+                # template score to about 0.715.  This threshold is safe only
+                # because ``research_queue_region`` rejects matches outside the
+                # fixed left research slot.
+                "confidence": min(
+                    0.70,
+                    float(research_queue.get("confidence", 0.88) or 0.88),
+                ),
+                "research_queue_region": True,
             }
         )
         upgraded += 1
 
-    for step_id in ("lab", "lab_alt_1"):
+    # The profile builder uses ``lab_alternate_1``.  Keep the older
+    # ``lab_alt_1`` identifier too so already-exported custom profiles are
+    # upgraded instead of silently losing the laboratory step.
+    for step_id in ("lab", "lab_alternate_1", "lab_alt_1"):
         research_lab = images_by_uid.get(
             str(uuid.uuid5(PROFILE_NAMESPACE, f"research:{step_id}"))
         )
@@ -1504,6 +1848,49 @@ def upgrade_strict_runtime_metadata(images, tasks):
         research_lab["confidence"] = min(
             0.84,
             float(research_lab.get("confidence", 0.88) or 0.88),
+        )
+        research_lab.update(
+            {
+                # These historical crops contain animated event text and
+                # level-dependent laboratory labels. The fixed queue icon plus
+                # verified radial-menu flow supersedes them and avoids false
+                # positives on unrelated settlement banners.
+                "enabled": False,
+                "superseded_by_research_queue": True,
+                "runtime_step": "lab",
+                "routine_priority": 10,
+                "allow_runtime_resume": True,
+            }
+        )
+        upgraded += 1
+
+    research_select = images_by_uid.get(
+        str(uuid.uuid5(PROFILE_NAMESPACE, "research:select"))
+    )
+    if research_select is not None:
+        research_select.update(
+            {
+                "action": "research_select",
+                "runtime_step": "select",
+                "routine_priority": 20,
+                "requires_runtime_steps": ["lab"],
+                "allow_runtime_resume": True,
+            }
+        )
+        upgraded += 1
+
+    research_confirm = images_by_uid.get(
+        str(uuid.uuid5(PROFILE_NAMESPACE, "research:confirm"))
+    )
+    if research_confirm is not None:
+        research_confirm.update(
+            {
+                "action": "research_confirm",
+                "runtime_step": "confirm",
+                "routine_priority": 30,
+                "requires_runtime_steps": ["select"],
+                "allow_runtime_resume": True,
+            }
         )
         upgraded += 1
 
@@ -1523,8 +1910,10 @@ def upgrade_strict_runtime_metadata(images, tasks):
     boost_24h_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "gathering_boost:boost_24h"))
     boost_24h = images_by_uid.get(boost_24h_uid)
     if boost_24h is not None:
-        # Never consume a 24-hour item when the user selected 8 hours.
-        boost_24h.pop("allow_higher_setting_fallback", None)
+        # If the preferred 8-hour gathering boost is absent, a visible
+        # 24-hour boost is better than dispatching every resource march with
+        # no boost at all. The actual 24-hour duration is persisted after use.
+        boost_24h["allow_higher_setting_fallback"] = True
         upgraded += 1
 
     for step_id in ("event_entry", "intro_map", "unavailable"):
@@ -1587,11 +1976,18 @@ def upgrade_strict_runtime_metadata(images, tasks):
                 5,
                 int(settings.get("max_queue_checks", 0) or 0),
             )
+            task["completion_runtime_step"] = "train"
         if task.get("id") == "research":
             settings = task.setdefault("settings", {})
             settings["max_lab_checks"] = max(
                 2,
                 int(settings.get("max_lab_checks", 0) or 0),
+            )
+            task["empty_home_is_success"] = False
+            task["completion_runtime_step"] = "confirm"
+            task["timeout_seconds"] = max(
+                30.0,
+                float(task.get("timeout_seconds", 0.0) or 0.0),
             )
         if task.get("id") == "wasteland_exploration":
             # Opening the event tile can return directly to the settlement for
@@ -1834,6 +2230,10 @@ def upgrade_radar_runtime_metadata(images, tasks):
                 image.pop("limit_key", None)
             if step_id.startswith("task_"):
                 image["runtime_step"] = "radar_marker"
+                # A radar icon is not processed merely because it accepted a
+                # tap. Require it to disappear/open its card before it can be
+                # remembered as handled for this pass.
+                image["confirm_disappears"] = True
                 image["repeat_runtime_step"] = True
                 image["prevents_idle_completion"] = True
                 image["skip_if_uid_visible"] = card_guard_uid
@@ -1900,6 +2300,7 @@ def upgrade_radar_runtime_metadata(images, tasks):
         )
         if task_id == "radar_marches":
             task["march_completion_runtime_step"] = "radar_march"
+            task.setdefault("settings", {})["dispatch_until_full"] = True
         task.setdefault("settings", {})["fixed_utc_hours"] = [0, 12]
         task["settings"].setdefault("in_progress_retry_minutes", 5)
         task["settings"]["visual_fallback"] = True
@@ -2006,11 +2407,9 @@ def _normalize_task(source, default):
             source.get("complete_when_idle", default.get("complete_when_idle", False))
         ),
         "empty_home_is_success": False
-        if task_id == "wasteland_exploration"
+        if task_id in {"research", "wasteland_exploration", "fence_survivors"}
         else task_id in {
-            "fence_survivors",
             "vip_rewards",
-            "research",
         }
         or bool(
             source.get(
@@ -2082,8 +2481,42 @@ def normalize_routine_tasks(raw_tasks):
             normalized.append(_normalize_task(source, fallback))
             added_ids.add(task_id)
 
-    # New built-in tasks are appended without disturbing the order chosen by
-    # the user in an older configuration.
+    # Insert the merchant and trucks immediately after VIP for older profiles.
+    # These migrations join the saved sequence without moving any of the
+    # existing tasks relative to one another.
+    merchant_id = "mysterious_merchant"
+    if merchant_id not in added_ids and "vip_rewards" in added_ids:
+        # This migration is intentionally enabled for the existing live
+        # profiles; brand-new untouched defaults remain opt-in.
+        normalized_by_id[merchant_id]["enabled"] = True
+        vip_index = next(
+            index
+            for index, task in enumerate(normalized)
+            if task.get("id") == "vip_rewards"
+        )
+        normalized.insert(vip_index + 1, normalized_by_id[merchant_id])
+        added_ids.add(merchant_id)
+
+    trucks_id = "trucks"
+    if trucks_id not in added_ids:
+        normalized_by_id[trucks_id]["enabled"] = True
+        anchor_id = merchant_id if merchant_id in added_ids else "vip_rewards"
+        anchor_index = next(
+            (
+                index
+                for index, task in enumerate(normalized)
+                if task.get("id") == anchor_id
+            ),
+            None,
+        )
+        if anchor_index is None:
+            normalized.append(normalized_by_id[trucks_id])
+        else:
+            normalized.insert(anchor_index + 1, normalized_by_id[trucks_id])
+        added_ids.add(trucks_id)
+
+    # Other new built-in tasks are appended without disturbing the order
+    # chosen by the user in an older configuration.
     for default in DEFAULT_ROUTINE_TASKS:
         task_id = default["id"]
         if task_id not in added_ids:
@@ -2127,11 +2560,15 @@ def is_task_effectively_enabled(task):
 
 
 def pick_due_task_index(tasks, next_run, start_index, now, active_marches=0, max_marches=5):
-    """Pick the next due task in the user-defined cyclic order."""
+    """Pick only the next enabled task in the user-defined cyclic order.
+
+    A later task must never overtake the next visible task just because its
+    own deadline has expired.  A march task is the one exception: when every
+    squad is already busy, skip that task so non-march work can continue.
+    """
     if not tasks:
         return None
     start_index = int(start_index or 0) % len(tasks)
-    candidates = []
     for offset in range(len(tasks)):
         index = (start_index + offset) % len(tasks)
         task = tasks[index]
@@ -2141,11 +2578,23 @@ def pick_due_task_index(tasks, next_run, start_index, now, active_marches=0, max
             continue
         deadline = float(next_run.get(task["id"], 0.0))
         if deadline <= float(now):
-            # Finish the first pass before repeating a task that has already
-            # run, then follow the visible order from start_index.
-            first_attempt = 0 if deadline <= 0.0 else 1
-            candidates.append((first_attempt, offset, index))
-    return min(candidates)[2] if candidates else None
+            return index
+        return None
+    return None
+
+
+def reset_manual_run_deadlines(tasks, next_run):
+    """Make a manual Start execute every selected task in its visible order."""
+    reset_ids = []
+    for task in tasks:
+        if not is_task_effectively_enabled(task):
+            continue
+        task_id = str(task.get("id") or "")
+        if not task_id:
+            continue
+        next_run[task_id] = 0.0
+        reset_ids.append(task_id)
+    return reset_ids
 
 
 def training_queue_match_is_safe(bbox, display_width, display_height):
@@ -2168,17 +2617,50 @@ def training_queue_match_is_safe(bbox, display_width, display_height):
     )
 
 
-def next_due_task(tasks, next_run, now, active_marches=0, max_marches=5):
-    enabled = [
-        task for task in tasks
-        if is_task_effectively_enabled(task)
-        and (not task.get("uses_march", False) or int(active_marches) < int(max_marches))
-    ]
-    if not enabled:
+def research_queue_match_is_safe(bbox, display_width, display_height):
+    """Limit the lower-confidence telescope match to its fixed left HUD slot."""
+    if not isinstance(bbox, (tuple, list)) or len(bbox) != 4:
+        return False
+    try:
+        left, top, width, height = map(float, bbox)
+        display_width = float(display_width)
+        display_height = float(display_height)
+    except (TypeError, ValueError):
+        return False
+    if display_width <= 0 or display_height <= 0 or width <= 0 or height <= 0:
+        return False
+    center_x = left + width / 2.0
+    center_y = top + height / 2.0
+    return (
+        center_x <= display_width * 0.13
+        and display_height * 0.25 <= center_y <= display_height * 0.43
+    )
+
+
+def next_due_task(
+    tasks,
+    next_run,
+    now,
+    active_marches=0,
+    max_marches=5,
+    start_index=0,
+):
+    """Describe the next enabled task without looking past it in the queue."""
+    if not tasks:
         return None, None
-    task = min(enabled, key=lambda item: float(next_run.get(item["id"], 0.0)))
-    wait_seconds = max(0.0, float(next_run.get(task["id"], 0.0)) - float(now))
-    return task, wait_seconds
+    start_index = int(start_index or 0) % len(tasks)
+    for offset in range(len(tasks)):
+        task = tasks[(start_index + offset) % len(tasks)]
+        if not is_task_effectively_enabled(task):
+            continue
+        if task.get("uses_march", False) and int(active_marches) >= int(max_marches):
+            continue
+        wait_seconds = max(
+            0.0,
+            float(next_run.get(task["id"], 0.0)) - float(now),
+        )
+        return task, wait_seconds
+    return None, None
 
 
 def next_run_after_finish(task, now):

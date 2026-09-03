@@ -125,6 +125,715 @@ def detect_blank_webview_close_target(frame_bgr):
     return int(round(1246 * scale_x)), int(round(34 * scale_y))
 
 
+def detect_settlement_event_panel_collapse_target(frame_bgr):
+    """Find the right-pointing toggle of the expanded settlement event panel.
+
+    The expanded event ribbon covers the upper third of the settlement and can
+    hide hospital completion markers while the camera is being searched. The
+    toggle is a stable pale ``>`` on a narrow dark tab. A collapsed ribbon
+    shows the opposite chevron, so comparing the middle and edge centroids
+    prevents this detector from reopening it.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    tab = gray[58:108, 451:475]
+    arrow = gray[70:95, 455:472]
+    if tab.size == 0 or arrow.size == 0:
+        return None
+    if float(np.mean(tab <= 75)) < 0.45:
+        return None
+
+    bright = arrow >= 145
+    bright_count = int(np.count_nonzero(bright))
+    if not 45 <= bright_count <= 180:
+        return None
+
+    def centroid_x(row_start, row_end):
+        _rows, columns = np.where(bright[row_start:row_end])
+        if columns.size < 5:
+            return None
+        return float(np.mean(columns))
+
+    top_x = centroid_x(3, 9)
+    middle_x = centroid_x(10, 16)
+    bottom_x = centroid_x(17, 23)
+    if top_x is None or middle_x is None or bottom_x is None:
+        return None
+    if middle_x < max(top_x, bottom_x) + 2.5:
+        return None
+
+    return int(round(463 * scale_x)), int(round(83 * scale_y))
+
+
+def _bright_cross_ratio(frame, center, half_width=50, half_height=42):
+    """Measure the pale cross used by empty truck slots."""
+    center_x, center_y = center
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    x1 = max(0, center_x - half_width)
+    x2 = min(frame.shape[1], center_x + half_width)
+    y1 = max(0, center_y - half_height)
+    y2 = min(frame.shape[0], center_y + half_height)
+    if x2 <= x1 or y2 <= y1:
+        return 0.0
+    bright = (gray[y1:y2, x1:x2] >= 160) & (hsv[y1:y2, x1:x2, 1] <= 90)
+    local_x = center_x - x1
+    local_y = center_y - y1
+    vertical = bright[:, max(0, local_x - 10):local_x + 11]
+    horizontal = bright[max(0, local_y - 10):local_y + 11, :]
+    if vertical.size == 0 or horizontal.size == 0:
+        return 0.0
+    return min(float(np.mean(vertical)), float(np.mean(horizontal)))
+
+
+def detect_truck_personal_slot_target(frame_bgr):
+    """Return an unlocked personal-shipment ``+`` slot.
+
+    The large upper plus belongs to Alliance Escort and must never be used for
+    personal truck dispatch.  Personal slots are the two lower unlocked cards.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    # A prepared-but-not-started truck is resumed before opening another slot.
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    unsent = hsv[430:472, 70:345]
+    red = (
+        ((unsent[:, :, 0] < 12) | (unsent[:, :, 0] > 170))
+        & (unsent[:, :, 1] > 90)
+        & (unsent[:, :, 2] > 85)
+    )
+    if float(np.mean(red)) >= 0.008:
+        return int(round(207 * scale_x)), int(round(410 * scale_y))
+
+    candidates = ((207, 410), (752, 410))
+    for center in candidates:
+        if _bright_cross_ratio(frame, center) >= 0.10:
+            return (
+                int(round(center[0] * scale_x)),
+                int(round(center[1] * scale_y)),
+            )
+    return None
+
+
+def detect_truck_occupied_slot_targets(frame_bgr):
+    """Return occupied personal truck cards for collection/status checks."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return []
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    targets = []
+    for center_x in (207, 752):
+        region = hsv[310:485, max(0, center_x - 145):min(1280, center_x + 145)]
+        unsent_region = hsv[430:472, max(0, center_x - 137):min(1280, center_x + 138)]
+        unsent_red = (
+            ((unsent_region[:, :, 0] < 12) | (unsent_region[:, :, 0] > 170))
+            & (unsent_region[:, :, 1] > 90)
+            & (unsent_region[:, :, 2] > 85)
+        )
+        if float(np.mean(unsent_red)) >= 0.008:
+            # Prepared "Not sent" cards belong to the dispatch path, where
+            # escort selection is mandatory before the gold start button.
+            continue
+        # Occupied cards contain the saturated blue truck body. Empty plus
+        # cards and locked cards do not.
+        blue = (
+            (region[:, :, 0] >= 80)
+            & (region[:, :, 0] <= 135)
+            & (region[:, :, 1] >= 65)
+            & (region[:, :, 2] >= 60)
+        )
+        if float(np.mean(blue)) >= 0.010:
+            targets.append(
+                (int(round(center_x * scale_x)), int(round(410 * scale_y)))
+            )
+    return targets
+
+
+def truck_alliance_escort_is_visible(frame_bgr):
+    """Recognise Alliance Escort so it cannot be mistaken for a personal truck."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # Alliance Escort has a persistent red 0/1 or 1/1 ticket counter here and
+    # no personal-shipment tab bar in the upper-right corner.
+    ticket = hsv[145:205, 370:450]
+    red = (
+        ((ticket[:, :, 0] < 12) | (ticket[:, :, 0] > 170))
+        & (ticket[:, :, 1] > 105)
+        & (ticket[:, :, 2] > 85)
+    )
+    tabs = hsv[14:66, 850:1268]
+    orange_tabs = (
+        (tabs[:, :, 0] >= 5)
+        & (tabs[:, :, 0] <= 35)
+        & (tabs[:, :, 1] >= 55)
+        & (tabs[:, :, 2] >= 95)
+    )
+    return bool(float(np.mean(red)) >= 0.008 and float(np.mean(orange_tabs)) < 0.40)
+
+
+def truck_express_overview_is_visible(frame_bgr):
+    """Recognise the personal/other shipment overview."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    tabs = hsv[14:66, 850:1268]
+    orange_tabs = (
+        (tabs[:, :, 0] >= 5)
+        & (tabs[:, :, 0] <= 35)
+        & (tabs[:, :, 1] >= 55)
+        & (tabs[:, :, 2] >= 95)
+    )
+    return bool(
+        float(np.mean(orange_tabs)) >= 0.20
+        and _bright_cross_ratio(frame, (640, 190)) >= 0.18
+    )
+
+
+def truck_arrival_reward_is_visible(frame_bgr):
+    """Recognise the full-screen reward shown after an arrived personal truck.
+
+    This screen is neither the shipment overview nor the world-map detail
+    panel.  Treating it as an unconfirmed detail used to leave the rewards
+    uncollected and defer the whole truck task.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None or truck_express_overview_is_visible(frame):
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    divider = hsv[205:235, 90:1190]
+    orange = (
+        (divider[:, :, 0] >= 4)
+        & (divider[:, :, 0] <= 35)
+        & (divider[:, :, 1] >= 70)
+        & (divider[:, :, 2] >= 85)
+    )
+    title = hsv[235:305, 485:795]
+    bright_text = (title[:, :, 1] <= 75) & (title[:, :, 2] >= 180)
+    lower = hsv[450:690, 80:1200]
+    dark_lower = lower[:, :, 2] <= 95
+    return bool(
+        float(np.mean(orange)) >= 0.025
+        and float(np.mean(bright_text)) >= 0.012
+        and float(np.mean(dark_lower)) >= 0.45
+    )
+
+
+def detect_truck_start_dispatch_target(frame_bgr):
+    """Return the enabled gold Start Escort button on a personal shipment."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    region = hsv[552:618, 420:855]
+    gold = (
+        (region[:, :, 0] >= 8)
+        & (region[:, :, 0] <= 38)
+        & (region[:, :, 1] >= 70)
+        & (region[:, :, 2] >= 130)
+    )
+    if float(np.mean(gold)) < 0.30:
+        return None
+    return int(round(640 * scale_x)), int(round(585 * scale_y))
+
+
+def detect_truck_escort_confirmation_target(frame_bgr):
+    """Return the gold Done button on the personal escort formation screen."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    region = hsv[580:650, 805:1195]
+    orange = (
+        (region[:, :, 0] >= 4)
+        & (region[:, :, 0] <= 35)
+        & (region[:, :, 1] >= 60)
+        & (region[:, :, 2] >= 80)
+    )
+    if float(np.mean(orange)) < 0.55:
+        return None
+    return int(round(1000 * scale_x)), int(round(616 * scale_y))
+
+
+def detect_truck_active_detail_back_target(frame_bgr):
+    """Return the back arrow for an in-progress truck's world-map panel."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    region = hsv[150:220, 1100:1190]
+    orange = (
+        (region[:, :, 0] >= 5)
+        & (region[:, :, 0] <= 35)
+        & (region[:, :, 1] >= 60)
+        & (region[:, :, 2] >= 110)
+    )
+    if float(np.mean(orange)) < 0.045:
+        return None
+    return int(round(1143 * scale_x)), int(round(181 * scale_y))
+
+
+def detect_truck_ready_collection_target(frame_bgr):
+    """Return a real gold Collect button inside a truck's world-map panel."""
+    if detect_truck_active_detail_back_target(frame_bgr) is None:
+        return None
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    region = hsv[540:625, 755:1175]
+    gold = (
+        (region[:, :, 0] >= 8)
+        & (region[:, :, 0] <= 38)
+        & (region[:, :, 1] >= 75)
+        & (region[:, :, 2] >= 145)
+    )
+    if float(np.mean(gold)) < 0.30:
+        return None
+    return int(round(965 * scale_x)), int(round(582 * scale_y))
+
+
+def truck_auto_dispatch_is_enabled(frame_bgr):
+    """Return whether the personal truck auto-dispatch toggle is on."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    left = hsv[345:384, 955:995]
+    right = hsv[345:384, 995:1038]
+    left_handle = (left[:, :, 1] <= 105) & (left[:, :, 2] >= 135)
+    right_handle = (right[:, :, 1] <= 105) & (right[:, :, 2] >= 135)
+    return bool(float(np.mean(right_handle)) > float(np.mean(left_handle)) + 0.08)
+
+
+def detect_shop_selection_marker_target(
+    frame_bgr,
+    building_target,
+    action_template_bgr=None,
+):
+    """Find the gold Shop marker directly above a facade candidate.
+
+    The previous broad contour search extended into the bottom navigation and
+    could return the Alliance button as the right-most "radial" action.  Shop
+    exposes a distinctive gold diamond above its roof, so local template
+    matching is both safer and more stable.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not building_target:
+        return None
+    building_x = float(building_target[0]) / max(scale_x, 1e-6)
+    building_y = float(building_target[1]) / max(scale_y, 1e-6)
+    template = np.asarray(action_template_bgr) if action_template_bgr is not None else None
+    if template is None or template.size == 0 or template.ndim not in (2, 3):
+        return None
+    template_gray = (
+        cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+        if template.ndim == 3
+        else template
+    )
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    left = int(max(0, building_x - 190))
+    right = int(min(1280, building_x + 190))
+    top = int(max(0, building_y - 245))
+    bottom = int(min(600, building_y + 15))
+    search = frame_gray[top:bottom, left:right]
+    if search.size == 0:
+        return None
+
+    best_score = -1.0
+    best_target = None
+    for scale in np.linspace(0.55, 1.70, 24):
+        resized = cv2.resize(
+            template_gray,
+            None,
+            fx=float(scale),
+            fy=float(scale),
+            interpolation=cv2.INTER_CUBIC,
+        )
+        if resized.shape[0] >= search.shape[0] or resized.shape[1] >= search.shape[1]:
+            continue
+        result = cv2.matchTemplate(search, resized, cv2.TM_CCOEFF_NORMED)
+        _minimum, score, _min_location, location = cv2.minMaxLoc(result)
+        if float(score) > best_score:
+            best_score = float(score)
+            best_target = (
+                left + location[0] + resized.shape[1] / 2.0,
+                top + location[1] + resized.shape[0] / 2.0,
+            )
+    if best_target is None or best_score < 0.58:
+        return None
+    return (
+        int(round(best_target[0] * scale_x)),
+        int(round(best_target[1] * scale_y)),
+    )
+
+
+def detect_shop_radial_action_target(frame_bgr, building_target=None):
+    """Return the middle Shop action after the building is selected.
+
+    Selection centres the building and places four bright-green direction
+    arrows around it.  Its three radial actions then appear below: Information,
+    Shop, and Beast Shop.  The ordinary Shop is the middle action.  Requiring
+    all four arrows prevents bottom navigation buttons from being mistaken for
+    the radial menu.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # The arrows are a narrow yellow-green.  A broader green range also picks
+    # up vegetation and illuminated facade details, joining an arrow to the
+    # building and making its contour unusable.
+    green = cv2.inRange(
+        hsv,
+        np.array([34, 130, 150], dtype=np.uint8),
+        np.array([55, 255, 255], dtype=np.uint8),
+    )
+    if building_target:
+        building_x = int(round(float(building_target[0]) / max(scale_x, 1e-6)))
+        building_y = int(round(float(building_target[1]) / max(scale_y, 1e-6)))
+        # The catalogue may centre Shop much higher than the ordinary camera
+        # route.  The old fixed 280..510 band consequently erased every real
+        # selection arrow (the live IGG 4 arrows were at y=138..240).  Anchor
+        # the mask to the just-tapped building instead of assuming one camera
+        # height.
+        green[:max(0, building_y - 100), :] = 0
+        green[min(720, building_y + 115):, :] = 0
+        green[:, :max(0, building_x - 240)] = 0
+        green[:, min(1280, building_x + 240):] = 0
+    else:
+        green[:280, :] = 0
+        green[510:, :] = 0
+        green[:, :560] = 0
+        green[:, 1020:] = 0
+    contours, _hierarchy = cv2.findContours(
+        green, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    arrows = []
+    for contour in contours:
+        x, y, width, height = cv2.boundingRect(contour)
+        area = float(cv2.contourArea(contour))
+        # Horizontal arrows are roughly 25x19, while the left/right arrow can
+        # be only 14x25 after isometric scaling.  Accept either orientation;
+        # the four-marker span check below remains the false-positive guard.
+        if 12 <= width <= 55 and 18 <= height <= 42 and area >= 150.0:
+            arrows.append((x + width / 2.0, y + height / 2.0))
+    if len(arrows) < 4:
+        return None
+    x_values = [point[0] for point in arrows]
+    y_values = [point[1] for point in arrows]
+    horizontal_span = max(x_values) - min(x_values)
+    vertical_span = max(y_values) - min(y_values)
+    if not 90 <= horizontal_span <= 230 or not 65 <= vertical_span <= 155:
+        return None
+    building_center_x = (min(x_values) + max(x_values)) / 2.0
+    bottom_arrow_y = max(y_values)
+    return (
+        int(round(building_center_x * scale_x)),
+        int(round((bottom_arrow_y + 45.0) * scale_y)),
+    )
+
+
+def detect_merchant_shop_building_target(
+    frame_bgr,
+    sign_template_bgr,
+    min_score=0.44,
+    search_bounds=None,
+):
+    """Locate the real Shop sign and return a tap below it.
+
+    The settlement contains several shield and notice-board emblems that look
+    vaguely like the four-stroke Shop sign.  The older 0.18 threshold accepted
+    those objects and then treated an unrelated radial action as the merchant.
+    Match only the dedicated sign crop at a materially stronger score.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or sign_template_bgr is None:
+        return None, -1.0
+    template = np.asarray(sign_template_bgr)
+    if template.size == 0:
+        return None, -1.0
+    if template.ndim == 3:
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    elif template.ndim != 2:
+        return None, -1.0
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if search_bounds is None:
+        left, top, right, bottom = 300, 150, 1000, 545
+    else:
+        left, top, right, bottom = map(int, search_bounds)
+        left = max(0, min(1279, left))
+        top = max(0, min(719, top))
+        right = max(left + 1, min(1280, right))
+        bottom = max(top + 1, min(720, bottom))
+    search_edges = cv2.Canny(gray[top:bottom, left:right], 40, 120)
+    best_score = -1.0
+    best_target = None
+    for scale in np.linspace(0.55, 1.55, 21):
+        resized = cv2.resize(
+            template,
+            None,
+            fx=float(scale),
+            fy=float(scale),
+            interpolation=cv2.INTER_CUBIC,
+        )
+        if (
+            resized.shape[0] >= search_edges.shape[0]
+            or resized.shape[1] >= search_edges.shape[1]
+        ):
+            continue
+        edges = cv2.Canny(resized, 40, 120)
+        if int(np.count_nonzero(edges)) < 12:
+            continue
+        result = cv2.matchTemplate(search_edges, edges, cv2.TM_CCOEFF_NORMED)
+        _minimum, score, _min_location, location = cv2.minMaxLoc(result)
+        if float(score) > best_score:
+            best_score = float(score)
+            best_target = (
+                int(round((left + location[0] + resized.shape[1] / 2) * scale_x)),
+                int(round((top + location[1] + resized.shape[0] / 2 + 35) * scale_y)),
+            )
+    if best_target is None or best_score < float(min_score):
+        return None, best_score
+    return best_target, best_score
+
+
+def detect_merchant_shop_feature_target(
+    frame_bgr,
+    building_template_bgr,
+    min_inliers=10,
+    search_bounds=(80, 75, 1210, 620),
+):
+    """Locate Shop by stable facade details despite small camera distortions.
+
+    Edge-template matching is intentionally retained as a cheap fallback, but
+    it is too brittle for the isometric settlement camera: a tiny pan changes
+    the facade perspective enough to turn an exact Shop crop into a score near
+    zero.  SIFT correspondences plus a RANSAC homography tolerate that change
+    while the inlier and projected-box checks reject unrelated buildings.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or building_template_bgr is None:
+        return None, 0
+    template = np.asarray(building_template_bgr)
+    if template.size == 0 or template.ndim not in (2, 3):
+        return None, 0
+
+    left, top, right, bottom = map(int, search_bounds)
+    left = max(0, min(1279, left))
+    top = max(0, min(719, top))
+    right = max(left + 1, min(1280, right))
+    bottom = max(top + 1, min(720, bottom))
+    search = frame[top:bottom, left:right]
+    if search.size == 0:
+        return None, 0
+
+    template_gray = (
+        cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+        if template.ndim == 3
+        else template
+    )
+    search_gray = cv2.cvtColor(search, cv2.COLOR_BGR2GRAY)
+    try:
+        sift = cv2.SIFT_create(nfeatures=2500, contrastThreshold=0.015)
+    except (AttributeError, cv2.error):
+        return None, 0
+    template_keypoints, template_descriptors = sift.detectAndCompute(
+        template_gray, None
+    )
+    search_keypoints, search_descriptors = sift.detectAndCompute(search_gray, None)
+    if (
+        template_descriptors is None
+        or search_descriptors is None
+        or len(template_keypoints) < 4
+        or len(search_keypoints) < 4
+    ):
+        return None, 0
+
+    matches = cv2.BFMatcher(cv2.NORM_L2).knnMatch(
+        template_descriptors, search_descriptors, k=2
+    )
+    good = [
+        first
+        for pair in matches
+        if len(pair) == 2
+        for first, second in [pair]
+        if first.distance < 0.76 * second.distance
+    ]
+    if len(good) < max(4, int(min_inliers)):
+        return None, 0
+
+    source_points = np.float32(
+        [template_keypoints[match.queryIdx].pt for match in good]
+    ).reshape(-1, 1, 2)
+    target_points = np.float32(
+        [search_keypoints[match.trainIdx].pt for match in good]
+    ).reshape(-1, 1, 2)
+    homography, inlier_mask = cv2.findHomography(
+        source_points, target_points, cv2.RANSAC, 5.0
+    )
+    if homography is None or inlier_mask is None:
+        return None, 0
+    inliers = int(np.count_nonzero(inlier_mask))
+    if inliers < int(min_inliers):
+        return None, inliers
+
+    template_height, template_width = template_gray.shape[:2]
+    corners = np.float32(
+        [[[0, 0], [template_width, 0], [template_width, template_height], [0, template_height]]]
+    )
+    projected = cv2.perspectiveTransform(corners, homography)[0]
+    projected_width = float(
+        (np.linalg.norm(projected[1] - projected[0]) + np.linalg.norm(projected[2] - projected[3]))
+        / 2.0
+    )
+    projected_height = float(
+        (np.linalg.norm(projected[3] - projected[0]) + np.linalg.norm(projected[2] - projected[1]))
+        / 2.0
+    )
+    polygon_area = abs(float(cv2.contourArea(projected.reshape(-1, 1, 2))))
+    if (
+        not np.isfinite(projected).all()
+        or not 95.0 <= projected_width <= 280.0
+        or not 65.0 <= projected_height <= 210.0
+        or polygon_area < 6500.0
+    ):
+        return None, inliers
+
+    center = np.mean(projected, axis=0)
+    center_x = left + float(center[0])
+    center_y = top + float(center[1])
+    if not (left <= center_x <= right and top <= center_y <= bottom):
+        return None, inliers
+    return (
+        int(round(center_x * scale_x)),
+        int(round(center_y * scale_y)),
+    ), inliers
+
+
+def mysterious_merchant_screen_is_visible(frame_bgr):
+    """Recognise the Mysterious Merchant offer grid."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # The settlement building catalogue is also brown/red and used to pass
+    # the broad merchant signature.  Its lower half is dominated by large,
+    # low-saturation parchment construction cards; merchant offers are not.
+    # Reject this screen before sampling any apparent resource price strips.
+    catalogue_cards = hsv[330:700, :]
+    catalogue_pale = (
+        (catalogue_cards[:, :, 1] <= 75)
+        & (catalogue_cards[:, :, 2] >= 75)
+    )
+    if float(np.mean(catalogue_pale)) >= 0.50:
+        return False
+    panel = hsv[65:650, 95:1035]
+    dark_brown = (
+        (panel[:, :, 0] <= 35)
+        & (panel[:, :, 1] >= 35)
+        & (panel[:, :, 2] <= 145)
+    )
+    left_tabs = hsv[90:590, 0:155]
+    muted_red = (
+        ((left_tabs[:, :, 0] <= 12) | (left_tabs[:, :, 0] >= 170))
+        & (left_tabs[:, :, 1] >= 35)
+        & (left_tabs[:, :, 2] >= 65)
+    )
+    return bool(float(np.mean(dark_brown)) >= 0.20 and float(np.mean(muted_red)) >= 0.025)
+
+
+def settlement_building_catalogue_is_visible(frame_bgr):
+    """Recognise the settlement building catalogue, regardless of its tab.
+
+    The catalogue can reopen on the last-used tab (including Decorations).
+    Merchant navigation must therefore prove that the large construction-card
+    panel is actually open before it swipes or selects the Economy tab.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    cards = hsv[330:700, :]
+    tabs = hsv[185:325, :]
+    pale_cards = (
+        (cards[:, :, 1] <= 75)
+        & (cards[:, :, 2] >= 75)
+    )
+    dark_tab_bar = tabs[:, :, 2] <= 75
+    return bool(
+        float(np.mean(pale_cards)) >= 0.62
+        and float(np.mean(dark_tab_bar)) >= 0.58
+    )
+
+
+def detect_mysterious_merchant_absent_ok_target(frame_bgr):
+    """Return OK on the notice shown while the merchant is away."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    parchment = hsv[215:465, 345:935]
+    button = hsv[484:534, 507:773]
+    if parchment.size == 0 or button.size == 0:
+        return None
+    pale = (
+        (parchment[:, :, 1] <= 70)
+        & (parchment[:, :, 2] >= 110)
+    )
+    gold = (
+        (button[:, :, 0] >= 8)
+        & (button[:, :, 0] <= 38)
+        & (button[:, :, 1] >= 70)
+        & (button[:, :, 2] >= 130)
+    )
+    if float(np.mean(pale)) < 0.72 or float(np.mean(gold)) < 0.68:
+        return None
+    return int(round(640 * scale_x)), int(round(509 * scale_y))
+
+
+def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
+    """Return only resource-priced merchant offers, never purple gem prices."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not mysterious_merchant_screen_is_visible(frame):
+        return []
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    candidates = []
+    for center_y in (270, 460, 640):
+        for center_x in (320, 620, 920):
+            x1, x2 = center_x - 105, center_x + 105
+            y1, y2 = center_y - 34, center_y + 34
+            region = hsv[y1:y2, x1:x2]
+            purple = (
+                (region[:, :, 0] >= 115)
+                & (region[:, :, 0] <= 170)
+                & (region[:, :, 1] >= 35)
+                & (region[:, :, 2] >= 65)
+            )
+            resource = (
+                (region[:, :, 0] >= 3)
+                & (region[:, :, 0] <= 42)
+                & (region[:, :, 1] >= 45)
+                & (region[:, :, 2] >= 70)
+            )
+            # Any meaningful purple price area vetoes the offer. Ambiguous
+            # buttons are skipped; this intentionally favours safety over
+            # exhausting every offer.
+            if float(np.mean(purple)) <= 0.08 and float(np.mean(resource)) >= 0.10:
+                candidates.append(
+                    (int(round(center_x * scale_x)), int(round(center_y * scale_y)))
+                )
+    return candidates
+
+
 def detect_login_session_expired_ok_target(frame_bgr):
     """Find the wide yellow OK button in the expired-login dialog."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
@@ -154,7 +863,11 @@ def detect_login_session_expired_ok_target(frame_bgr):
             and 30 <= height <= 80
             and 3.5 <= aspect <= 9.0
             and 500 <= center_x <= 780
-            and 450 <= center_y <= 560
+            # The title screen's yellow UPDATE button is centred around y=466
+            # and otherwise has almost the same colour and proportions as the
+            # confirmation button.  The interrupted-session dialog always
+            # places its action row lower in the modal.
+            and 485 <= center_y <= 560
         ):
             candidates.append((width * height, center_x, center_y))
     if not candidates:
@@ -162,6 +875,223 @@ def detect_login_session_expired_ok_target(frame_bgr):
 
     _area, center_x, center_y = max(candidates)
     return int(round(center_x * scale_x)), int(round(center_y * scale_y))
+
+
+def detect_research_action_target(frame_bgr):
+    """Return the enabled gold Collect/Confirm button on a research screen.
+
+    Research completion and research start use the same lower-right action
+    slot, but the button text changes between accounts and game languages.
+    The caller only uses this detector while the research routine is already
+    inside a selected laboratory, which keeps this colour fallback scoped to
+    the safe research flow.
+    """
+    if frame_bgr is None or getattr(frame_bgr, "size", 0) == 0:
+        return None
+    height, width = frame_bgr.shape[:2]
+    if width < 640 or height < 360:
+        return None
+    scale_x = width / 1280.0
+    scale_y = height / 720.0
+    frame = cv2.resize(frame_bgr, (1280, 720), interpolation=cv2.INTER_LINEAR)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    left, top, right, bottom = 800, 515, 1165, 650
+    region = hsv[top:bottom, left:right]
+    gold = (
+        (region[:, :, 0] >= 8)
+        & (region[:, :, 0] <= 42)
+        & (region[:, :, 1] >= 65)
+        & (region[:, :, 2] >= 125)
+    ).astype(np.uint8)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 5))
+    gold = cv2.morphologyEx(gold, cv2.MORPH_CLOSE, kernel)
+    count, _labels, stats, centroids = cv2.connectedComponentsWithStats(gold, 8)
+    candidates = []
+    for index in range(1, count):
+        component_left = int(stats[index, cv2.CC_STAT_LEFT])
+        component_top = int(stats[index, cv2.CC_STAT_TOP])
+        component_width = int(stats[index, cv2.CC_STAT_WIDTH])
+        component_height = int(stats[index, cv2.CC_STAT_HEIGHT])
+        component_area = int(stats[index, cv2.CC_STAT_AREA])
+        touches_search_edge = (
+            component_top <= 3
+            or component_left + component_width >= region.shape[1] - 3
+        )
+        if not (
+            150 <= component_width <= 340
+            and 28 <= component_height <= 90
+            and component_area >= 3500
+            and component_width / max(1.0, float(component_height)) >= 2.5
+            and not touches_search_edge
+        ):
+            continue
+        center_x, center_y = centroids[index]
+        candidates.append(
+            (
+                component_area,
+                left + float(center_x),
+                top + float(center_y),
+                component_left,
+                component_top,
+            )
+        )
+    if not candidates:
+        return None
+    _area, center_x, center_y, _component_left, _component_top = max(
+        candidates,
+        key=lambda item: item[0],
+    )
+    return int(round(center_x * scale_x)), int(round(center_y * scale_y))
+
+
+def research_progress_bar_is_active(frame_bgr):
+    """Return whether the centred laboratory shows an active research timer.
+
+    Selecting the left research queue centres the laboratory.  While a project
+    is running, its stable green horizontal progress bar appears immediately
+    below the countdown.  This is stronger evidence than the animated ``1/1``
+    HUD counter and lets a resumed daily pass accept research that is already
+    in progress without repeatedly tapping the settlement.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    left, top, right, bottom = 540, 390, 750, 425
+    region = hsv[top:bottom, left:right]
+    green = cv2.inRange(
+        region,
+        np.array([35, 80, 70], dtype=np.uint8),
+        np.array([95, 255, 255], dtype=np.uint8),
+    )
+    matching_rows = 0
+    for row_index in range(10, min(29, green.shape[0])):
+        row = green[row_index] > 0
+        boundaries = np.diff(np.pad(row.astype(np.int8), (1, 1)))
+        starts = np.where(boundaries == 1)[0]
+        ends = np.where(boundaries == -1)[0]
+        row_matches = any(
+            25 <= int(start) <= 75 and 25 <= int(end - start) <= 175
+            for start, end in zip(starts, ends)
+        )
+        matching_rows = matching_rows + 1 if row_matches else 0
+        if matching_rows >= 4:
+            return True
+    return False
+
+
+def research_radial_menu_is_visible(before_bgr, after_bgr):
+    """Confirm that the centred laboratory exposed its research radial action.
+
+    Settlement timers, units and event art animate continuously, so a global
+    frame difference is not evidence that the radial menu opened.  The actual
+    research control occupies a stable lower-right sector beside the centred
+    laboratory and changes that sector substantially.
+    """
+    before, _scale_x, _scale_y = _reference_frame(before_bgr)
+    after, _after_scale_x, _after_scale_y = _reference_frame(after_bgr)
+    if before is None or after is None:
+        return False
+    left, top, right, bottom = 720, 345, 855, 470
+    change = float(
+        cv2.absdiff(
+            before[top:bottom, left:right],
+            after[top:bottom, left:right],
+        ).mean()
+    )
+    return change >= 10.0
+
+
+def research_tree_is_visible(frame_bgr):
+    """Return whether a full personal-research tree/detail panel is open."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Both economy and war research use the same large dark panel.  This guard
+    # deliberately does not depend on language, branch title or project text.
+    panel = gray[90:650, 120:1160]
+    side_tabs = gray[100:610, 35:110]
+    return (
+        float(np.mean(panel < 80)) >= 0.72
+        and float(np.mean(side_tabs < 95)) >= 0.72
+    )
+
+
+def research_branch_is_selected(frame_bgr, branch):
+    """Confirm the selected research branch from its highlighted side tab."""
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None or branch not in {"economy", "war"}:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    regions = {
+        "economy": hsv[115:225, 35:110],
+        "war": hsv[245:355, 35:110],
+    }
+
+    def highlight_ratio(region):
+        return float(
+            np.mean(
+                (region[:, :, 0] >= 8)
+                & (region[:, :, 0] <= 42)
+                & (region[:, :, 1] >= 55)
+                & (region[:, :, 2] >= 95)
+            )
+        )
+
+    selected = highlight_ratio(regions[branch])
+    other = highlight_ratio(regions["war" if branch == "economy" else "economy"])
+    return selected >= 0.035 and selected >= other + 0.02
+
+
+def research_tree_progress_is_active(frame_bgr):
+    """Detect an already-running project in the open research tree.
+
+    The settlement progress bar is sometimes hidden even though opening the
+    laboratory shows a countdown, a long progress track and the large gold
+    Speed-up button at the top of either research branch.  Detecting this
+    stable control pair prevents an active project from being mistaken for an
+    idle laboratory and repeatedly scanning completed nodes.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None or not research_tree_is_visible(frame):
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    button = hsv[55:125, 780:970]
+    button_gold = (
+        (button[:, :, 0] >= 8)
+        & (button[:, :, 0] <= 42)
+        & (button[:, :, 1] >= 65)
+        & (button[:, :, 2] >= 115)
+    ).astype(np.uint8)
+    count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
+        button_gold,
+        8,
+    )
+    has_speed_button = any(
+        115 <= int(stats[index, cv2.CC_STAT_WIDTH]) <= 185
+        and 28 <= int(stats[index, cv2.CC_STAT_HEIGHT]) <= 62
+        and int(stats[index, cv2.CC_STAT_AREA]) >= 2200
+        for index in range(1, count)
+    )
+
+    track = hsv[80:108, 420:800]
+    dark_track_ratio = float(np.mean(track[:, :, 2] <= 70))
+    gold_track_ratio = float(
+        np.mean(
+            (track[:, :, 0] >= 8)
+            & (track[:, :, 0] <= 42)
+            & (track[:, :, 1] >= 55)
+            & (track[:, :, 2] >= 105)
+        )
+    )
+    return (
+        has_speed_button
+        and dark_track_ratio >= 0.35
+        and gold_track_ratio >= 0.005
+    )
 
 
 def detect_login_saved_account_continue_target(frame_bgr):
@@ -232,6 +1162,83 @@ def detect_igg_id_selection_target(frame_bgr):
     return int(round(640 * scale_x)), int(round(162 * scale_y))
 
 
+def equipment_report_screen_is_visible(frame_bgr):
+    """Return whether Doomsday's full-screen equipment-report offer is open.
+
+    The upper row contains free score-milestone rewards while the large lower
+    banner is a paid offer. Keep this detector deliberately specific so the
+    reward handler can never confuse another shop screen with this overlay.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    header = hsv[35:305, 160:1120]
+    paid_panel = hsv[305:700, 155:1125]
+    close_region = hsv[40:110, 1060:1140]
+
+    pale_header = (header[:, :, 1] < 90) & (header[:, :, 2] > 105)
+    red_panel = (
+        ((paid_panel[:, :, 0] <= 15) | (paid_panel[:, :, 0] >= 170))
+        & (paid_panel[:, :, 1] > 55)
+        & (paid_panel[:, :, 2] > 65)
+    )
+    gold_close = (
+        (close_region[:, :, 0] >= 5)
+        & (close_region[:, :, 0] <= 40)
+        & (close_region[:, :, 1] >= 45)
+        & (close_region[:, :, 2] >= 105)
+    )
+    return (
+        float(np.mean(pale_header)) >= 0.62
+        and float(np.mean(red_panel)) >= 0.45
+        and float(np.mean(gold_close)) >= 0.12
+    )
+
+
+def detect_equipment_report_free_reward_target(frame_bgr):
+    """Find the next illuminated free reward in the equipment-report row.
+
+    Only the five fixed upper milestone cards are inspected. In particular,
+    this function cannot return a point inside the paid lower banner.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not equipment_report_screen_is_visible(frame):
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    for center_x in (460, 590, 723, 854, 985):
+        card = hsv[198:294, center_x - 50:center_x + 50]
+        gold = (
+            (card[:, :, 0] >= 8)
+            & (card[:, :, 0] <= 40)
+            & (card[:, :, 1] >= 55)
+            & (card[:, :, 2] >= 125)
+        )
+        border = np.zeros(gold.shape, dtype=bool)
+        border[:8, :] = True
+        border[-8:, :] = True
+        border[:, :8] = True
+        border[:, -8:] = True
+        if float(np.mean(gold[border])) >= 0.52:
+            return (
+                int(round(center_x * scale_x)),
+                int(round(245 * scale_y)),
+            )
+    return None
+
+
+def detect_equipment_report_close_target(frame_bgr):
+    """Return the overlay close button only after no free reward remains."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not equipment_report_screen_is_visible(frame):
+        return None
+    if detect_equipment_report_free_reward_target(frame) is not None:
+        return None
+    return int(round(1099 * scale_x)), int(round(72 * scale_y))
+
+
 def detect_game_event_overlay_close_target(frame_bgr):
     """Detect a full-screen promotional overlay blocking account navigation."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
@@ -240,6 +1247,7 @@ def detect_game_event_overlay_close_target(frame_bgr):
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     close_region = hsv[74:152, 1110:1195]
+    alternate_close_region = hsv[70:220, 1020:1225]
     content = hsv[70:570, 150:1130]
     action_button = hsv[565:650, 440:840]
     gold_close = (
@@ -248,6 +1256,12 @@ def detect_game_event_overlay_close_target(frame_bgr):
         & (close_region[:, :, 1] >= 45)
         & (close_region[:, :, 2] >= 105)
     )
+    alternate_gold_close = (
+        (alternate_close_region[:, :, 0] >= 5)
+        & (alternate_close_region[:, :, 0] <= 40)
+        & (alternate_close_region[:, :, 1] >= 45)
+        & (alternate_close_region[:, :, 2] >= 105)
+    )
     rich_content = (content[:, :, 1] >= 55) & (content[:, :, 2] >= 75)
     gold_button = (
         (action_button[:, :, 0] >= 8)
@@ -255,13 +1269,55 @@ def detect_game_event_overlay_close_target(frame_bgr):
         & (action_button[:, :, 1] >= 70)
         & (action_button[:, :, 2] >= 135)
     )
+    rich_ratio = float(np.mean(rich_content))
+    button_ratio = float(np.mean(gold_button))
+    close_ratio = float(np.mean(gold_close))
+    alternate_close_ratio = float(np.mean(alternate_gold_close))
+    legacy_count, _legacy_labels, legacy_stats, legacy_centroids = (
+        cv2.connectedComponentsWithStats(gold_close.astype(np.uint8), 8)
+    )
+    legacy_candidates = [
+        (legacy_stats[index, cv2.CC_STAT_AREA], legacy_centroids[index])
+        for index in range(1, legacy_count)
+        if 350 <= legacy_stats[index, cv2.CC_STAT_AREA] <= 2000
+        and 25 <= legacy_stats[index, cv2.CC_STAT_WIDTH] <= 70
+        and 25 <= legacy_stats[index, cv2.CC_STAT_HEIGHT] <= 70
+    ]
     if (
-        float(np.mean(gold_close)) < 0.035
-        or float(np.mean(rich_content)) < 0.30
-        or float(np.mean(gold_button)) < 0.20
+        0.035 <= close_ratio <= 0.25
+        and rich_ratio >= 0.30
+        and button_ratio >= 0.20
+        and legacy_candidates
+    ):
+        _area, center = max(legacy_candidates, key=lambda item: item[0])
+        return (
+            int(round((1110 + float(center[0])) * scale_x)),
+            int(round((74 + float(center[1])) * scale_y)),
+        )
+    if (
+        not 0.015 <= alternate_close_ratio <= 0.16
+        or rich_ratio < 0.24
+        or button_ratio < 0.20
     ):
         return None
-    return int(round(1152 * scale_x)), int(round(112 * scale_y))
+    count, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        alternate_gold_close.astype(np.uint8),
+        8,
+    )
+    candidates = [
+        (stats[index, cv2.CC_STAT_AREA], centroids[index])
+        for index in range(1, count)
+        if 350 <= stats[index, cv2.CC_STAT_AREA] <= 3000
+        and 25 <= stats[index, cv2.CC_STAT_WIDTH] <= 100
+        and 25 <= stats[index, cv2.CC_STAT_HEIGHT] <= 70
+    ]
+    if not candidates:
+        return None
+    _area, center = max(candidates, key=lambda item: item[0])
+    return (
+        int(round((1020 + float(center[0])) * scale_x)),
+        int(round((70 + float(center[1])) * scale_y)),
+    )
 
 
 def detect_igg_game_login_ok_target(frame_bgr):
@@ -673,6 +1729,55 @@ def detect_radar_card_action_target(frame_bgr):
     return int(round(244 * scale_x)), int(round(621 * scale_y))
 
 
+def radar_card_has_active_countdown(frame_bgr):
+    """Recognize the HH:MM:SS timer on an already-running radar card.
+
+    Radar task artwork and text vary between accounts, but the six dark timer
+    digits always occupy the same narrow strip in the left card. Detecting
+    aligned digit components is more stable than matching one duration.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    timer_strip = gray[338:378, 292:430]
+    if timer_strip.size == 0:
+        return False
+    dark = (timer_strip < 105).astype(np.uint8) * 255
+    component_count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
+        dark
+    )
+    glyphs = []
+    for index in range(1, component_count):
+        x, y, width, height, area = map(int, stats[index])
+        if 5 <= width <= 14 and 11 <= height <= 22 and area >= 24:
+            glyphs.append((x, y, width, height))
+
+    # The six digits share a baseline. Colons are intentionally ignored
+    # because their two tiny dots are affected most by capture scaling.
+    for anchor in glyphs:
+        aligned = sorted(
+            (
+                glyph
+                for glyph in glyphs
+                if abs(glyph[1] - anchor[1]) <= 3
+                and abs(glyph[3] - anchor[3]) <= 4
+            ),
+            key=lambda glyph: glyph[0],
+        )
+        if len(aligned) < 6:
+            continue
+        for start in range(len(aligned) - 5):
+            run = aligned[start : start + 6]
+            centers = [x + width / 2.0 for x, _y, width, _height in run]
+            span = centers[-1] - centers[0]
+            gaps = [right - left for left, right in zip(centers, centers[1:])]
+            if 65.0 <= span <= 105.0 and all(7.0 <= gap <= 25.0 for gap in gaps):
+                return True
+    return False
+
+
 def detect_radar_pass_purchase_cancel_target(frame_bgr):
     """Return only the Cancel button from the radar-pass purchase dialog."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
@@ -767,6 +1872,42 @@ def detect_radar_deployment_prompt_target(frame_bgr):
     if enabled_button_fraction(240, 295) < 0.20:
         return None
     return int(round(970 * scale_x)), int(round(210 * scale_y))
+
+
+def detect_radar_squad_march_target(frame_bgr):
+    """Return the enabled March button from the world-map squad panel.
+
+    The live 4/4 deployment layout renders this button narrower than the
+    exported template.  Requiring the pale squad-size panel and the dark hero
+    roster keeps this fallback specific to the deployment screen instead of a
+    generic yellow world-map action.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    panel = hsv[40:310, 835:1105]
+    button = hsv[218:263, 875:1065]
+    roster = hsv[65:550, 1135:1278]
+    if not panel.size or not button.size or not roster.size:
+        return None
+
+    pale_panel = (panel[:, :, 1] <= 120) & (panel[:, :, 2] >= 110)
+    gold_button = (
+        (button[:, :, 0] >= 8)
+        & (button[:, :, 0] <= 45)
+        & (button[:, :, 1] >= 70)
+        & (button[:, :, 2] >= 120)
+    )
+    dark_roster = roster[:, :, 2] <= 90
+    if (
+        float(np.mean(pale_panel)) < 0.55
+        or float(np.mean(gold_button)) < 0.45
+        or float(np.mean(dark_roster)) < 0.45
+    ):
+        return None
+    return int(round(970 * scale_x)), int(round(240 * scale_y))
 
 
 def zombie_camp_checkbox_is_checked(frame_bgr):
@@ -1077,6 +2218,70 @@ def healing_troop_form_is_visible(frame_bgr):
             or stable_form_chrome
         )
     )
+
+
+def detect_processing_factory_target(frame_bgr):
+    """Find the processing factory by its four distinctive orange furnaces.
+
+    The ordinary image templates are sensitive to the settlement camera
+    position and to reward bubbles above the building.  The four glowing
+    furnace trays remain visible across those states, so use their compact
+    geometric cluster as a camera-independent fallback.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(
+        hsv,
+        np.array([5, 150, 140], dtype=np.uint8),
+        np.array([28, 255, 255], dtype=np.uint8),
+    )
+    # Exclude fixed HUD controls.  A previous live attempt found an orange
+    # cluster in the chat/navigation chrome at (225, 645); accepting it opened
+    # chat and left the factory task waiting on a screen it had never opened.
+    # The camera scan will bring a partly clipped factory into this safe field.
+    mask[:135, :] = 0
+    mask[600:, :] = 0
+    mask[:, :300] = 0
+    mask[:, 1140:] = 0
+    mask = cv2.morphologyEx(
+        mask,
+        cv2.MORPH_OPEN,
+        np.ones((2, 2), dtype=np.uint8),
+    )
+
+    count, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
+    candidates = []
+    for index in range(1, count):
+        left, top, width, height, area = map(int, stats[index])
+        if not (180 <= area <= 1250):
+            continue
+        if not (18 <= width <= 58 and 12 <= height <= 48):
+            continue
+        center_x, center_y = map(float, centroids[index])
+        candidates.append((center_x, center_y, area))
+
+    best_cluster = []
+    for center_x, center_y, _area in candidates:
+        cluster = [
+            candidate
+            for candidate in candidates
+            if abs(candidate[0] - center_x) <= 145
+            and abs(candidate[1] - center_y) <= 95
+        ]
+        if len(cluster) > len(best_cluster):
+            best_cluster = cluster
+
+    if len(best_cluster) < 3:
+        return None
+
+    target_x = int(round(np.mean([item[0] for item in best_cluster]) * scale_x))
+    target_y = int(
+        round((np.mean([item[1] for item in best_cluster]) + 18) * scale_y)
+    )
+    return target_x, target_y
 
 
 def detect_finished_healing_target(frame_bgr):

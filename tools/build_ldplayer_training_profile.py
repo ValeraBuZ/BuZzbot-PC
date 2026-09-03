@@ -30,6 +30,7 @@ from buzzbot.version import APP_VERSION
 
 
 TRAINING_DIR = PROJECT_ROOT / "build" / "training"
+PREBUILT_TEMPLATE_DIR = PROJECT_ROOT / "assets" / "templates"
 DEFAULT_PROFILE = TRAINING_DIR / "BuZzbot_Phoenix675_1280x720.zip"
 PROFILE_NAMESPACE = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
 SYSTEM_GROUP = "Системные окна"
@@ -343,6 +344,14 @@ DAILY_TASK_STEPS = {
             "refinery_open.png",
             (81, 18, 388, 62),
             (0, 0),
+            True,
+        ),
+        (
+            "collect_reward",
+            "Собрать завершённую обработку",
+            "prebuilt:processing_factory_completed.png",
+            None,
+            (0, -135),
             True,
         ),
         (
@@ -1305,6 +1314,12 @@ def load_image(name):
 
 
 def crop_image(source_name, box):
+    if source_name.startswith("prebuilt:"):
+        asset_path = PREBUILT_TEMPLATE_DIR / source_name.split(":", 1)[1]
+        crop = cv2.imread(str(asset_path), cv2.IMREAD_COLOR)
+        if crop is None:
+            raise FileNotFoundError(asset_path)
+        return crop, crop.copy()
     source = load_image(source_name)
     left, top, right, bottom = box
     crop = source[top:bottom, left:right].copy()
@@ -1425,10 +1440,13 @@ def build_profile(destination):
             "glory_league_close",
             "beast_taming_close",
             "limited_quantity_offer_close",
-            "limited_trial_forward",
             "google_play_cancel",
         }:
             system_image["startup_only"] = True
+        if step_id == "limited_trial_forward":
+            # The same interstitial can be opened by a radar squad task after
+            # login, so it must remain available while radar_marches is active.
+            system_image["only_routine_ids"] = ["game_login", "radar_marches"]
         if step_id in {
             "connection_interrupted",
             "loading_error_reload",
@@ -1689,20 +1707,34 @@ def build_profile(destination):
                     configured_image["confidence"] = 0.75
                     configured_image["orb_match_threshold"] = 3
                 else:
-                    runtime_step = (
-                        "select_refinery"
-                        if step_id.startswith("select_refinery")
-                        else "open_refinery"
-                        if step_id.startswith("open_refinery")
-                        else step_id
-                    )
-                    step_index = actionable_steps.index(runtime_step)
-                    configured_image["runtime_step"] = runtime_step
-                    configured_image["routine_priority"] = 10 + step_index * 10
-                    if step_index:
-                        configured_image["requires_runtime_steps"] = [
-                            actionable_steps[step_index - 1]
-                        ]
+                    if step_id == "collect_reward":
+                        configured_image.update(
+                            {
+                                "runtime_step": "collect_reward",
+                                "routine_priority": 35,
+                                "requires_runtime_steps": ["open_refinery"],
+                                "repeat_runtime_step": True,
+                                "allow_repeat": True,
+                                "block_seconds": 0.6,
+                                "prevents_idle_completion": True,
+                                "search_region": [500, 175, 760, 465],
+                            }
+                        )
+                    else:
+                        runtime_step = (
+                            "select_refinery"
+                            if step_id.startswith("select_refinery")
+                            else "open_refinery"
+                            if step_id.startswith("open_refinery")
+                            else step_id
+                        )
+                        step_index = actionable_steps.index(runtime_step)
+                        configured_image["runtime_step"] = runtime_step
+                        configured_image["routine_priority"] = 10 + step_index * 10
+                        if step_index:
+                            configured_image["requires_runtime_steps"] = [
+                                actionable_steps[step_index - 1]
+                            ]
                 if step_id.startswith("pan_north"):
                     configured_image.update(
                         {
@@ -1721,6 +1753,13 @@ def build_profile(destination):
                     configured_image["confidence"] = 0.68
                     configured_image["orb_match_threshold"] = 3
                 elif step_id.startswith("open_refinery"):
+                    configured_image["action"] = "open_processing_factory"
+                    configured_image["confirmation_uid"] = str(
+                        uuid.uuid5(
+                            PROFILE_NAMESPACE,
+                            "processing_factory:factory_guard",
+                        )
+                    )
                     configured_image["confidence"] = 0.75
                     configured_image["orb_match_threshold"] = 3
                 elif step_id in {"open_slot", "process_all", "collect_all"}:

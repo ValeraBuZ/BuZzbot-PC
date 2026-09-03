@@ -40,6 +40,52 @@ class MultiEmulatorTests(unittest.TestCase):
         self.assertEqual(worker["images"], source["images"])
         self.assertEqual(source["routine_next_run"]["zombie_hunt"], 999999.0)
 
+    def test_worker_keeps_profiles_assigned_to_its_ldplayer_and_rotates_them(self):
+        source = {
+            "routine_tasks": [
+                {"id": "radar_rewards", "enabled": True, "settings": {}},
+                {"id": "food", "enabled": False, "settings": {"level": 7}},
+            ],
+            "account_profiles": [
+                {
+                    "id": "phoenix675",
+                    "name": "Phoenix675",
+                    "enabled": True,
+                    "ldplayer_index": 5,
+                    "task_enabled": {"radar_rewards": True, "food": True},
+                    "task_settings": {"food": {"level": 6}},
+                },
+                {
+                    "id": "luckynoob",
+                    "name": "LuckyNoob",
+                    "enabled": True,
+                    "ldplayer_index": 5,
+                },
+                {"id": "zzub1", "name": "zZuB1", "enabled": True, "ldplayer_index": 1},
+            ],
+            "current_account_id": "zzub1",
+            "account_rotation_enabled": True,
+        }
+
+        worker = prepare_worker_config(
+            source,
+            serial="emulator-5564",
+            index=5,
+            name="Phoenix675",
+        )
+
+        self.assertEqual(
+            [profile["id"] for profile in worker["account_profiles"]],
+            ["phoenix675", "luckynoob"],
+        )
+        self.assertEqual(worker["current_account_id"], "phoenix675")
+        self.assertTrue(worker["account_rotation_enabled"])
+        self.assertTrue(next(task for task in worker["routine_tasks"] if task["id"] == "food")["enabled"])
+        self.assertEqual(
+            next(task for task in worker["routine_tasks"] if task["id"] == "food")["settings"]["level"],
+            6,
+        )
+
     def test_runtime_directory_is_stable_per_ldplayer(self):
         path = runtime_dir_for_instance("C:/BuZzbot", 3)
         self.assertEqual(path.name, "ldplayer_3")

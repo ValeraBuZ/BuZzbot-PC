@@ -188,8 +188,49 @@ def apply_tasks(profile, tasks):
     return tasks
 
 
-def next_enabled_account(profiles, current_id):
-    enabled = [profile for profile in profiles if profile.get("enabled", True)]
+def ensure_account_task_defaults(profiles, tasks, enabled_task_ids=()):
+    """Add new safe built-in tasks to every saved account profile.
+
+    Existing account-specific choices are preserved, except that premium
+    currency remains disabled for the merchant and truck automations.
+    """
+    defaults = {
+        str(task.get("id") or ""): task
+        for task in tasks or ()
+        if isinstance(task, dict) and task.get("id")
+    }
+    enabled_ids = {str(task_id or "") for task_id in enabled_task_ids}
+    for profile in profiles or ():
+        if not isinstance(profile, dict):
+            continue
+        enabled = profile.setdefault("task_enabled", {})
+        settings = profile.setdefault("task_settings", {})
+        for task_id in enabled_ids:
+            task = defaults.get(task_id)
+            if task is None:
+                continue
+            enabled.setdefault(task_id, True)
+            task_settings = settings.setdefault(task_id, {})
+            if not isinstance(task_settings, dict):
+                task_settings = {}
+                settings[task_id] = task_settings
+            for key, value in task.get("settings", {}).items():
+                task_settings.setdefault(key, deepcopy(value))
+            if task_id in {"mysterious_merchant", "trucks"}:
+                task_settings["avoid_gems"] = True
+    return profiles
+
+
+def next_enabled_account(profiles, current_id, ldplayer_index=None):
+    enabled = [
+        profile
+        for profile in profiles
+        if profile.get("enabled", True)
+        and (
+            ldplayer_index is None
+            or int(profile.get("ldplayer_index", -1)) == int(ldplayer_index)
+        )
+    ]
     if len(enabled) <= 1:
         return None
     current_index = next(

@@ -43,7 +43,7 @@ class ProfileBundleTests(unittest.TestCase):
                 self.assertLessEqual(template.shape[0], 82)
 
             boost_24h_uid = str(uuid.uuid5(namespace, "gathering_boost:boost_24h"))
-            self.assertFalse(
+            self.assertTrue(
                 images[boost_24h_uid].get("allow_higher_setting_fallback", False)
             )
 
@@ -73,7 +73,11 @@ class ProfileBundleTests(unittest.TestCase):
             self.assertTrue(images[reload_uid]["startup_only"])
             self.assertGreaterEqual(images[reload_uid]["delay"], 8.0)
             limited_trial_uid = str(uuid.uuid5(namespace, "system:limited_trial_forward"))
-            self.assertTrue(images[limited_trial_uid]["startup_only"])
+            self.assertNotIn("startup_only", images[limited_trial_uid])
+            self.assertEqual(
+                images[limited_trial_uid]["only_routine_ids"],
+                ["game_login", "radar_marches"],
+            )
 
     def test_march_templates_require_screen_change_confirmation(self):
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
@@ -86,6 +90,24 @@ class ProfileBundleTests(unittest.TestCase):
         ]
         self.assertTrue(march_images)
         self.assertTrue(all(image.get("confirm_disappears") for image in march_images))
+
+    def test_processing_profile_contains_completed_slot_collection(self):
+        profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
+        namespace = uuid.UUID("7d37a3a8-c963-49ef-9bf2-e3daecf85c48")
+        uid = str(uuid.uuid5(namespace, "processing_factory:collect_reward"))
+
+        with zipfile.ZipFile(profile_path) as archive:
+            manifest = json.loads(archive.read("profile.json"))
+            images = {image["uid"]: image for image in manifest["images"]}
+            collect = images[uid]
+            encoded = np.frombuffer(archive.read(collect["path"]), dtype=np.uint8)
+            template = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+
+        self.assertIsNotNone(template)
+        self.assertEqual(collect["runtime_step"], "collect_reward")
+        self.assertEqual(collect["requires_runtime_steps"], ["open_refinery"])
+        self.assertEqual(collect["click_offset"], [0, -135])
+        self.assertTrue(collect["repeat_runtime_step"])
 
     def test_radar_marches_defer_when_no_squad_can_be_deployed(self):
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "BuZzbot_PC_1280x720.zip"
