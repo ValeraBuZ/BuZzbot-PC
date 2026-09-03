@@ -535,9 +535,33 @@ def detect_shop_radial_action_target(frame_bgr, building_target=None):
         return None
     building_center_x = (min(x_values) + max(x_values)) / 2.0
     bottom_arrow_y = max(y_values)
+    action_x = int(round(building_center_x))
+    action_y = int(round(bottom_arrow_y + 45.0))
+
+    # Several settlement buildings use the same four green selection arrows.
+    # Equipment Repair is the important live false positive: it exposes only
+    # two actions, leaving bare ground at the centre where Shop's middle action
+    # must be.  Verify that a real high-contrast circular control occupies that
+    # position before returning a tap.  This prevents a no-op centre tap from
+    # being interpreted as "merchant unavailable".
+    radius = 28
+    left = max(0, action_x - radius)
+    right = min(1280, action_x + radius + 1)
+    top = max(0, action_y - radius)
+    bottom = min(720, action_y + radius + 1)
+    action_roi = frame[top:bottom, left:right]
+    if action_roi.size == 0:
+        return None
+    action_gray = cv2.cvtColor(action_roi, cv2.COLOR_BGR2GRAY)
+    action_edges = cv2.Canny(action_gray, 60, 140)
+    if (
+        float(np.std(action_gray)) < 38.0
+        or float(np.mean(action_edges > 0)) < 0.07
+    ):
+        return None
     return (
-        int(round(building_center_x * scale_x)),
-        int(round((bottom_arrow_y + 45.0) * scale_y)),
+        int(round(action_x * scale_x)),
+        int(round(action_y * scale_y)),
     )
 
 

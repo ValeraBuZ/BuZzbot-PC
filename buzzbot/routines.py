@@ -318,7 +318,10 @@ DEFAULT_ROUTINE_TASKS = (
         # merely opening the technology tree from being treated as success.
         "completion_runtime_step": "all_projects_checked",
         "settings": {
-            "max_donations": 100,
+            # The game exposes twenty shared resource attempts.  Keeping the
+            # old 100-click ceiling made a stale enabled-looking button consume
+            # most of an account pass after the real attempts were exhausted.
+            "max_donations": 20,
             "max_project_checks": 6,
             "avoid_gems": True,
         },
@@ -1413,9 +1416,9 @@ def upgrade_repeatable_claim_metadata(images, tasks):
     for task in tasks:
         if task.get("id") == "alliance_donations":
             settings = task.setdefault("settings", {})
-            settings["max_donations"] = max(
-                100,
-                int(settings.get("max_donations", 0) or 0),
+            settings["max_donations"] = min(
+                20,
+                max(1, int(settings.get("max_donations", 20) or 20)),
             )
             settings["max_project_checks"] = max(
                 6,

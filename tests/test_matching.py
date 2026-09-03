@@ -234,6 +234,8 @@ class DynamicGameControlTests(unittest.TestCase):
                 (45, 225, 85),
                 thickness=-1,
             )
+        cv2.circle(frame, (795, 519), 24, (225, 215, 190), thickness=4)
+        cv2.line(frame, (783, 519), (807, 519), (35, 35, 35), thickness=5)
 
         target = detect_shop_radial_action_target(frame, (800, 410))
 
@@ -257,12 +259,32 @@ class DynamicGameControlTests(unittest.TestCase):
                 (45, 225, 85),
                 thickness=-1,
             )
+        cv2.circle(frame, (410, 275), 24, (225, 215, 190), thickness=4)
+        cv2.line(frame, (398, 275), (422, 275), (35, 35, 35), thickness=5)
 
         target = detect_shop_radial_action_target(frame, (424, 194))
 
         self.assertIsNotNone(target)
         self.assertLessEqual(abs(target[0] - 410), 2)
         self.assertLessEqual(abs(target[1] - 275), 2)
+
+    def test_shop_radial_detector_rejects_two_action_equipment_repair_menu(self):
+        frame = np.full((720, 1280, 3), (60, 80, 65), dtype=np.uint8)
+        for center in ((885, 315), (1037, 315), (885, 383), (1037, 383)):
+            cv2.ellipse(
+                frame,
+                center,
+                (19, 14),
+                0,
+                0,
+                360,
+                (45, 225, 85),
+                thickness=-1,
+            )
+        cv2.circle(frame, (901, 445), 24, (225, 215, 190), thickness=4)
+        cv2.circle(frame, (1031, 445), 24, (225, 215, 190), thickness=4)
+
+        self.assertIsNone(detect_shop_radial_action_target(frame, (961, 349)))
 
     def test_merchant_shop_features_survive_isometric_camera_shift(self):
         template_path = (

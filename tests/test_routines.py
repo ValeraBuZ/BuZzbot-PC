@@ -598,7 +598,7 @@ class RoutineTaskTests(unittest.TestCase):
         task = next(task for task in default_routine_tasks() if task["id"] == "alliance_donations")
         self.assertFalse(task["enabled"])
         self.assertTrue(task["settings"]["avoid_gems"])
-        self.assertEqual(task["settings"]["max_donations"], 100)
+        self.assertEqual(task["settings"]["max_donations"], 20)
         self.assertEqual(task["settings"]["max_project_checks"], 6)
         self.assertEqual(task["interval_minutes"], 20.0)
         self.assertEqual(task["timeout_seconds"], 45.0)
@@ -652,7 +652,7 @@ class RoutineTaskTests(unittest.TestCase):
             by_uid[vip_close_uid]["skip_if_visible_uids"],
             [vip_claim_uid, vip_dismiss_uid, vip_receive_uid],
         )
-        self.assertEqual(donation_task["settings"]["max_donations"], 100)
+        self.assertEqual(donation_task["settings"]["max_donations"], 20)
         self.assertEqual(donation_task["settings"]["max_project_checks"], 6)
         self.assertGreaterEqual(donation_task["timeout_seconds"], 45.0)
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")

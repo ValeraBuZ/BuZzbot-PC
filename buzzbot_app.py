@@ -7920,12 +7920,19 @@ class AutoClicker:
             )
             target = None
             sign_score = -1.0
+            expected_shop_target = (
+                int(round(width * 955 / 1280.0)),
+                int(round(height * 415 / 720.0)),
+            )
             if sign_template is not None and sign_template.size:
                 target, sign_score = detect_merchant_shop_building_target(
                     frame,
                     sign_template,
                     min_score=0.33,
-                    search_bounds=(0, 280, 1280, 520),
+                    # After the explicit rewind and one full swipe, Shop is the
+                    # fourth visible Economy card.  Restrict matching to that
+                    # slot so the POLICE roof on the previous card cannot win.
+                    search_bounds=(820, 280, 1120, 520),
                 )
             logger.info(
                 "Merchant catalogue Shop card match score=%.3f target=%s",
@@ -7933,48 +7940,16 @@ class AutoClicker:
                 target,
             )
             if target is None:
-                self._save_routine_calibration_frame(
-                    "mysterious_merchant", "shop_card_not_found", frame
+                # Live IGG 6 proved the old whole-row weak match could select
+                # Police Station at x=660.  The catalogue is already normalised
+                # here, so the fourth card centre is a safer deterministic
+                # fallback than additional carousel swipes.
+                target = expected_shop_target
+                logger.info(
+                    "Merchant catalogue Shop sign was weak; using the verified "
+                    "fourth Economy card at (%s, %s)",
+                    *target,
                 )
-                scroll_attempts = int(
-                    getattr(
-                        self,
-                        "routine_merchant_catalog_scroll_attempts",
-                        0,
-                    )
-                    or 0
-                )
-                if scroll_attempts < 6:
-                    # Catalogue offsets vary between accounts.  Continue the
-                    # same Economy carousel in bounded steps and inspect every
-                    # resulting frame instead of assuming Shop is exactly one
-                    # swipe from the left edge.
-                    from_x = int(round(width * 1040 / 1280.0))
-                    to_x = int(round(width * 360 / 1280.0))
-                    y = int(round(height * (420 if scroll_attempts % 2 == 0 else 620) / 720.0))
-                    try:
-                        if self.input_backend == "adb" and self.adb_client:
-                            self.adb_client.swipe(from_x, y, to_x, y, 700)
-                        else:
-                            pyautogui.moveTo(from_x, y, duration=0.05)
-                            pyautogui.dragTo(to_x, y, duration=0.7, button="left")
-                    except Exception:
-                        logger.exception("Merchant building list could not continue scrolling")
-                        return False
-                    self.routine_merchant_catalog_scroll_attempts = scroll_attempts + 1
-                    self._invalidate_capture()
-                    self._interruptible_sleep(0.8)
-                    logger.info(
-                        "Merchant catalogue continued searching for Shop (%s/6)",
-                        self.routine_merchant_catalog_scroll_attempts,
-                    )
-                    return True
-                self._defer_current_routine_unavailable(
-                    "карточка магазина не найдена в каталоге",
-                    time.time(),
-                    retry_delay=60.0,
-                )
-                return True
             if not self._tap_routine_fallback(
                 target,
                 ("merchant_shop_card", *target),
@@ -8164,7 +8139,6 @@ class AutoClicker:
             building_target = None
             building_score = -1.0
             shop_marker_target = None
-            unmarked_feature_target = None
             feature_inliers = 0
             if building_template is not None and building_template.size:
                 building_target, feature_inliers = detect_merchant_shop_feature_target(
@@ -8193,31 +8167,17 @@ class AutoClicker:
                         shop_marker_target,
                     )
                     if shop_marker_target is None:
-                        # Truck, equipment-repair and Shop facades share many
-                        # construction details.  Live testing produced a
-                        # 43-inlier false match on Equipment Repair.  Keep the
-                        # candidate only for a guarded tap: the following state
-                        # must expose Shop's radial actions, otherwise it is
-                        # closed and the bounded camera scan continues.
-                        if feature_inliers >= 20:
-                            unmarked_feature_target = building_target
+                        # The bundled full-building reference is visually close
+                        # to Equipment Repair on several accounts.  A high ORB
+                        # count alone is therefore not authority to click it;
+                        # require the catalogue selection marker or continue to
+                        # the dedicated SHOP roof-sign detector below.
+                        logger.info(
+                            "Merchant feature candidate rejected without the "
+                            "catalogue marker (%s inliers)",
+                            feature_inliers,
+                        )
                         building_target = None
-            if unmarked_feature_target is not None:
-                if not self._tap_routine_fallback(
-                    unmarked_feature_target,
-                    ("merchant_guarded_feature_candidate", *unmarked_feature_target),
-                    "Таинственный торговец: проверяю найденное здание магазина",
-                ):
-                    return False
-                self.routine_merchant_shop_target = unmarked_feature_target
-                self.routine_completed_steps.add("merchant_shop_building_tapped")
-                logger.info(
-                    "Merchant guarded feature candidate requested at (%s, %s) "
-                    "with %s inliers",
-                    *unmarked_feature_target,
-                    feature_inliers,
-                )
-                return True
             if building_target is None and building_template is not None and building_template.size:
                 building_target, building_score = detect_merchant_shop_building_target(
                     frame,
