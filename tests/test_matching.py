@@ -119,6 +119,25 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertIsNone(detect_processing_factory_target(frame))
 
+    def test_processing_factory_rejects_diagonal_shelter_wall_lights(self):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        furnace_color = (0, 120, 255)
+        for left, top, width, height in (
+            (838, 136, 57, 36),
+            (825, 168, 19, 21),
+            (781, 171, 47, 42),
+            (749, 219, 27, 23),
+        ):
+            cv2.rectangle(
+                frame,
+                (left, top),
+                (left + width - 1, top + height - 1),
+                furnace_color,
+                -1,
+            )
+
+        self.assertIsNone(detect_processing_factory_target(frame))
+
     @staticmethod
     def equipment_report_frame(active_cards=(460, 590, 723)):
         frame = np.full((720, 1280, 3), (18, 20, 22), dtype=np.uint8)
@@ -1003,6 +1022,12 @@ class DynamicGameControlTests(unittest.TestCase):
         frame[482:535, 360:632] = (80, 95, 110)
         frame[482:535, 650:920] = (20, 180, 245)
         self.assertEqual(detect_back_confirmation_cancel_target(frame), (495, 509))
+
+    def test_back_confirmation_rejects_single_connection_error_ok_button(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        frame[210:470, 330:950] = (210, 215, 220)
+        cv2.rectangle(frame, (508, 482), (772, 535), (20, 180, 245), -1)
+        self.assertIsNone(detect_back_confirmation_cancel_target(frame))
 
     def test_healing_checkbox_border_is_not_mistaken_for_checkmark(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)

@@ -281,22 +281,20 @@ FENCE_SURVIVOR_SCAN_PATTERN = (
     + ("left",) * 4
 )
 PROCESSING_FACTORY_SCAN_PATTERN = (
-    # After the initial vertical anchor, sweep a compact rectangle.  The
-    # generic building templates run before every move, so the scan stops as
-    # soon as either a free or working processing factory becomes visible.
-    "left",
-    "up",
-    "left",
-    "down",
-    "down",
-    "right",
-    "right",
-    "up",
-    "up",
-    "left",
-    "right",
-    "right",
-    "down",
+    # Force a reproducible corner, then cover the complete shelter in wide
+    # rows.  The previous compact 13-step route only revisited the central
+    # strip and missed account-specific refinery placements entirely.
+    ("left",) * 12
+    + ("up",) * 10
+    + ("right",) * 12
+    + ("down",) * 3
+    + ("left",) * 12
+    + ("down",) * 3
+    + ("right",) * 12
+    + ("down",) * 3
+    + ("left",) * 12
+    + ("down",) * 3
+    + ("right",) * 12
 )
 
 logger = configure_logging(RUNTIME_DIR / "bot.log")
@@ -2142,6 +2140,70 @@ class AutoClicker:
             self._interruptible_sleep(0.8)
         logger.warning("Главный экран не подтверждён после завершения задачи")
         return False
+
+    def _try_global_login_connection_recovery(self, task):
+        """Recover the one-button in-game login/network error without looping Back."""
+        if not self.uses_adb or not task or task.get("id") == "game_login":
+            return False
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Login connection recovery could not capture the screen")
+            return False
+        # Two-button Android Back confirmation is handled by normal screen
+        # recovery.  Only the distinct single wide OK dialog may restart login.
+        if detect_back_confirmation_cancel_target(frame) is not None:
+            return False
+        target = detect_login_session_expired_ok_target(frame)
+        if target is None:
+            return False
+
+        interrupted_index = int(self.current_routine_index or 0)
+        login_index = next(
+            (
+                index
+                for index, candidate in enumerate(self.routine_tasks)
+                if candidate.get("id") == "game_login"
+                and is_task_effectively_enabled(candidate)
+            ),
+            None,
+        )
+        if login_index is None:
+            return False
+        try:
+            self.adb_client.tap(*map(int, target))
+            self._invalidate_capture()
+            self._interruptible_sleep(0.8)
+            self.adb_client.force_stop_package(GAME_PACKAGE)
+            self._interruptible_sleep(2.0)
+            self.adb_client.launch_package(GAME_PACKAGE)
+        except Exception:
+            logger.exception("Login connection error recovery failed")
+            return False
+
+        self.routine_forced_task_active_id = "game_login"
+        self.routine_forced_task_return_index = interrupted_index
+        self.routine_next_run["game_login"] = 0.0
+        self.current_routine_index = int(login_index)
+        self.current_routine_task_id = None
+        self.routine_current_had_action = False
+        self.routine_completed_steps = set()
+        self.routine_idle_confirmation_count = 0
+        self.blocked_coords.clear()
+        self.routine_last_action_time = time.time()
+        self.set_status_message(
+            "Ошибка входа: перезапускаю игру и затем продолжу текущую задачу",
+            force=True,
+        )
+        logger.warning(
+            "In-game login connection error confirmed; forced game_login will return "
+            "to interrupted routine %s at index %s",
+            task.get("id"),
+            interrupted_index,
+        )
+        self.save_config()
+        self._interruptible_sleep(8.0)
+        return True
 
     def _find_template_opencv(self, template_path, region, confidence, grayscale, scales):
         screen_bgr, origin = self._capture_screen_bgr(region=region)
@@ -4840,9 +4902,14 @@ class AutoClicker:
         started_at = float(
             getattr(self, "routine_research_budget_started_at", 0.0) or 0.0
         )
+        # The account-pass soft target is diagnostic only.  Research often
+        # appears after radar and donations, so a healthy long pass can reach
+        # this task after that target.  Cutting the research watchdog short in
+        # that case used to close a freshly opened tree before its first visual
+        # inspection.  Only the task's own restart-stable budget may defer it.
         return bool(
-            (started_at > 0.0 and now - started_at >= RESEARCH_UNCONFIRMED_BUDGET_SECONDS)
-            or self._account_pass_soft_due(now)
+            started_at > 0.0
+            and now - started_at >= RESEARCH_UNCONFIRMED_BUDGET_SECONDS
         )
 
     def _drain_expired_account_pass(self, now=None):
@@ -7068,49 +7135,6 @@ class AutoClicker:
             getattr(self, "routine_processing_factory_scan_index", 0) or 0
         )
         if scan_index >= len(PROCESSING_FACTORY_SCAN_PATTERN):
-            if not bool(
-                getattr(
-                    self,
-                    "routine_processing_factory_recenter_attempted",
-                    False,
-                )
-            ):
-                # An inherited edge camera position can make one complete
-                # route miss the refinery.  Re-entering the settlement centres
-                # it and gives the factory task one clean second pass before
-                # the ordered queue may advance to the processing contest.
-                self.routine_processing_factory_recenter_attempted = True
-                height, width = frame.shape[:2]
-                map_target = (
-                    int(round(width * 65 / 1280.0)),
-                    int(round(height * 655 / 720.0)),
-                )
-                self.set_status_message(
-                    "Завод по обработке: заново центрирую убежище перед повторным поиском",
-                    force=True,
-                )
-                try:
-                    if self.uses_adb:
-                        self.adb_client.tap(*map_target)
-                    else:
-                        pyautogui.click(*map_target)
-                except Exception:
-                    logger.exception("Processing factory shelter recenter failed")
-                else:
-                    self._invalidate_capture()
-                    self._interruptible_sleep(1.2)
-                    if self._switch_to_settlement_screen():
-                        self.routine_processing_factory_scan_index = 0
-                        self.routine_processing_factory_dynamic_selected_at = 0.0
-                        self.routine_processing_factory_dynamic_target = None
-                        self.routine_processing_factory_radial_attempted = False
-                        logger.info(
-                            "Processing factory search recentered the shelter; restarting the scan"
-                        )
-                        return True
-                logger.warning(
-                    "Processing factory search could not confirm the shelter after recentering"
-                )
             self._defer_current_routine_unavailable(
                 "завод не найден после полного обзора убежища",
                 time.time(),
@@ -7139,6 +7163,13 @@ class AutoClicker:
                     target,
                 )
                 return True
+
+        if scan_index % 12 == 0:
+            self._save_routine_calibration_frame(
+                task_id,
+                f"scan_{scan_index:02d}",
+                frame,
+            )
 
         height, width = frame.shape[:2]
         swipes = {
@@ -8133,6 +8164,7 @@ class AutoClicker:
             building_target = None
             building_score = -1.0
             shop_marker_target = None
+            unmarked_feature_target = None
             feature_inliers = 0
             if building_template is not None and building_template.size:
                 building_target, feature_inliers = detect_merchant_shop_feature_target(
@@ -8163,9 +8195,29 @@ class AutoClicker:
                     if shop_marker_target is None:
                         # Truck, equipment-repair and Shop facades share many
                         # construction details.  Live testing produced a
-                        # 43-inlier false match on Equipment Repair, so the
-                        # catalogue selection marker remains mandatory.
+                        # 43-inlier false match on Equipment Repair.  Keep the
+                        # candidate only for a guarded tap: the following state
+                        # must expose Shop's radial actions, otherwise it is
+                        # closed and the bounded camera scan continues.
+                        if feature_inliers >= 20:
+                            unmarked_feature_target = building_target
                         building_target = None
+            if unmarked_feature_target is not None:
+                if not self._tap_routine_fallback(
+                    unmarked_feature_target,
+                    ("merchant_guarded_feature_candidate", *unmarked_feature_target),
+                    "Таинственный торговец: проверяю найденное здание магазина",
+                ):
+                    return False
+                self.routine_merchant_shop_target = unmarked_feature_target
+                self.routine_completed_steps.add("merchant_shop_building_tapped")
+                logger.info(
+                    "Merchant guarded feature candidate requested at (%s, %s) "
+                    "with %s inliers",
+                    *unmarked_feature_target,
+                    feature_inliers,
+                )
+                return True
             if building_target is None and building_template is not None and building_template.size:
                 building_target, building_score = detect_merchant_shop_building_target(
                     frame,
@@ -8218,7 +8270,10 @@ class AutoClicker:
                 sign_score,
                 best_target,
             )
-            self._save_routine_calibration_frame("mysterious_merchant", "shop_search", frame)
+            scan_index = int(getattr(self, "routine_merchant_scan_index", 0) or 0)
+            self._save_routine_calibration_frame(
+                "mysterious_merchant", f"shop_search_{scan_index:02d}", frame
+            )
             if not shop_match_confirmed:
                 scan_index = int(getattr(self, "routine_merchant_scan_index", 0) or 0)
                 # Catalogue selection already centred Shop.  A short bounded
@@ -9605,7 +9660,6 @@ class AutoClicker:
             research_elapsed = max(0.0, float(now) - research_started_at)
             retry_allowed = bool(
                 research_elapsed < RESEARCH_UNCONFIRMED_BUDGET_SECONDS
-                and not self._account_pass_soft_due(now)
             )
             retry_delay = min(float(retry_delay), 30.0)
             self._return_to_main_screen(
@@ -9613,6 +9667,19 @@ class AutoClicker:
                 require_settlement=True,
             )
             if not retry_allowed:
+                try:
+                    diagnostic_frame, _diagnostic_origin = self._capture_screen_bgr(
+                        force=True
+                    )
+                    self._save_routine_calibration_frame(
+                        "research",
+                        "unconfirmed",
+                        diagnostic_frame,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not capture the unconfirmed research screen"
+                    )
                 # Do not call _finish_current_routine here: no research start
                 # was confirmed.  This is an explicit, auditable deferral that
                 # advances exactly one saved-order slot.
@@ -10605,6 +10672,8 @@ class AutoClicker:
                     current_routine_task = self._begin_due_routine(now)
                     if current_routine_task is None:
                         time.sleep(max(0.1, min(0.5, self.sleep_not_found)))
+                        continue
+                    if self._try_global_login_connection_recovery(current_routine_task):
                         continue
                     if (
                         current_routine_task.get("id") == "radar_marches"
@@ -12209,37 +12278,48 @@ class AutoClicker:
                 selected_frame, _selected_origin = self._capture_screen_bgr(force=True)
                 radial_x = int(round(float(radial_target[0]) * display.scale_x))
                 radial_y = int(round(float(radial_target[1]) * display.scale_y))
-                if self.uses_adb:
-                    self.adb_client.tap(radial_x, radial_y)
-                else:
-                    pyautogui.click(radial_x, radial_y)
                 self.routine_completed_steps.add("building")
-                self._invalidate_capture()
                 self.set_status_message(
                     f"Выбрано учебное здание {queue_ordinal}/4",
                     force=True,
                 )
-                self._interruptible_sleep(1.5)
-                training_frame, _training_origin = self._capture_screen_bgr(force=True)
-                if training_frame.shape != selected_frame.shape:
-                    selected_frame = cv2.resize(
-                        selected_frame,
-                        (training_frame.shape[1], training_frame.shape[0]),
-                        interpolation=cv2.INTER_LINEAR,
-                    )
-                screen_change = float(cv2.absdiff(selected_frame, training_frame).mean())
-                if screen_change < 3.0:
-                    logger.info(
-                        "Training radial tap did not change the screen (%.2f); retrying",
-                        screen_change,
-                    )
+                screen_change = 0.0
+                training_frame = selected_frame
+                # Live accounts occasionally ignore the first radial action
+                # tap while the building animation is still settling.  Retry
+                # the *same* verified action (never neighbouring radial icons)
+                # a few times before declaring this troop queue unavailable.
+                for radial_attempt in range(1, 5):
                     if self.uses_adb:
                         self.adb_client.tap(radial_x, radial_y)
                     else:
                         pyautogui.click(radial_x, radial_y)
+                    self._invalidate_capture()
                     self._interruptible_sleep(1.5)
                     training_frame, _training_origin = self._capture_screen_bgr(force=True)
-                    screen_change = float(cv2.absdiff(selected_frame, training_frame).mean())
+                    if training_frame.shape != selected_frame.shape:
+                        selected_frame = cv2.resize(
+                            selected_frame,
+                            (training_frame.shape[1], training_frame.shape[0]),
+                            interpolation=cv2.INTER_LINEAR,
+                        )
+                    screen_change = float(
+                        cv2.absdiff(selected_frame, training_frame).mean()
+                    )
+                    if screen_change >= 3.0:
+                        break
+                    logger.info(
+                        "Training radial tap did not change the screen "
+                        "(attempt %s/4, %.2f); retrying",
+                        radial_attempt,
+                        screen_change,
+                    )
+                if screen_change < 3.0:
+                    self._save_routine_calibration_frame(
+                        str(getattr(self, "current_routine_task_id", "training")),
+                        f"radial_unopened_queue_{queue_ordinal}",
+                        training_frame,
+                    )
                 if screen_change >= 3.0:
                     logger.info(
                         "Training screen opened for queue %s/4, screen change %.2f",

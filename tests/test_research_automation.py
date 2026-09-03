@@ -126,6 +126,11 @@ class ResearchAutomationTests(unittest.TestCase):
         bot._advance_routine_after_outcome = (
             lambda *_args, **_kwargs: advanced.append(True)
         )
+        # A long but healthy account pass must not shorten research's own
+        # cumulative confirmation budget.
+        bot.current_account_id = "account-a"
+        bot.account_pass_account_id = "account-a"
+        bot.account_pass_started_at = -1000.0
 
         with patch("buzzbot_app.time.time", return_value=101.0):
             bot._defer_current_routine_no_action(now=100.0)
@@ -161,6 +166,14 @@ class ResearchAutomationTests(unittest.TestCase):
         bot.account_pass_account_id = "a"
         bot.current_account_id = "a"
         bot._return_to_main_screen = lambda **_kwargs: True
+        bot._capture_screen_bgr = lambda **_kwargs: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        diagnostics = []
+        bot._save_routine_calibration_frame = (
+            lambda task_id, stage, _frame: diagnostics.append((task_id, stage))
+        )
         bot.set_status_message = lambda *_args, **_kwargs: None
         bot.save_config = lambda: None
         bot._interruptible_sleep = lambda _seconds: self.fail(
@@ -181,6 +194,7 @@ class ResearchAutomationTests(unittest.TestCase):
             "unconfirmed_research_budget",
         )
         self.assertEqual(advanced, [("research", 191.0)])
+        self.assertEqual(diagnostics, [("research", "unconfirmed")])
 
     def test_collected_result_is_not_clicked_twice_before_selection(self):
         bot = AutoClicker.__new__(AutoClicker)

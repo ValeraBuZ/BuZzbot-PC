@@ -2094,6 +2094,7 @@ def detect_back_confirmation_cancel_target(frame_bgr):
         return None
 
     body_hsv = cv2.cvtColor(modal_body, cv2.COLOR_BGR2HSV)
+    left_hsv = cv2.cvtColor(left_button, cv2.COLOR_BGR2HSV)
     right_hsv = cv2.cvtColor(right_button, cv2.COLOR_BGR2HSV)
     pale_body = (body_hsv[:, :, 1] <= 55) & (body_hsv[:, :, 2] >= 135)
     gold_button = (
@@ -2102,7 +2103,21 @@ def detect_back_confirmation_cancel_target(frame_bgr):
         & (right_hsv[:, :, 1] >= 70)
         & (right_hsv[:, :, 2] >= 120)
     )
-    if float(np.mean(pale_body)) < 0.45 or float(np.mean(gold_button)) < 0.35:
+    left_gold = (
+        (left_hsv[:, :, 0] >= 8)
+        & (left_hsv[:, :, 0] <= 40)
+        & (left_hsv[:, :, 1] >= 70)
+        & (left_hsv[:, :, 2] >= 120)
+    )
+    # A connection-error modal has one centred gold OK button spanning both
+    # halves.  Android Back confirmation has a dark/grey Cancel on the left and
+    # a separate gold action on the right.  Without this guard the generic
+    # recovery tapped OK forever and mislabeled it as cancelling game exit.
+    if (
+        float(np.mean(pale_body)) < 0.45
+        or float(np.mean(gold_button)) < 0.35
+        or float(np.mean(left_gold)) > 0.20
+    ):
         return None
     return int(round(495 * scale_x)), int(round(509 * scale_y))
 
@@ -2275,6 +2290,27 @@ def detect_processing_factory_target(frame_bgr):
             best_cluster = cluster
 
     if len(best_cluster) < 3:
+        return None
+
+    # Orange lamps along the shelter wall can form three or four components
+    # with exactly the same spacing as the furnace trays.  Unlike the real
+    # factory, those components lie on one near-perfect diagonal.  Require a
+    # genuinely two-dimensional cluster before clicking it; otherwise the bot
+    # repeatedly selects the wall and never advances its camera scan.
+    cluster_points = np.array(
+        [[item[0], item[1]] for item in best_cluster],
+        dtype=np.float32,
+    )
+    hull_area = float(cv2.contourArea(cv2.convexHull(cluster_points)))
+    singular_values = np.linalg.svd(
+        cluster_points - np.mean(cluster_points, axis=0),
+        compute_uv=False,
+    )
+    if (
+        hull_area < 850.0
+        or len(singular_values) < 2
+        or float(singular_values[1]) < float(singular_values[0]) * 0.20
+    ):
         return None
 
     target_x = int(round(np.mean([item[0] for item in best_cluster]) * scale_x))

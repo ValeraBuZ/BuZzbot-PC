@@ -73,6 +73,16 @@ class AccountPassWatchdogTests(unittest.TestCase):
 
         self.assertTrue(bot._research_watchdog_due(191.0))
 
+    def test_research_watchdog_does_not_inherit_expired_account_soft_target(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.current_routine_task_id = "research"
+        bot.routine_research_budget_started_at = 995.0
+        bot.current_account_id = "account-a"
+        bot.account_pass_account_id = "account-a"
+        bot.account_pass_started_at = 1.0
+
+        self.assertFalse(bot._research_watchdog_due(1000.0))
+
     def test_hard_deadline_does_not_skip_remaining_ordered_tasks(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.routine_mode = True
