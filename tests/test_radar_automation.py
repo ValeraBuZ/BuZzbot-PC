@@ -140,6 +140,7 @@ class RadarAutomationTests(unittest.TestCase):
             (0, 0),
         )
         bot._is_main_screen_visible = lambda: False
+        bot._is_settlement_screen_visible = lambda: False
         bot.set_status_message = lambda *_args, **_kwargs: None
         return bot
 
@@ -153,6 +154,28 @@ class RadarAutomationTests(unittest.TestCase):
     ):
         bot = self._game_login_recovery_bot(last_action_time=90.0)
         bot._is_main_screen_visible = lambda: True
+        bot._is_settlement_screen_visible = lambda: False
+        taps = []
+        bot._tap_routine_fallback = (
+            lambda *args, **kwargs: taps.append((args, kwargs)) or True
+        )
+
+        acted = bot._try_game_login_visual_fallback({"id": "game_login"})
+
+        self.assertFalse(acted)
+        self.assertEqual(taps, [])
+        overlay_detector.assert_not_called()
+
+    @patch(
+        "buzzbot_app.detect_game_event_overlay_close_target",
+        return_value=(1051, 109),
+    )
+    def test_game_login_does_not_click_false_event_target_in_settlement(
+        self,
+        overlay_detector,
+    ):
+        bot = self._game_login_recovery_bot(last_action_time=90.0)
+        bot._is_settlement_screen_visible = lambda: True
         taps = []
         bot._tap_routine_fallback = (
             lambda *args, **kwargs: taps.append((args, kwargs)) or True

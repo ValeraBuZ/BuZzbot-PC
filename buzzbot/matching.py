@@ -1568,6 +1568,20 @@ def detect_alliance_marked_project_target(frame_bgr):
             center_x, center_y = centroids[index]
             ribbon_candidates.append((int(area), float(center_x), float(center_y)))
             continue
+        if (
+            # On the live technology tree the pale letters in "Marked!"
+            # split the red ribbon into two shorter components.  The largest
+            # surviving half is still much wider than the compact project dot
+            # and is authoritative inside the bounded technology-tree area.
+            400 <= area <= 1600
+            and 60 <= width <= 180
+            and 12 <= height <= 32
+            and 2.5 <= aspect <= 9.0
+            and extent >= 0.30
+        ):
+            center_x, center_y = centroids[index]
+            ribbon_candidates.append((int(area), float(center_x), float(center_y)))
+            continue
         if not (
             70 <= area <= 220
             and 9 <= width <= 18

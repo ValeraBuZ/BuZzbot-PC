@@ -1910,12 +1910,12 @@ class AutoClicker:
 
     def _is_main_screen_visible(self):
         markers = [
-            image for image in self.search_images
+            image for image in getattr(self, "search_images", [])
             if image.get("home_screen_marker") and image.get("enabled", True)
         ]
         if not markers:
             markers = [
-                image for image in self.search_images
+                image for image in getattr(self, "search_images", [])
                 if image.get("description") == "Открыть альянс" and image.get("enabled", True)
             ]
         for marker in markers:
@@ -1930,7 +1930,7 @@ class AutoClicker:
 
     def _is_settlement_screen_visible(self):
         markers = [
-            image for image in self.search_images
+            image for image in getattr(self, "search_images", [])
             if image.get("settlement_screen_marker") and image.get("enabled", True)
         ]
         for marker in markers:
@@ -1942,6 +1942,20 @@ class AutoClicker:
             if location and bbox:
                 return True
         return False
+
+    def _is_game_home_visible(self):
+        """Return true for either normal playable home surface.
+
+        The world map and the settlement deliberately use different markers:
+        navigation code needs to distinguish them.  Login and account switching
+        do not; reaching either surface proves that the game has loaded.  Using
+        only the world-map marker made ``game_login`` wait forever whenever a
+        profile opened directly in its settlement.
+        """
+        return bool(
+            self._is_main_screen_visible()
+            or self._is_settlement_screen_visible()
+        )
 
     def _switch_to_settlement_screen(self):
         if self._is_settlement_screen_visible():
@@ -6067,7 +6081,7 @@ class AutoClicker:
         # icons on the normal settlement screen.  Once the home marker is
         # visible, leave the frame untouched so the stable-screen check below
         # can complete game_login instead of opening an event again.
-        if self._is_main_screen_visible():
+        if self._is_game_home_visible():
             return False
 
         if self._try_equipment_report_overlay(frame, "game_login"):
@@ -6276,7 +6290,7 @@ class AutoClicker:
             }.issubset(self.routine_completed_steps)
         )
         if target is None and login_progressed:
-            if self._is_main_screen_visible():
+            if self._is_game_home_visible():
                 return False
             if self._try_equipment_report_overlay(frame, "account_switch_post_login"):
                 self._interruptible_sleep(1.0)
@@ -6318,7 +6332,7 @@ class AutoClicker:
         return True
 
     def _account_switch_main_screen_confirmed(self, task):
-        if not self.account_switch_selected_at or not self._is_main_screen_visible():
+        if not self.account_switch_selected_at or not self._is_game_home_visible():
             return False
         settings = task.get("settings", {})
         if settings.get("login_method") == "igg":
@@ -6815,7 +6829,7 @@ class AutoClicker:
         return_grace = 8.0 if login_progressed else 30.0
         if time.time() - self.account_switch_selected_at < return_grace:
             return False
-        if self._is_main_screen_visible():
+        if self._is_game_home_visible():
             return False
 
         self.set_status_message(
@@ -7921,7 +7935,7 @@ class AutoClicker:
             target = None
             sign_score = -1.0
             expected_shop_target = (
-                int(round(width * 955 / 1280.0)),
+                int(round(width * 585 / 1280.0)),
                 int(round(height * 415 / 720.0)),
             )
             if sign_template is not None and sign_template.size:
@@ -7929,10 +7943,12 @@ class AutoClicker:
                     frame,
                     sign_template,
                     min_score=0.33,
-                    # After the explicit rewind and one full swipe, Shop is the
-                    # fourth visible Economy card.  Restrict matching to that
-                    # slot so the POLICE roof on the previous card cannot win.
-                    search_bounds=(820, 280, 1120, 520),
+                    # A live 1280x720 catalogue confirms that after the
+                    # explicit rewind and one full swipe the Shop is the
+                    # centred card (Police is immediately to its left and the
+                    # Trade Post immediately to its right).  Restrict matching
+                    # to that slot so neither neighbouring roof can win.
+                    search_bounds=(430, 280, 740, 520),
                 )
             logger.info(
                 "Merchant catalogue Shop card match score=%.3f target=%s",
@@ -7942,12 +7958,12 @@ class AutoClicker:
             if target is None:
                 # Live IGG 6 proved the old whole-row weak match could select
                 # Police Station at x=660.  The catalogue is already normalised
-                # here, so the fourth card centre is a safer deterministic
+                # here, so the centred Shop card is a safer deterministic
                 # fallback than additional carousel swipes.
                 target = expected_shop_target
                 logger.info(
                     "Merchant catalogue Shop sign was weak; using the verified "
-                    "fourth Economy card at (%s, %s)",
+                    "centred Economy card at (%s, %s)",
                     *target,
                 )
             if not self._tap_routine_fallback(
@@ -11400,7 +11416,7 @@ class AutoClicker:
                             self._finish_current_routine(time.time())
                         continue
                     if current_routine_task.get("id") == "game_login":
-                        if self._is_main_screen_visible():
+                        if self._is_game_home_visible():
                             self.routine_idle_confirmation_count += 1
                             task_elapsed = time.time() - self.routine_task_started_at
                             if (
