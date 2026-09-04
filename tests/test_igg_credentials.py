@@ -314,6 +314,30 @@ class IggCredentialTests(unittest.TestCase):
 
     @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
     @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
+    def test_post_login_event_overlay_is_closed_after_interrupted_session_resume(
+        self,
+        _confirm,
+        _overlay,
+    ):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 10.0
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda force=False: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_main_screen_visible = lambda: False
+        tapped = []
+        bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
+        bot._interruptible_sleep = lambda _seconds: None
+
+        handled = bot._try_account_switch_igg_game_confirmation(self.task())
+
+        self.assertTrue(handled)
+        self.assertEqual(tapped, [(1152, 112)])
+
+    @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
+    @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
     def test_post_login_overlay_detector_does_not_click_main_screen(self, _confirm, _overlay):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 10.0

@@ -6322,7 +6322,10 @@ class AutoClicker:
 
         target = detect_igg_game_login_ok_target(frame)
         login_progressed = (
-            "account_switch_igg_game_confirmed" in self.routine_completed_steps
+            bool(self.account_switch_selected_at)
+            or "account_switch_igg_game_confirmed" in self.routine_completed_steps
+            or "account_switch_igg_interrupted_after_selection"
+            in self.routine_completed_steps
             or {
                 "account_switch_igg_login_submitted",
                 "account_switch_igg_id_selected",
