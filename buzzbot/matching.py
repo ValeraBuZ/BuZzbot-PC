@@ -2296,9 +2296,13 @@ def detect_processing_factory_target(frame_bgr):
     # chat and left the factory task waiting on a screen it had never opened.
     # The camera scan will bring a partly clipped factory into this safe field.
     mask[:135, :] = 0
-    mask[600:, :] = 0
+    # On the zZuB1 settlement the refinery sits at the extreme south-east
+    # boundary.  The scan can only expose three furnace trays before the
+    # building reaches the bottom edge, so retain the narrow strip above the
+    # actual bottom HUD instead of discarding it with the HUD itself.
+    mask[660:, :] = 0
     mask[:, :300] = 0
-    mask[:, 1140:] = 0
+    mask[:, 1240:] = 0
     mask = cv2.morphologyEx(
         mask,
         cv2.MORPH_OPEN,
@@ -2314,10 +2318,10 @@ def detect_processing_factory_target(frame_bgr):
         if not (18 <= width <= 58 and 12 <= height <= 48):
             continue
         center_x, center_y = map(float, centroids[index])
-        candidates.append((center_x, center_y, area))
+        candidates.append((center_x, center_y, area, width, height))
 
     best_cluster = []
-    for center_x, center_y, _area in candidates:
+    for center_x, center_y, _area, _width, _height in candidates:
         cluster = [
             candidate
             for candidate in candidates
@@ -2344,12 +2348,47 @@ def detect_processing_factory_target(frame_bgr):
         cluster_points - np.mean(cluster_points, axis=0),
         compute_uv=False,
     )
-    if (
+    invalid_two_dimensional_cluster = (
         hull_area < 850.0
         or len(singular_values) < 2
         or float(singular_values[1]) < float(singular_values[0]) * 0.20
-    ):
-        return None
+    )
+    if invalid_two_dimensional_cluster:
+        # A clipped south-east refinery exposes only three large, evenly
+        # staggered furnace trays.  They are necessarily almost collinear, but
+        # are much larger and lower than the orange shelter-wall lamps that the
+        # two-dimensional guard above rejects.  Keep this exception tightly
+        # constrained to that edge geometry so fixed HUD chrome remains inert.
+        large_trays = sorted(
+            (
+                item
+                for item in best_cluster
+                if 350 <= item[2] <= 1250
+                and 28 <= item[3] <= 48
+                and 20 <= item[4] <= 36
+            ),
+            key=lambda item: item[0],
+        )
+        clipped_refinery = False
+        for start in range(max(0, len(large_trays) - 2)):
+            trio = large_trays[start : start + 3]
+            if len(trio) < 3:
+                continue
+            x_values = [item[0] for item in trio]
+            y_values = [item[1] for item in trio]
+            x_steps = np.diff(x_values)
+            y_steps = np.diff(y_values)
+            if (
+                float(np.mean(x_values)) >= 980.0
+                and float(np.mean(y_values)) >= 535.0
+                and np.all((x_steps >= 20.0) & (x_steps <= 50.0))
+                and np.all((y_steps >= 12.0) & (y_steps <= 35.0))
+            ):
+                best_cluster = trio
+                clipped_refinery = True
+                break
+        if not clipped_refinery:
+            return None
 
     target_x = int(round(np.mean([item[0] for item in best_cluster]) * scale_x))
     target_y = int(

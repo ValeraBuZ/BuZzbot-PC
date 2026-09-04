@@ -138,6 +138,28 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertIsNone(detect_processing_factory_target(frame))
 
+    def test_detects_three_clipped_south_east_factory_furnaces(self):
+        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        furnace_color = (0, 120, 255)
+        for left, top, width, height in (
+            (1019, 546, 30, 24),
+            (1055, 572, 30, 24),
+            (1090, 598, 30, 24),
+        ):
+            cv2.rectangle(
+                frame,
+                (left, top),
+                (left + width - 1, top + height - 1),
+                furnace_color,
+                -1,
+            )
+
+        target = detect_processing_factory_target(frame)
+
+        self.assertIsNotNone(target)
+        self.assertLess(abs(target[0] - 1070), 8)
+        self.assertLess(abs(target[1] - 600), 10)
+
     @staticmethod
     def equipment_report_frame(active_cards=(460, 590, 723)):
         frame = np.full((720, 1280, 3), (18, 20, 22), dtype=np.uint8)
