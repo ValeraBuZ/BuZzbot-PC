@@ -1739,6 +1739,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertEqual(tasks[0]["timeout_seconds"], 15.0)
         self.assertTrue(tasks[0]["complete_when_idle"])
         self.assertEqual(tasks[0]["idle_confirmations"], 2)
+        self.assertEqual(tasks[0]["idle_completion_timeout_seconds"], 6.0)
         self.assertFalse(tasks[0]["manual_screen_required"])
         self.assertTrue(tasks[0]["settings"]["visual_fallback"])
         marker = next(image for image in images if image["uid"] == marker_uid)

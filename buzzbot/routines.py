@@ -340,6 +340,7 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_uid": "",
         "complete_when_idle": True,
         "idle_confirmations": 2,
+        "idle_completion_timeout_seconds": 6.0,
         "manual_screen_required": False,
         "idle_completion_guard_uid": str(
             uuid.uuid5(PROFILE_NAMESPACE, "radar_rewards:radar_screen_guard")
@@ -364,6 +365,7 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_uid": "",
         "complete_when_idle": True,
         "idle_confirmations": 2,
+        "idle_completion_timeout_seconds": 6.0,
         "manual_screen_required": False,
         "idle_completion_guard_uid": str(
             uuid.uuid5(PROFILE_NAMESPACE, "radar_quick:radar_screen_guard")
@@ -389,6 +391,7 @@ DEFAULT_ROUTINE_TASKS = (
         "completion_uid": "",
         "complete_when_idle": True,
         "idle_confirmations": 2,
+        "idle_completion_timeout_seconds": 6.0,
         "manual_screen_required": False,
         "idle_completion_guard_uid": str(
             uuid.uuid5(PROFILE_NAMESPACE, "radar_marches:radar_screen_guard")
@@ -2312,6 +2315,11 @@ def upgrade_radar_runtime_metadata(images, tasks):
         task["complete_when_idle"] = True
         task["manual_screen_required"] = False
         task["idle_confirmations"] = max(2, int(task.get("idle_confirmations", 0) or 0))
+        # The radar screen is sampled every few seconds and the same card is
+        # excluded after it is handled.  Two six-second empty confirmations
+        # are sufficient to prove that no distinct card remains without
+        # spending another 24 seconds on every radar category.
+        task["idle_completion_timeout_seconds"] = 6.0
         task["idle_completion_guard_uid"] = str(
             uuid.uuid5(PROFILE_NAMESPACE, f"{task_id}:radar_screen_guard")
         )
