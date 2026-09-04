@@ -639,6 +639,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertIn(donate_uid, by_uid[donation_close_uid]["skip_if_visible_uids"])
         self.assertEqual(by_uid[donation_close_uid]["runtime_step"], "project_closed")
         self.assertTrue(by_uid[donation_close_uid]["repeat_runtime_step"])
+        self.assertTrue(by_uid[donation_close_uid]["completes_routine"])
         self.assertLessEqual(by_uid[donation_project_uid]["confidence"], 0.74)
         self.assertEqual(by_uid[donation_project_uid]["orb_match_threshold"], 3)
         self.assertEqual(by_uid[donation_marked_uid]["action"], "alliance_marked_project")

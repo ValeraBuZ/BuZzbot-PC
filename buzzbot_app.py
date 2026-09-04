@@ -10799,7 +10799,18 @@ class AutoClicker:
                     current_group_disp = self.cycle_groups[self.current_cycle_index] if self.cycle_groups else "None"
                 else:
                     current_group_disp = "None (обычный режим)"
-                logger.info(f"=== Итерация: группа={current_group_disp}, last_action_time={self.last_action_time:.2f}, now={now:.2f}, diff={now - self.last_action_time:.2f}")
+                diagnostic_last_action = (
+                    self.routine_last_action_time
+                    if self.routine_mode
+                    else self.last_action_time
+                )
+                logger.info(
+                    "=== Итерация: группа=%s, last_action_time=%.2f, now=%.2f, diff=%.2f",
+                    current_group_disp,
+                    diagnostic_last_action,
+                    now,
+                    now - diagnostic_last_action,
+                )
 
                 if self.anti_loop_enabled:
                     expired = [coord for coord, unblock in self.blocked_coords.items() if unblock <= now]

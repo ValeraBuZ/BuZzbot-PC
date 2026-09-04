@@ -1375,6 +1375,13 @@ def upgrade_repeatable_claim_metadata(images, tasks):
         if uid == alliance_close_uid:
             image["runtime_step"] = "project_closed"
             image["repeat_runtime_step"] = True
+            # The close control is guarded by the donation action above.  It
+            # can therefore only be used after the opened project exposes no
+            # further resource donation.  The attempt pool is shared across
+            # alliance projects, so opening five more projects only repeats
+            # the same exhausted state and can consume most of an account
+            # pass.  Finish the task as soon as that state is confirmed.
+            image["completes_routine"] = True
         upgraded += 1
 
     donation_priorities = {
