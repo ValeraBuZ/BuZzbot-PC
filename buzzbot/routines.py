@@ -1778,6 +1778,13 @@ def upgrade_strict_runtime_metadata(images, tasks):
                 image["dynamic_building_search"] = True
                 image["limit_key"] = "max_queue_checks"
                 image["defer_when_limit_reached"] = True
+                # This fixed left-HUD control is the four-slot troop-training
+                # overview (the independent march counter is at the upper
+                # right). Each press selects the next available barracks.
+                # Validate the troop-specific title after every press; never
+                # trust a historical ordinal or a blind radial tap.
+                image["enabled"] = True
+                image.pop("superseded_by_training_settlement_scan", None)
                 image["action"] = "select_training_queue"
                 image["training_queue_ordinal"] = TRAINING_QUEUE_ORDINALS[task_id]
                 image["training_radial_target"] = list(

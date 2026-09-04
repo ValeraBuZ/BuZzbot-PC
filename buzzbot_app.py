@@ -7126,6 +7126,57 @@ class AutoClicker:
             )
             self._interruptible_sleep(0.8)
             return True
+        # A restart resets the scan index but preserves the settlement camera.
+        # Live IGG 5 therefore restarted the 94-step route from the dark map
+        # boundary and spent every early step moving farther along that same
+        # edge.  Toggle through the world map once to obtain the game's stable
+        # settlement centre before any bounded factory scan.
+        if not getattr(
+            self,
+            "routine_processing_factory_recenter_attempted",
+            False,
+        ):
+            if not self._is_settlement_screen_visible():
+                return False
+            frame, _origin = self._capture_screen_bgr(force=True)
+            height, width = frame.shape[:2]
+            region_target = (
+                int(round(width * 65 / 1280.0)),
+                int(round(height * 655 / 720.0)),
+            )
+            try:
+                if self.uses_adb:
+                    self.adb_client.tap(*region_target)
+                else:
+                    pyautogui.click(*region_target)
+            except Exception:
+                logger.exception("Processing factory could not open the world map for recentering")
+                return False
+            self._invalidate_capture()
+            self.routine_current_had_action = True
+            self.routine_last_action_time = time.time()
+            self.click_count += 1
+            world_ready = False
+            for _attempt in range(5):
+                self._interruptible_sleep(0.55)
+                if self._is_main_screen_visible():
+                    world_ready = True
+                    break
+            if not world_ready or not self._switch_to_settlement_screen():
+                logger.warning(
+                    "Processing factory recenter transition was not confirmed; "
+                    "keeping the task in place"
+                )
+                return False
+            self.routine_processing_factory_recenter_attempted = True
+            self.routine_processing_factory_scan_index = 0
+            self._invalidate_capture()
+            self.set_status_message(
+                "Завод по обработке: поселение отцентрировано, начинаю поиск",
+                force=True,
+            )
+            logger.info("Processing factory settlement recenter confirmed")
+            return True
         try:
             frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
@@ -8160,7 +8211,10 @@ class AutoClicker:
                 building_target, feature_inliers = detect_merchant_shop_feature_target(
                     frame,
                     building_template,
-                    min_inliers=10,
+                    # Live accounts consistently produce 23-31 inliers for
+                    # the real Shop.  A lower threshold used to admit the
+                    # visually similar Equipment Repair building.
+                    min_inliers=18,
                     search_bounds=(80, 75, 1210, 620),
                 )
                 logger.info(
@@ -8183,17 +8237,18 @@ class AutoClicker:
                         shop_marker_target,
                     )
                     if shop_marker_target is None:
-                        # The bundled full-building reference is visually close
-                        # to Equipment Repair on several accounts.  A high ORB
-                        # count alone is therefore not authority to click it;
-                        # require the catalogue selection marker or continue to
-                        # the dedicated SHOP roof-sign detector below.
+                        # A maxed building catalogue displays crossed-out cards
+                        # and does not place its selection marker at all.  The
+                        # high-confidence facade match is still a valid
+                        # candidate; the next iteration verifies Shop's real
+                        # four-arrow radial menu before opening anything.  If
+                        # that verification fails, the scan continues without
+                        # completing or deferring the merchant task.
                         logger.info(
-                            "Merchant feature candidate rejected without the "
-                            "catalogue marker (%s inliers)",
+                            "Merchant feature candidate accepted without the "
+                            "catalogue marker for radial verification (%s inliers)",
                             feature_inliers,
                         )
-                        building_target = None
             if building_target is None and building_template is not None and building_template.size:
                 building_target, building_score = detect_merchant_shop_building_target(
                     frame,
@@ -8206,8 +8261,8 @@ class AutoClicker:
                 building_score,
                 building_target,
             )
-            if building_target is not None and shop_marker_target is not None:
-                tap_target = shop_marker_target
+            if building_target is not None:
+                tap_target = shop_marker_target or building_target
                 if not self._tap_routine_fallback(
                     tap_target,
                     ("merchant_full_shop_marker", *tap_target),
@@ -8216,8 +8271,8 @@ class AutoClicker:
                     return False
                 self.routine_completed_steps.add("merchant_shop_open_requested")
                 logger.info(
-                    "Merchant full Shop marker requested at (%s, %s)",
-                    *shop_marker_target,
+                    "Merchant full Shop candidate requested at (%s, %s)",
+                    *tap_target,
                 )
                 return True
             if sign_template is None or sign_template.size == 0:
@@ -8377,6 +8432,126 @@ class AutoClicker:
         self.routine_completed_steps.discard("merchant_shop_building_tapped")
         self.routine_merchant_force_scan_move = True
         logger.info("Merchant Shop candidate had no radial actions; continuing camera scan")
+        return True
+
+    def _training_step_templates(self, task, runtime_step):
+        return [
+            image
+            for image in self.get_routine_templates(task, active_only=True)
+            if str(image.get("runtime_step") or "") == runtime_step
+        ]
+
+    def _training_step_visible(self, task, runtime_step):
+        """Return the first validated template for one training screen step."""
+        for image in self._training_step_templates(task, runtime_step):
+            location, bbox, score = self._locate_image(image)
+            if location is None or bbox is None:
+                continue
+            is_valid, reject_reason = self._validate_detected_match(image, bbox)
+            if not is_valid:
+                logger.info(
+                    "Training %s template rejected by %s (score %.3f)",
+                    runtime_step,
+                    reject_reason,
+                    float(score or 0.0),
+                )
+                continue
+            return image, location, bbox, float(score or 0.0)
+        return None
+
+    def _try_training_catalogue_fallback(self, task):
+        """Select the requested barracks through the fixed training overview.
+
+        The left crossed-weapons control cycles through available troop
+        buildings. Occupied queues may be omitted, so never infer troop type
+        from the click number: validate the real building title every time.
+        """
+        task_id = str(task.get("id") or "")
+        if task_id not in {
+            "train_infantry",
+            "train_riders",
+            "train_shooters",
+            "train_vehicles",
+        }:
+            return False
+
+        if self._training_step_visible(task, "train") is not None:
+            # Let the normal template executor perform and confirm Start.
+            return False
+        if self._training_step_visible(task, "building") is not None:
+            # The requested barracks is selected.  The next normal iteration
+            # clicks only its calibrated radial training action.
+            return False
+
+        if not self._is_settlement_screen_visible():
+            return bool(
+                self._return_to_main_screen(
+                    max_back_steps=4,
+                    require_settlement=True,
+                )
+            )
+
+        action_counts = getattr(self, "routine_action_counts", None)
+        if not isinstance(action_counts, dict):
+            action_counts = {}
+            self.routine_action_counts = action_counts
+        queue_checks = int(action_counts.get("training_queue_fallback_checks", 0) or 0)
+        max_checks = max(
+            4,
+            int(task.get("settings", {}).get("max_queue_checks", 5) or 5),
+        )
+        if queue_checks >= max_checks:
+            self._defer_current_routine_unavailable(
+                "max_queue_checks",
+                time.time(),
+                retry_delay=60.0,
+            )
+            return True
+        display = self.get_display_profile()
+        target_x = int(round(42 * display.scale_x))
+        target_y = int(round(330 * display.scale_y))
+        try:
+            if self.uses_adb:
+                self.adb_client.tap(target_x, target_y)
+            else:
+                pyautogui.click(target_x, target_y)
+        except Exception:
+            logger.exception("Training queue fallback click failed")
+            return False
+        self._invalidate_capture()
+        self.routine_last_action_time = time.time()
+        self.routine_current_had_action = True
+        self.click_count += 1
+        queue_checks += 1
+        action_counts["training_queue_fallback_checks"] = queue_checks
+        self._interruptible_sleep(0.8)
+        match = self._training_step_visible(task, "building")
+        if match is not None:
+            _image, location, _bbox, score = match
+            self.routine_completed_steps.add("queue")
+            self.set_status_message(
+                f"{self.get_routine_task_name(task)}: нужные казармы подтверждены",
+                force=True,
+            )
+            logger.info(
+                "Training queue fallback confirmed %s barracks at (%s, %s), score %.3f",
+                task_id,
+                int(location.x),
+                int(location.y),
+                score,
+            )
+        else:
+            self.set_status_message(
+                f"{self.get_routine_task_name(task)}: проверяю свободные казармы "
+                f"{queue_checks}/{max_checks}",
+                force=True,
+            )
+            logger.info(
+                "Training queue fallback did not select %s (%s/%s)",
+                task_id,
+                queue_checks,
+                max_checks,
+            )
         return True
 
     def _healing_camera_route_key(self):
@@ -10816,6 +10991,13 @@ class AutoClicker:
                     # time as the generic tree selector.  Collect/start always
                     # wins so the selector cannot skip the pending result.
                     continue
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id")
+                    in {"train_infantry", "train_riders", "train_shooters", "train_vehicles"}
+                    and self._try_training_catalogue_fallback(current_routine_task)
+                ):
+                    continue
                 if self.uses_adb:
                     with self._adb_capture_lock:
                         self._adb_iteration_frame = self._capture_adb_frame(force=True)
@@ -12247,87 +12429,31 @@ class AutoClicker:
                 pyautogui.click(target_x, target_y)
             self._invalidate_capture()
             self._interruptible_sleep(0.8)
-            queue_number = self.routine_action_counts.get("max_queue_checks", 0) + 1
-            queue_ordinal = int(img_config.get("training_queue_ordinal", 0) or 0)
-            radial_target = img_config.get("training_radial_target", ())
-            if queue_ordinal and queue_number == queue_ordinal and len(radial_target) == 2:
-                selected_frame, _selected_origin = self._capture_screen_bgr(force=True)
-                radial_x = int(round(float(radial_target[0]) * display.scale_x))
-                radial_y = int(round(float(radial_target[1]) * display.scale_y))
-                self.routine_completed_steps.add("building")
+            training_task = self.get_routine_task(self.current_routine_task_id)
+            building_match = (
+                self._training_step_visible(training_task, "building")
+                if training_task is not None
+                else None
+            )
+            if building_match is not None:
+                _building_image, location, _bbox, score = building_match
+                self.routine_completed_steps.add("queue")
                 self.set_status_message(
-                    f"Выбрано учебное здание {queue_ordinal}/4",
+                    f"{self.get_routine_task_name(training_task)}: нужные казармы подтверждены",
                     force=True,
                 )
-                screen_change = 0.0
-                training_frame = selected_frame
-                # Live accounts occasionally ignore the first radial action
-                # tap while the building animation is still settling.  Retry
-                # the *same* verified action (never neighbouring radial icons)
-                # a few times before declaring this troop queue unavailable.
-                for radial_attempt in range(1, 5):
-                    if self.uses_adb:
-                        self.adb_client.tap(radial_x, radial_y)
-                    else:
-                        pyautogui.click(radial_x, radial_y)
-                    self._invalidate_capture()
-                    self._interruptible_sleep(1.5)
-                    training_frame, _training_origin = self._capture_screen_bgr(force=True)
-                    if training_frame.shape != selected_frame.shape:
-                        selected_frame = cv2.resize(
-                            selected_frame,
-                            (training_frame.shape[1], training_frame.shape[0]),
-                            interpolation=cv2.INTER_LINEAR,
-                        )
-                    screen_change = float(
-                        cv2.absdiff(selected_frame, training_frame).mean()
-                    )
-                    if screen_change >= 3.0:
-                        break
-                    logger.info(
-                        "Training radial tap did not change the screen "
-                        "(attempt %s/4, %.2f); retrying",
-                        radial_attempt,
-                        screen_change,
-                    )
-                if screen_change < 3.0:
-                    self._save_routine_calibration_frame(
-                        str(getattr(self, "current_routine_task_id", "training")),
-                        f"radial_unopened_queue_{queue_ordinal}",
-                        training_frame,
-                    )
-                if screen_change >= 3.0:
-                    logger.info(
-                        "Training screen opened for queue %s/4, screen change %.2f",
-                        queue_ordinal,
-                        screen_change,
-                    )
-                    synthetic = dict(img_config)
-                    synthetic.update(
-                        {
-                            "action": "train_highest",
-                            "click_offset": (423, 564),
-                            "delay": 1.5,
-                        }
-                    )
-                    synthetic_location = pyautogui.Point(
-                        int(round(640 * display.scale_x)),
-                        int(round(62 * display.scale_y)),
-                    )
-                    training_started = self._execute_action(
-                        synthetic,
-                        synthetic_location,
-                    )
-                    if training_started is True:
-                        self.routine_completed_steps.add("train")
-                        self.routine_action_completes_task = True
-                    else:
-                        logger.warning(
-                            "Training queue %s/4 opened, but the start action was not confirmed",
-                            queue_ordinal,
-                        )
+                logger.info(
+                    "Training queue selected requested barracks at (%s, %s), score %.3f",
+                    int(location.x),
+                    int(location.y),
+                    score,
+                )
+            else:
+                self.set_status_message(
+                    "Выбрано следующее свободное учебное здание",
+                    force=True,
+                )
             img_config["last_used"] = time.time()
-            self.set_status_message("Выбрано следующее учебное здание", force=True)
             self._interruptible_sleep(img_config.get("delay", self.sleep_found))
             return
 
@@ -13237,6 +13363,19 @@ class AutoClicker:
             return False
 
         if action == "train_highest":
+            training_task = self.get_routine_task(self.current_routine_task_id)
+            if (
+                training_task is None
+                or self._training_step_visible(training_task, "train") is None
+            ):
+                logger.warning(
+                    "Training start blocked: the troop-specific training form is not visible"
+                )
+                self.set_status_message(
+                    "Запуск обучения заблокирован: нужная форма войск не подтверждена",
+                    force=True,
+                )
+                return False
             frame, _origin = self._capture_screen_bgr(force=True)
             height, width = frame.shape[:2]
             scale_x = width / 1280.0
@@ -13296,9 +13435,13 @@ class AutoClicker:
                         started_frame[y1:y2, x1:x2],
                     ).mean()
                 )
-            if screen_change < 1.0 and button_change < 3.0:
+            training_form_still_visible = (
+                self._training_step_visible(training_task, "train") is not None
+            )
+            if training_form_still_visible and button_change < 3.0:
                 logger.warning(
-                    "Training start was not confirmed: screen change %.2f, button change %.2f",
+                    "Training start was not confirmed: troop form remains visible, "
+                    "screen change %.2f, button change %.2f",
                     screen_change,
                     button_change,
                 )
