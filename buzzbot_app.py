@@ -2219,7 +2219,15 @@ class AutoClicker:
         self._interruptible_sleep(8.0)
         return True
 
-    def _find_template_opencv(self, template_path, region, confidence, grayscale, scales):
+    def _find_template_opencv(
+        self,
+        template_path,
+        region,
+        confidence,
+        grayscale,
+        scales,
+        excluded_centers=None,
+    ):
         screen_bgr, origin = self._capture_screen_bgr(region=region)
         if grayscale:
             screen = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
@@ -2251,6 +2259,22 @@ class AutoClicker:
             if resized.shape[0] > screen.shape[0] or resized.shape[1] > screen.shape[1]:
                 continue
             result = cv2.matchTemplate(screen, resized, cv2.TM_CCOEFF_NORMED)
+            # Several radar marker templates can describe the same running
+            # card.  Returning only the global best match made every template
+            # resolve to that one already-confirmed marker, so the task
+            # incorrectly completed while ordinary march slots were still
+            # free.  Mask confirmed marker centres before selecting the best
+            # remaining occurrence of this template.
+            for excluded_x, excluded_y in excluded_centers or ():
+                local_x = int(round(float(excluded_x) - origin[0] - resized.shape[1] / 2.0))
+                local_y = int(round(float(excluded_y) - origin[1] - resized.shape[0] / 2.0))
+                radius = max(36, int(max(resized.shape[:2]) * 0.75))
+                left = max(0, local_x - radius)
+                top = max(0, local_y - radius)
+                right = min(result.shape[1], local_x + radius + 1)
+                bottom = min(result.shape[0], local_y + radius + 1)
+                if left < right and top < bottom:
+                    result[top:bottom, left:right] = -1.0
             _, max_val, _, max_loc = cv2.minMaxLoc(result)
             if max_val > best_val:
                 best_val = float(max_val)
@@ -2302,12 +2326,27 @@ class AutoClicker:
                 maximum=self.scale_max,
                 steps=self.scale_steps,
             )
+            excluded_centers = None
+            if (
+                is_radar_task_id(getattr(self, "current_routine_task_id", None))
+                and img_config.get("prevents_idle_completion")
+            ):
+                excluded_centers = [
+                    (marker_x, marker_y)
+                    for marker_uid, marker_x, marker_y in getattr(
+                        self,
+                        "routine_radar_confirmed_marker_keys",
+                        set(),
+                    )
+                    if marker_uid == "*"
+                ]
             return self._find_template_opencv(
                 img_config["path"],
                 search_region,
                 confidence,
                 img_config.get("grayscale", True),
                 scales,
+                excluded_centers=excluded_centers,
             )
         screen_region = self._screen_game_region()
         if self.scale_enabled and img_config.get("use_scaling", True):

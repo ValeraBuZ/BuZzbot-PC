@@ -10,6 +10,30 @@ from buzzbot.routines import PROFILE_NAMESPACE
 
 
 class RadarAutomationTests(unittest.TestCase):
+    def test_radar_template_matching_can_skip_a_confirmed_occurrence(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        rng = np.random.default_rng(42)
+        template = rng.integers(0, 255, size=(10, 10), dtype=np.uint8)
+        screen_gray = np.zeros((60, 120), dtype=np.uint8)
+        screen_gray[20:30, 10:20] = template
+        screen_gray[20:30, 80:90] = template
+        screen_bgr = np.repeat(screen_gray[:, :, None], 3, axis=2)
+        bot._capture_screen_bgr = lambda region=None: (screen_bgr, (0, 0))
+        bot.template_cache = SimpleNamespace(
+            get_gray=lambda _path: template,
+            get_color=lambda _path: None,
+        )
+
+        first, _bbox, _confidence = bot._find_template_opencv(
+            "marker.png", None, 0.8, True, [1.0]
+        )
+        second, _bbox, _confidence = bot._find_template_opencv(
+            "marker.png", None, 0.8, True, [1.0], excluded_centers=[(15, 25)]
+        )
+
+        self.assertEqual((first.x, first.y), (15, 25))
+        self.assertEqual((second.x, second.y), (85, 25))
+
     def test_fence_survivors_scans_before_confirming_no_rewards(self):
         bot = AutoClicker.__new__(AutoClicker)
         swipes = []
