@@ -62,6 +62,7 @@ jobs:
           $actualSha256 = (Get-FileHash $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 
           if ($exe.Length -lt 1MB) { throw 'BuZzbot.exe повреждён или отсутствует.' }
+          if (Test-Path dist/BuZzbotPortable/_internal) { throw 'EXE ошибочно зависит от внешней папки _internal.' }
           if ($archive.Length -lt 10MB) { throw 'Portable ZIP повреждён или отсутствует.' }
           if (@($config.images).Count -eq 0) { throw 'В portable-конфигурации нет шаблонов.' }
           if ($templates.Count -lt @($config.images).Count) { throw 'В portable-сборке не хватает PNG-шаблонов.' }

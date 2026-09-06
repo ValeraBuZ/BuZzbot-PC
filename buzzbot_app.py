@@ -238,6 +238,10 @@ APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
 RUNTIME_DIR = Path(os.environ.get("BUZZBOT_RUNTIME_DIR", APP_DIR)).expanduser().resolve()
 RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 IMG_DIR = APP_DIR / "img"
+BUNDLED_ASSET_DIR = Path(
+    getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)
+) / "buzzbot" / "assets"
+MERCHANT_ASSET_DIR = BUNDLED_ASSET_DIR / "merchant"
 CONFIG_FILE = RUNTIME_DIR / "config.json"
 CONFIG_BACKUP_DIR = RUNTIME_DIR / "backups" / "config"
 TRASH_DIR = IMG_DIR / "_trash"
@@ -264,6 +268,7 @@ MARCH_DECREASE_CONFIRMATION_SECONDS = 2.0
 ACCOUNT_PASS_SOFT_SECONDS = 15.0 * 60.0
 ACCOUNT_PASS_TASK_HARD_SECONDS = 25.0 * 60.0
 ACCOUNT_SWITCH_TIMEOUT_SECONDS = 5.0 * 60.0
+ACCOUNT_SWITCH_RETRY_SECONDS = 60.0
 # A radar dispatch may legitimately keep the ordered pointer blocked for its
 # five-minute safety interval.  Do not start one when it could consume the
 # switch reserve at the end of the account pass.
@@ -4490,28 +4495,6 @@ class AutoClicker:
                 return task
             self.current_routine_task_id = None
 
-        if (
-            self.account_rotation_enabled
-            and bool(getattr(self, "routine_pass_completed", False))
-            and self.routine_only_task_id is None
-            and int(getattr(self, "account_switch_failure_count", 0) or 0) > 0
-        ):
-            # This persisted latch covers both a reported failure and a process
-            # restart during the one allowed switch attempt.  Do not fall
-            # through to the normal scheduler and repeat the completed account.
-            logger.error(
-                "Automatic account rotation is blocked after its bounded switch attempt"
-            )
-            self.set_status_message(
-                "Переключение аккаунта остановлено после одной попытки; нужен явный повтор",
-                force=True,
-            )
-            self.routine_mode = False
-            stop_event = getattr(self, "stop_event", None)
-            if stop_event is not None:
-                stop_event.set()
-            return None
-
         if self._account_rotation_switch_due(now):
             current_profile = self.get_current_account() or {}
             next_profile = next_enabled_account(
@@ -4523,7 +4506,10 @@ class AutoClicker:
                 if self._prepare_account_switch(next_profile):
                     # Persist the attempt before the external WebView flow so a
                     # process restart cannot start a duplicate transition.
-                    self.account_switch_failure_count = 1
+                    self.account_switch_failure_count = max(
+                        1,
+                        int(getattr(self, "account_switch_failure_count", 0) or 0),
+                    )
                     self.account_switch_retry_at = 0.0
                     self.save_config()
                 else:
@@ -4882,7 +4868,6 @@ class AutoClicker:
             self.account_rotation_enabled
             and self.routine_only_task_id is None
             and not self.routine_forced_task_queue
-            and int(getattr(self, "account_switch_failure_count", 0) or 0) == 0
             and self._account_rotation_cycle_ready()
             and float(now) >= float(getattr(self, "account_switch_retry_at", 0.0) or 0.0)
         )
@@ -5379,11 +5364,13 @@ class AutoClicker:
                 self.account_switch_last_result = "Переключение не подтверждено главным экраном"
                 self.set_status_message(self.account_switch_last_result, force=True)
             if switch_failed:
-                logger.error(
-                    "Account switch failed after one bounded attempt; automatic retry is blocked"
+                self.account_switch_retry_at = now + ACCOUNT_SWITCH_RETRY_SECONDS
+                logger.warning(
+                    "Account switch failed; automatic retry scheduled in %.0f seconds",
+                    ACCOUNT_SWITCH_RETRY_SECONDS,
                 )
                 self.save_config()
-            if switch_failed or not self.account_rotation_enabled:
+            if not self.account_rotation_enabled:
                 self.routine_mode = False
                 self.stop_event.set()
             return
@@ -6266,38 +6253,11 @@ class AutoClicker:
         ):
             return False
 
-        completed_steps = set(getattr(self, "routine_completed_steps", ()))
-        selected_igg_profile = (
-            task.get("settings", {}).get("login_method") == "igg"
-            and "account_switch_igg_id_selected" in completed_steps
-        )
-        if selected_igg_profile:
-            # IGG can report an expired/interrupted session immediately after
-            # accepting the saved ID even though the game has already switched
-            # to that profile.  Preserve the verified navigation steps and
-            # reopen the game so the main-screen check can confirm the target
-            # instead of submitting the same credentials forever.
-            self.account_switch_selected_at = time.time()
-            self.account_switch_auto_login_attempted = True
-            self.account_switch_error = ""
-            self.routine_current_had_action = False
-            self.routine_last_action_time = time.time()
-            self.routine_completed_steps.add(
-                "account_switch_igg_interrupted_after_selection"
-            )
-            try:
-                if self.uses_adb:
-                    self.adb_client.launch_package(GAME_PACKAGE)
-            except AdbError:
-                logger.exception(
-                    "Account switch could not reopen the game after an interrupted IGG session"
-                )
-            logger.warning(
-                "Interrupted IGG session followed saved-ID selection; reopening the game to verify the selected profile"
-            )
-            self._interruptible_sleep(10.0)
-            return True
-
+        # A connection error means the saved ID was not accepted.  Do not
+        # preserve the selection or accept the settlement that was visible
+        # before the attempt: that can silently keep the previous account
+        # while advancing the logical profile.  Restart the complete IGG
+        # navigation and submit the target credentials again.
         self.account_switch_selected_at = 0.0
         self.account_switch_auto_login_attempted = False
         self.account_switch_error = ""
@@ -6307,7 +6267,9 @@ class AutoClicker:
         }
         self.routine_current_had_action = False
         self.routine_last_action_time = time.time()
-        logger.warning("Interrupted game session dismissed; account switch will retry")
+        logger.warning(
+            "Interrupted game session dismissed; account switch will retry from credentials"
+        )
         self._interruptible_sleep(5.0)
         return True
 
@@ -6324,8 +6286,6 @@ class AutoClicker:
         login_progressed = (
             bool(self.account_switch_selected_at)
             or "account_switch_igg_game_confirmed" in self.routine_completed_steps
-            or "account_switch_igg_interrupted_after_selection"
-            in self.routine_completed_steps
             or {
                 "account_switch_igg_login_submitted",
                 "account_switch_igg_id_selected",
@@ -6379,11 +6339,6 @@ class AutoClicker:
         settings = task.get("settings", {})
         if settings.get("login_method") == "igg":
             if "account_switch_igg_game_confirmed" in self.routine_completed_steps:
-                return True
-            if (
-                "account_switch_igg_interrupted_after_selection"
-                in self.routine_completed_steps
-            ):
                 return True
             return {
                 "account_switch_igg_login_submitted",
@@ -8022,7 +7977,7 @@ class AutoClicker:
             # which sent the subsequent settlement scan to the wrong building.
             # Locate the SHOP sign inside the catalogue card itself instead.
             sign_template = cv2.imread(
-                str(IMG_DIR / "system" / "merchant_shop_sign.jpg"),
+                str(MERCHANT_ASSET_DIR / "merchant_shop_sign.jpg"),
                 cv2.IMREAD_COLOR,
             )
             target = None
@@ -8094,7 +8049,7 @@ class AutoClicker:
             # survives arbitrary account layouts and is the authoritative
             # target; tap the building immediately below it.
             selection_template = cv2.imread(
-                str(IMG_DIR / "system" / "merchant_catalog_selection_marker.jpg"),
+                str(MERCHANT_ASSET_DIR / "merchant_catalog_selection_marker.jpg"),
                 cv2.IMREAD_COLOR,
             )
             selection_target = None
@@ -8139,7 +8094,7 @@ class AutoClicker:
             # stable than the tiny SHOP roof lettering and is independent of
             # where each account placed its buildings.
             marker_template = cv2.imread(
-                str(IMG_DIR / "system" / "merchant_arrival_marker.jpg"),
+                str(MERCHANT_ASSET_DIR / "merchant_arrival_marker.jpg"),
                 cv2.IMREAD_COLOR,
             )
             marker_target = None
@@ -8238,11 +8193,11 @@ class AutoClicker:
                 logger.info("Merchant search restored the settlement before locating Shop")
                 return True
             sign_template = cv2.imread(
-                str(IMG_DIR / "system" / "merchant_shop_sign.jpg"),
+                str(MERCHANT_ASSET_DIR / "merchant_shop_sign.jpg"),
                 cv2.IMREAD_COLOR,
             )
             building_template = cv2.imread(
-                str(IMG_DIR / "system" / "merchant_shop_building.jpg"),
+                str(MERCHANT_ASSET_DIR / "merchant_shop_building.jpg"),
                 cv2.IMREAD_COLOR,
             )
             building_target = None
@@ -8266,7 +8221,7 @@ class AutoClicker:
                 )
                 if building_target is not None:
                     marker_template = cv2.imread(
-                        str(IMG_DIR / "system" / "merchant_catalog_selection_marker.jpg"),
+                        str(MERCHANT_ASSET_DIR / "merchant_catalog_selection_marker.jpg"),
                         cv2.IMREAD_COLOR,
                     )
                     shop_marker_target = detect_shop_selection_marker_target(
@@ -8311,9 +8266,17 @@ class AutoClicker:
                     "Таинственный торговец: открываю найденный Магазин",
                 ):
                     return False
-                self.routine_completed_steps.add("merchant_shop_open_requested")
+                # This tap selects the settlement building; it does not open
+                # the merchant yet.  The next frame must prove Shop's radial
+                # action before merchant_shop_open_requested is set.  Marking
+                # it here skipped that proof and immediately deferred a real
+                # live Shop as "merchant unavailable".
+                # Keep the facade centre for the radial detector even when a
+                # gold marker above it was the safer place to tap.
+                self.routine_merchant_shop_target = building_target
+                self.routine_completed_steps.add("merchant_shop_building_tapped")
                 logger.info(
-                    "Merchant full Shop candidate requested at (%s, %s)",
+                    "Merchant full Shop building requested at (%s, %s); awaiting radial action",
                     *tap_target,
                 )
                 return True

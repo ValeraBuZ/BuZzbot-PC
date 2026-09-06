@@ -219,11 +219,11 @@ class AccountPassWatchdogTests(unittest.TestCase):
         )
         self.assertFalse(bot.routine_radar_dispatched_this_pass)
 
-    def test_switch_failure_blocks_unattended_repeat(self):
+    def test_switch_failure_waits_until_retry_deadline(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_rotation_enabled = True
         bot.account_switch_failure_count = 1
-        bot.account_switch_retry_at = 0.0
+        bot.account_switch_retry_at = 1100.0
         bot.routine_only_task_id = None
         bot.routine_forced_task_queue = []
         bot.routine_pass_completed = True
@@ -231,27 +231,21 @@ class AccountPassWatchdogTests(unittest.TestCase):
         bot.routine_radar_return_hold = False
 
         self.assertFalse(bot._account_rotation_switch_due(1000.0))
+        self.assertTrue(bot._account_rotation_switch_due(1100.0))
         self.assertEqual(ACCOUNT_SWITCH_TIMEOUT_SECONDS, 300.0)
 
-    def test_restart_after_switch_attempt_does_not_repeat_completed_account(self):
+    def test_restart_after_switch_attempt_retries_next_account(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.current_routine_task_id = None
         bot.account_rotation_enabled = True
         bot.routine_pass_completed = True
         bot.routine_only_task_id = None
         bot.account_switch_failure_count = 1
-        bot.routine_mode = True
-        bot.stop_event = threading.Event()
-        messages = []
-        bot.set_status_message = (
-            lambda message, **_kwargs: messages.append(message)
-        )
+        bot.account_switch_retry_at = 900.0
+        bot.routine_forced_task_queue = []
+        bot.routine_radar_return_hold = False
 
-        self.assertIsNone(bot._begin_due_routine(1000.0))
-
-        self.assertFalse(bot.routine_mode)
-        self.assertTrue(bot.stop_event.is_set())
-        self.assertEqual(len(messages), 1)
+        self.assertTrue(bot._account_rotation_switch_due(1000.0))
 
     def test_explicit_switch_latches_attempt_before_start(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -269,7 +263,7 @@ class AccountPassWatchdogTests(unittest.TestCase):
         self.assertEqual(saves, [1])
         self.assertEqual(bot.routine_next_run["__account_switch__"], 0.0)
 
-    def test_failed_switch_stops_after_one_bounded_attempt(self):
+    def test_failed_switch_schedules_automatic_retry(self):
         bot = AutoClicker.__new__(AutoClicker)
         task = {
             "id": "__account_switch__",
@@ -285,6 +279,7 @@ class AccountPassWatchdogTests(unittest.TestCase):
         bot.account_switch_task = task
         bot.account_switch_candidates = []
         bot.account_switch_failure_count = 0
+        bot.account_switch_retry_at = 0.0
         bot.routine_current_had_action = True
         bot.routine_only_task_id = "__account_switch__"
         bot.account_rotation_enabled = True
@@ -297,8 +292,9 @@ class AccountPassWatchdogTests(unittest.TestCase):
         bot._finish_current_routine(now=100.0)
 
         self.assertEqual(bot.account_switch_failure_count, 1)
-        self.assertFalse(bot.routine_mode)
-        self.assertTrue(bot.stop_event.is_set())
+        self.assertEqual(bot.account_switch_retry_at, 160.0)
+        self.assertTrue(bot.routine_mode)
+        self.assertFalse(bot.stop_event.is_set())
         self.assertEqual(saved, [True])
 
 

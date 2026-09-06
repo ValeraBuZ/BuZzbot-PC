@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import uuid
 
 import numpy as np
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from buzzbot_app import AutoClicker, FENCE_SURVIVOR_SCAN_PATTERN
 from buzzbot.routines import PROFILE_NAMESPACE
@@ -103,6 +103,81 @@ class RadarAutomationTests(unittest.TestCase):
         allowed = bot.get_routine_templates(task, active_only=True)
 
         self.assertEqual([image["uid"] for image in allowed], ["open", "free", "resources"])
+
+    @patch(
+        "buzzbot_app.detect_shop_radial_action_target",
+        return_value=(471, 225),
+    )
+    @patch(
+        "buzzbot_app.detect_shop_selection_marker_target",
+        return_value=None,
+    )
+    @patch(
+        "buzzbot_app.detect_merchant_shop_feature_target",
+        return_value=((471, 140), 27),
+    )
+    @patch("buzzbot_app.mysterious_merchant_screen_is_visible", return_value=False)
+    @patch(
+        "buzzbot_app.detect_mysterious_merchant_absent_ok_target",
+        return_value=None,
+    )
+    def test_merchant_feature_candidate_waits_for_verified_radial_action(
+        self,
+        _absent_detector,
+        _screen_detector,
+        _feature_detector,
+        _selection_detector,
+        radial_detector,
+    ):
+        """A facade match is only the building tap, never an opened merchant."""
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_completed_steps = {
+            "merchant_build_menu_open",
+            "merchant_catalog_economy_selected",
+            "merchant_catalog_reset",
+            "merchant_catalog_scrolled",
+            "merchant_shop_card_tapped",
+            "merchant_build_menu_closed",
+            "merchant_catalog_selection_marker_checked",
+            "merchant_arrival_marker_checked",
+            "merchant_event_panel_checked",
+            "merchant_selected_building_revealed",
+        }
+        bot.routine_only_task_id = None
+        bot.routine_merchant_shop_target = None
+        bot._capture_screen_bgr = lambda **_kwargs: (
+            np.zeros((720, 1280, 3), dtype=np.uint8),
+            (0, 0),
+        )
+        bot._is_settlement_screen_visible = lambda: True
+        bot._save_routine_calibration_frame = lambda *_args, **_kwargs: None
+        taps = []
+        bot._tap_routine_fallback = (
+            lambda target, key, _status: taps.append((target, key)) or True
+        )
+        deferred = []
+        bot._defer_current_routine_unavailable = (
+            lambda *args, **kwargs: deferred.append((args, kwargs))
+        )
+        task = {"id": "mysterious_merchant", "settings": {}}
+
+        self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
+        self.assertIn("merchant_shop_building_tapped", bot.routine_completed_steps)
+        self.assertNotIn("merchant_shop_open_requested", bot.routine_completed_steps)
+        self.assertEqual(bot.routine_merchant_shop_target, (471, 140))
+        radial_detector.assert_not_called()
+
+        self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
+        radial_detector.assert_called_once_with(
+            ANY,
+            (471, 140),
+        )
+        self.assertIn("merchant_shop_open_requested", bot.routine_completed_steps)
+        self.assertEqual(
+            [key[0] for _target, key in taps],
+            ["merchant_full_shop_marker", "merchant_shop_radial_action"],
+        )
+        self.assertEqual(deferred, [])
 
     def test_missing_merchant_is_deferred_without_blocking_next_saved_task(self):
         bot = AutoClicker.__new__(AutoClicker)

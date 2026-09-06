@@ -21,6 +21,10 @@ android_samsung_mvp/debug_frames/
 *.generated.spec
 BuZzbotPortable.spec
 
+# Local visual diagnostics are written to the repository root during live runs.
+/*.png
+/smoke-test.ok
+
 *.tmp
 *.bak
 Thumbs.db

@@ -61,25 +61,18 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='BuZzbot',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='BuZzbotPortable',
 )
 """
 
@@ -119,6 +112,7 @@ def run_pyinstaller():
 
 
 def finalize_portable_layout(preserve_runtime=True):
+    stage_executable()
     (STAGE_DIR / "backups" / "config").mkdir(parents=True, exist_ok=True)
     stage_runtime_config()
     stage_templates()
@@ -126,6 +120,7 @@ def finalize_portable_layout(preserve_runtime=True):
         preserve_runtime_data()
         merge_runtime_additions()
     validate_portable_layout()
+    run_portable_smoke_test()
     if DIST_DIR.exists():
         try:
             shutil.rmtree(DIST_DIR)
@@ -146,6 +141,15 @@ def finalize_portable_layout(preserve_runtime=True):
         root_dir=DIST_ROOT,
         base_dir=BUNDLE_NAME,
     )
+
+
+def stage_executable():
+    """Place PyInstaller's one-file executable into the portable directory."""
+    source = STAGE_ROOT / f"{APP_NAME}.exe"
+    if not source.is_file():
+        raise FileNotFoundError(f"One-file executable is missing: {source}")
+    STAGE_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(STAGE_DIR / source.name))
 
 
 def stage_runtime_config():
@@ -189,6 +193,22 @@ def validate_portable_layout():
         )
 
     print(f"Portable templates verified: {png_count} PNG files")
+
+
+def run_portable_smoke_test():
+    """Start the frozen app once so missing Tcl/Tk data blocks publication."""
+    executable = STAGE_DIR / f"{APP_NAME}.exe"
+    marker = STAGE_DIR / "smoke-test.ok"
+    marker.unlink(missing_ok=True)
+    subprocess.run(
+        [str(executable), "--smoke-test"],
+        cwd=STAGE_DIR,
+        check=True,
+        timeout=180,
+    )
+    if not marker.is_file():
+        raise RuntimeError("Portable executable did not complete its startup smoke test.")
+    marker.unlink()
 
 
 def preserve_runtime_data():

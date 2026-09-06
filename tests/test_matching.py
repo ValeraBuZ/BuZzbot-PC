@@ -71,6 +71,10 @@ from buzzbot.matching import (
     zombie_camp_checkbox_is_checked,
 )
 
+MERCHANT_ASSET_DIR = (
+    Path(__file__).resolve().parents[1] / "buzzbot" / "assets" / "merchant"
+)
+
 
 class UnicodeImageReadTests(unittest.TestCase):
     def test_reads_png_from_non_ascii_windows_path(self):
@@ -224,12 +228,7 @@ class DynamicGameControlTests(unittest.TestCase):
         )
 
     def test_shop_action_detector_uses_gold_marker_above_building(self):
-        marker_path = (
-            Path(__file__).resolve().parents[1]
-            / "img"
-            / "system"
-            / "merchant_catalog_selection_marker.jpg"
-        )
+        marker_path = MERCHANT_ASSET_DIR / "merchant_catalog_selection_marker.jpg"
         marker = cv2.imread(str(marker_path), cv2.IMREAD_COLOR)
         frame = np.full((720, 1280, 3), (60, 80, 65), dtype=np.uint8)
         resized = cv2.resize(marker, (78, 77), interpolation=cv2.INTER_CUBIC)
@@ -309,12 +308,7 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertIsNone(detect_shop_radial_action_target(frame, (961, 349)))
 
     def test_merchant_shop_features_survive_isometric_camera_shift(self):
-        template_path = (
-            Path(__file__).resolve().parents[1]
-            / "img"
-            / "system"
-            / "merchant_shop_building.jpg"
-        )
+        template_path = MERCHANT_ASSET_DIR / "merchant_shop_building.jpg"
         template = cv2.imread(str(template_path), cv2.IMREAD_COLOR)
         self.assertIsNotNone(template)
         frame = np.full((720, 1280, 3), (60, 80, 65), dtype=np.uint8)
@@ -342,7 +336,7 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertLess(abs(target[1] - 300), 10)
 
     def test_merchant_shop_sign_requires_a_strong_exact_match(self):
-        sign_path = Path(__file__).resolve().parents[1] / "img" / "system" / "merchant_shop_sign.jpg"
+        sign_path = MERCHANT_ASSET_DIR / "merchant_shop_sign.jpg"
         sign = cv2.imread(str(sign_path), cv2.IMREAD_COLOR)
         self.assertIsNotNone(sign)
         frame = np.full((720, 1280, 3), 45, dtype=np.uint8)
@@ -357,7 +351,7 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertLess(abs(target[1] - (y + sign.shape[0] // 2 + 35)), 4)
 
     def test_merchant_shop_sign_rejects_unrelated_radial_screen(self):
-        sign_path = Path(__file__).resolve().parents[1] / "img" / "system" / "merchant_shop_sign.jpg"
+        sign_path = MERCHANT_ASSET_DIR / "merchant_shop_sign.jpg"
         sign = cv2.imread(str(sign_path), cv2.IMREAD_COLOR)
         frame = np.full((720, 1280, 3), (55, 90, 75), dtype=np.uint8)
         cv2.circle(frame, (480, 330), 65, (190, 190, 190), thickness=8)

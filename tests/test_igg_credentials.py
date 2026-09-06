@@ -183,7 +183,7 @@ class IggCredentialTests(unittest.TestCase):
         self.assertFalse(bot.routine_current_had_action)
 
     @patch("buzzbot_app.time.time", return_value=456.0)
-    def test_interrupted_connection_after_saved_id_preserves_switch_progress(self, _time):
+    def test_interrupted_connection_after_saved_id_restarts_switch(self, _time):
         class GameAdb:
             def __init__(self):
                 self.launched = []
@@ -214,16 +214,12 @@ class IggCredentialTests(unittest.TestCase):
         handled = bot._try_account_switch_connection_recovery(self.task())
 
         self.assertTrue(handled)
-        self.assertEqual(bot.account_switch_selected_at, 456.0)
-        self.assertTrue(bot.account_switch_auto_login_attempted)
+        self.assertEqual(bot.account_switch_selected_at, 0.0)
+        self.assertFalse(bot.account_switch_auto_login_attempted)
         self.assertEqual(bot.account_switch_error, "")
-        self.assertIn("account_switch_igg_id_selected", bot.routine_completed_steps)
-        self.assertIn(
-            "account_switch_igg_interrupted_after_selection",
-            bot.routine_completed_steps,
-        )
+        self.assertEqual(bot.routine_completed_steps, {"unrelated_step"})
         self.assertFalse(bot.routine_current_had_action)
-        self.assertEqual(bot.adb_client.launched, [GAME_PACKAGE])
+        self.assertEqual(bot.adb_client.launched, [])
 
     def test_final_igg_game_confirmation_keeps_selected_account(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -259,6 +255,10 @@ class IggCredentialTests(unittest.TestCase):
         self.assertTrue(bot._account_switch_main_screen_confirmed(task))
 
         bot.routine_completed_steps.remove("account_switch_igg_login_submitted")
+        bot.routine_completed_steps.add("account_switch_igg_interrupted_after_selection")
+        self.assertFalse(bot._account_switch_main_screen_confirmed(task))
+
+        bot.routine_completed_steps.remove("account_switch_igg_interrupted_after_selection")
         bot.routine_completed_steps.add("account_switch_igg_game_confirmed")
         self.assertTrue(bot._account_switch_main_screen_confirmed(task))
 
