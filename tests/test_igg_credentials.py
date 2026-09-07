@@ -1,5 +1,6 @@
 import unittest
 import threading
+from pathlib import Path
 from unittest.mock import patch
 
 import cv2
@@ -64,6 +65,16 @@ class FakeCredentialStore:
 
 
 class IggCredentialTests(unittest.TestCase):
+    def test_global_recovery_preserves_account_switch_retry_flow(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.adb_client = FakeAdbClient()
+        handled = []
+        bot._try_account_switch_connection_recovery = lambda task: handled.append(task) or True
+        task = self.task()
+        self.assertTrue(bot._try_global_login_connection_recovery(task))
+        self.assertEqual(handled, [task])
+
     def make_bot(self, *, auto_login=True, ui_xml=IGG_FORM_XML):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 0.0
@@ -223,13 +234,15 @@ class IggCredentialTests(unittest.TestCase):
 
     def test_final_igg_game_confirmation_keeps_selected_account(self):
         bot = AutoClicker.__new__(AutoClicker)
-        bot.account_switch_selected_at = 0.0
-        bot.routine_completed_steps = set()
+        bot.account_switch_selected_at = 1.0
+        bot.routine_completed_steps = {"account_switch_igg_id_selected"}
         bot._interruptible_sleep = lambda _seconds: None
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = np.full((720, 1280, 3), 35, dtype=np.uint8)
         cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
         cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
         cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
+        marker = cv2.imread(str(Path(__file__).parents[1] / "buzzbot/assets/accounts/igg_id_confirmation_marker.png"))
+        frame[321:346, 610:693] = marker
         bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
         tapped = []
         bot._tap_routine_fallback = lambda target, *_args: tapped.append(target) or True
@@ -242,6 +255,15 @@ class IggCredentialTests(unittest.TestCase):
         self.assertIn("account_switch_igg_id_selected", bot.routine_completed_steps)
         self.assertIn("account_switch_igg_game_confirmed", bot.routine_completed_steps)
 
+    @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=(784, 508))
+    def test_final_igg_confirmation_requires_selection_in_current_attempt(self, _detect):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 0.0
+        bot.routine_completed_steps = set()
+        bot._capture_screen_bgr = lambda **kwargs: (None, (0, 0))
+        bot._tap_routine_fallback = lambda *_args: self.fail("Unrequested IGG confirmation")
+        self.assertFalse(bot._try_account_switch_igg_game_confirmation(self.task()))
+
     def test_igg_switch_does_not_accept_old_main_screen_before_final_confirmation(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 1.0
@@ -252,7 +274,7 @@ class IggCredentialTests(unittest.TestCase):
         self.assertFalse(bot._account_switch_main_screen_confirmed(task))
 
         bot.routine_completed_steps.add("account_switch_igg_login_submitted")
-        self.assertTrue(bot._account_switch_main_screen_confirmed(task))
+        self.assertFalse(bot._account_switch_main_screen_confirmed(task))
 
         bot.routine_completed_steps.remove("account_switch_igg_login_submitted")
         bot.routine_completed_steps.add("account_switch_igg_interrupted_after_selection")
@@ -261,6 +283,27 @@ class IggCredentialTests(unittest.TestCase):
         bot.routine_completed_steps.remove("account_switch_igg_interrupted_after_selection")
         bot.routine_completed_steps.add("account_switch_igg_game_confirmed")
         self.assertTrue(bot._account_switch_main_screen_confirmed(task))
+
+    def test_selected_igg_id_uses_visual_confirmation_without_reopening_webview_inspection(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.input_backend = "adb"
+        bot.routine_completed_steps = {"account_switch_igg_id_selected"}
+        bot.adb_client = FakeAdbClient()
+        bot.adb_client.ui_xml = lambda: self.fail("SDK inspection after handoff")
+
+        self.assertFalse(bot._pause_for_manual_account_verification(self.task()))
+        self.assertFalse(bot._try_account_switch_igg_rejected_login(self.task()))
+        self.assertFalse(bot._try_account_switch_igg_id_selection(self.task()))
+
+    @patch("buzzbot_app.time.time", return_value=20.0)
+    def test_confirmed_igg_login_does_not_back_out_of_game_loading(self, _time):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.account_switch_selected_at = 1.0
+        bot.routine_completed_steps = {
+            "account_switch_igg_id_selected", "account_switch_igg_game_confirmed"
+        }
+        bot._return_to_main_screen = lambda **kwargs: self.fail("Back during loading")
+        self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
 
     @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
     @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
@@ -360,10 +403,12 @@ class IggCredentialTests(unittest.TestCase):
         bot.account_switch_auto_login_attempted = True
         bot.routine_completed_steps = {"account_switch_old", "unrelated"}
         bot._interruptible_sleep = lambda _seconds: None
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = np.full((720, 1280, 3), 35, dtype=np.uint8)
         cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
         cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
         cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
+        marker = cv2.imread(str(Path(__file__).parents[1] / "buzzbot/assets/accounts/igg_id_confirmation_marker.png"))
+        frame[321:346, 610:693] = marker
         bot._capture_screen_bgr = lambda force=False: (frame, (0, 0))
         bot._tap_routine_fallback = lambda *_args: True
         task = {"id": "__account_switch__", "settings": {"login_method": "google"}}
@@ -404,6 +449,10 @@ class IggCredentialTests(unittest.TestCase):
         bot._return_to_main_screen = lambda **_kwargs: self.fail("recovery is premature")
         bot.set_status_message = lambda *_args, **_kwargs: None
 
+        self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
+
+        # Submitting credentials is still not the game's final confirmation.
+        bot.routine_completed_steps.add("account_switch_igg_login_submitted")
         self.assertFalse(bot._try_account_switch_return_to_main(self.task()))
 
     @patch("buzzbot_app.time.time", return_value=40.0)

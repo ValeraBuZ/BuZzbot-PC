@@ -13,6 +13,27 @@ import numpy as np
 
 
 class ProfileBundleTests(unittest.TestCase):
+    def test_profile_contains_both_alliance_gift_types_and_bundled_controls(self):
+        from buzzbot.alliance_gifts import ASSET_DIR, gift_profile_images
+        from buzzbot.routines import normalize_routine_tasks
+        profile_path = Path(__file__).resolve().parents[1] / "profiles/BuZzbot_PC_1280x720.zip"
+        with zipfile.ZipFile(profile_path) as archive:
+            manifest = json.loads(archive.read("profile.json"))
+            images = {image["uid"]: image for image in manifest["images"]}
+            task = next(task for task in manifest["routine_tasks"] if task["id"] == "alliance_gifts")
+            self.assertTrue(task["settings"]["collect_activity"])
+            self.assertTrue(task["settings"]["collect_purchase"])
+            for expected in gift_profile_images():
+                image = images[expected["uid"]]
+                self.assertEqual(archive.read(image["path"]), (ASSET_DIR / (expected["asset_name"] + ".png")).read_bytes())
+                self.assertTrue(image["observer_only"])
+        old = [{"id": "food"}, {"id": "alliance_help"}, {"id": "wood"}]
+        upgraded = normalize_routine_tasks(old)
+        retained = [task["id"] for task in upgraded if task["id"] in {"food", "alliance_help", "wood"}]
+        self.assertEqual(retained, [task["id"] for task in old])
+        ids = [task["id"] for task in upgraded]
+        self.assertEqual(ids[ids.index("alliance_help") + 1], "alliance_gifts")
+
     def test_profile_installer_can_run_as_a_script(self):
         project_root = Path(__file__).resolve().parents[1]
         result = subprocess.run(

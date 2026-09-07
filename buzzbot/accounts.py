@@ -183,8 +183,15 @@ def apply_tasks(profile, tasks):
         task_id = task["id"]
         if task_id in enabled:
             task["enabled"] = bool(enabled[task_id])
+        # Runtime observations belong to the selected account. A sparse older
+        # profile must not inherit a boost deadline or pending treatment from
+        # the character that was active immediately before it.
+        task_settings = task.setdefault("settings", {})
+        for key in list(task_settings):
+            if key == "active_until" or str(key).startswith("_"):
+                task_settings.pop(key)
         if isinstance(settings.get(task_id), dict):
-            task.setdefault("settings", {}).update(deepcopy(settings[task_id]))
+            task_settings.update(deepcopy(settings[task_id]))
     return tasks
 
 

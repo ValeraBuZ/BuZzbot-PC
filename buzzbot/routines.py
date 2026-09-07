@@ -159,6 +159,21 @@ DEFAULT_ROUTINE_TASKS = (
         "settings": {},
     },
     {
+        "id": "alliance_gifts",
+        "name": "Подарки альянса",
+        "group": "Подарки альянса",
+        "category": "daily",
+        "enabled": False,
+        "uses_march": False,
+        "priority": 11,
+        "interval_minutes": 30.0,
+        "timeout_seconds": 90.0,
+        "march_duration_minutes": 30.0,
+        "completion_uid": "",
+        "completion_runtime_step": "alliance_gifts_complete",
+        "settings": {"collect_activity": True, "collect_purchase": True},
+    },
+    {
         "id": "fence_survivors",
         "name": "Выжившие у забора",
         "group": "Выжившие у забора",
@@ -655,6 +670,10 @@ DEFAULT_ROUTINE_TASKS = (
 
 
 TASK_SETTING_SPECS = {
+    "alliance_gifts": (
+        {"key": "collect_activity", "label": "Награды за активность", "kind": "bool"},
+        {"key": "collect_purchase", "label": "Награды за покупки", "kind": "bool"},
+    ),
     "mysterious_merchant": (
         {"key": "buy_free", "label": "Забирать бесплатные предложения", "kind": "bool"},
         {"key": "buy_resources", "label": "Покупать за ресурсы", "kind": "bool"},
@@ -2539,6 +2558,13 @@ def normalize_routine_tasks(raw_tasks):
         else:
             normalized.insert(anchor_index + 1, normalized_by_id[trucks_id])
         added_ids.add(trucks_id)
+
+    gift_id = "alliance_gifts"
+    if gift_id not in added_ids and "alliance_help" in added_ids:
+        normalized_by_id[gift_id]["enabled"] = True
+        anchor = next(index for index, task in enumerate(normalized) if task["id"] == "alliance_help")
+        normalized.insert(anchor + 1, normalized_by_id[gift_id])
+        added_ids.add(gift_id)
 
     # Other new built-in tasks are appended without disturbing the order
     # chosen by the user in an older configuration.

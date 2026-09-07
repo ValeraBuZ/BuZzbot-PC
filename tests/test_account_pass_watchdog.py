@@ -10,6 +10,83 @@ from buzzbot_app import (
 
 
 class AccountPassWatchdogTests(unittest.TestCase):
+    def test_switch_retry_wait_does_not_restart_completed_pass(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.current_routine_task_id = None
+        bot.routine_only_task_id = None
+        bot.account_rotation_enabled = True
+        bot.routine_pass_completed = True
+        bot.routine_forced_task_queue = []
+        bot.account_switch_retry_at = 200.0
+        bot.get_active_marches = lambda _now: self.fail("Completed pass restarted during retry wait")
+        self.assertIsNone(bot._begin_due_routine(100.0))
+
+    def test_disabled_saved_tail_finishes_pass_during_advance(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_tasks = [
+            {"id": "game_login", "enabled": True},
+            {"id": "oil", "enabled": True},
+            {"id": "heal", "enabled": False},
+            {"id": "prize_hunt", "enabled": False},
+            {"id": "zombie_hunt", "enabled": False},
+        ]
+        bot.current_routine_index = 1
+        bot.routine_only_task_id = None
+        bot.routine_forced_task_active_id = None
+        bot.routine_forced_task_queue = []
+        bot.routine_forced_task_return_index = None
+        bot.routine_radar_in_progress_seen = False
+        bot.routine_pass_completed = False
+
+        bot._advance_routine_after_outcome(bot.routine_tasks[1], 100.0)
+
+        self.assertEqual(bot.current_routine_index, 0)
+        self.assertTrue(bot.routine_pass_completed)
+
+    def test_runtime_inactive_tail_finishes_pass_before_scheduler_wraps(self):
+        tails = [
+            {"id": "heal", "group": "disabled_group", "enabled": True},
+            {"id": "heal", "group": "missing_templates", "enabled": True},
+        ]
+        for tail in tails:
+            with self.subTest(tail=tail):
+                bot = AutoClicker.__new__(AutoClicker)
+                bot.routine_tasks = [
+                    {"id": "game_login", "enabled": True},
+                    {"id": "oil", "group": "oil", "enabled": True},
+                    tail,
+                ]
+                bot.groups = {"disabled_group": False}
+                bot.search_images = [
+                    {"group": group, "enabled": True}
+                    for group in ("oil", "heal", "research", "disabled_group")
+                ]
+                bot.current_routine_index = 1
+                bot.current_routine_task_id = None
+                bot.account_rotation_enabled = True
+                bot.routine_only_task_id = None
+                bot.routine_forced_task_queue = []
+                bot.routine_forced_task_active_id = None
+                bot.routine_forced_task_return_index = None
+                bot.routine_radar_return_hold = False
+                bot.routine_pass_completed = False
+                bot.routine_deployment_blocked_until = 0.0
+                bot.get_active_marches = lambda _now: 0
+                bot._release_radar_return_hold = lambda *_args: False
+                bot._try_return_camped_zombie_march = lambda *_args: False
+                bot.get_routine_task = lambda _task_id: None
+                saved = []
+                bot.save_config = lambda: saved.append(bot.routine_pass_completed)
+
+                bot._advance_routine_after_outcome(bot.routine_tasks[1], 100.0)
+                self.assertEqual(bot.current_routine_index, 2)
+                self.assertIsNone(bot._begin_due_routine(101.0))
+
+                self.assertEqual(bot.current_routine_index, 0)
+                self.assertTrue(bot.routine_pass_completed)
+                self.assertTrue(bot._account_rotation_switch_due(101.0))
+                self.assertEqual(saved, [True])
+
     def test_resume_preserves_original_account_pass_deadline(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.routine_tasks = [

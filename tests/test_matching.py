@@ -20,6 +20,8 @@ from buzzbot.matching import (
     detect_merchant_shop_building_target,
     detect_merchant_shop_feature_target,
     detect_mysterious_merchant_absent_ok_target,
+    detect_mysterious_merchant_non_gem_offer_targets,
+    detect_shop_merchant_tab_target,
     equipment_report_screen_is_visible,
     detect_shop_selection_marker_target,
     detect_shop_radial_action_target,
@@ -242,6 +244,48 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertLess(abs(target[0] - 716), 5)
         self.assertLess(abs(target[1] - 312), 5)
 
+    def test_shop_facade_reference_rejects_equipment_repair(self):
+        template = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_shop_building.jpg"))
+        repair = cv2.imread(str(Path(__file__).parent / "assets/merchant/equipment_repair.jpg"))
+        self.assertIsNotNone(template)
+        self.assertIsNotNone(repair)
+        frame = np.full((720, 1280, 3), (60, 80, 65), dtype=np.uint8)
+        height, width = repair.shape[:2]
+        frame[260:260 + height, 480:480 + width] = repair
+
+        target, _inliers = detect_merchant_shop_feature_target(frame, template, min_inliers=10)
+
+        self.assertIsNone(target)
+
+    def test_shop_facade_matches_upgraded_building_in_live_settlement(self):
+        template = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_shop_building.jpg"))
+        frame = cv2.imread(str(Path(__file__).parent / "assets/merchant/high_level_settlement.png"))
+        target, inliers = detect_merchant_shop_feature_target(frame, template, min_inliers=10)
+        self.assertIsNotNone(target)
+        self.assertLess(np.linalg.norm(np.array(target) - (977, 401)), 20)
+        self.assertGreaterEqual(inliers, 10)
+        upgraded = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_shop_building_upgraded.jpg"))
+        target, inliers = detect_merchant_shop_feature_target(frame, upgraded, min_inliers=10)
+        self.assertIsNotNone(target)
+        self.assertLess(np.linalg.norm(np.array(target) - (977, 401)), 25)
+        self.assertGreaterEqual(inliers, 15)
+
+    def test_upgraded_shop_selects_shop_instead_of_armory(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/merchant/high_level_shop_actions.png"))
+        target = detect_shop_radial_action_target(frame, (976, 396))
+        self.assertIsNotNone(target)
+        self.assertLess(np.linalg.norm(np.array(target) - (928, 512)), 8)
+        frame[275:325] = 0
+        self.assertIsNone(detect_shop_radial_action_target(frame, (976, 396)))
+
+    def test_upgraded_shop_label_survives_camera_background_change(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/merchant/high_level_shop_actions_shifted.png"))
+        target = detect_shop_radial_action_target(frame, (465, 271))
+        self.assertIsNotNone(target)
+        self.assertLess(np.linalg.norm(np.array(target) - (418, 382)), 8)
+        frame[400:440, 365:460] = 0
+        self.assertIsNone(detect_shop_radial_action_target(frame, (465, 271)))
+
     def test_shop_radial_detector_selects_middle_action(self):
         frame = np.full((720, 1280, 3), (60, 80, 65), dtype=np.uint8)
         for center in ((711, 367), (879, 367), (711, 474), (879, 474)):
@@ -382,7 +426,35 @@ class DynamicGameControlTests(unittest.TestCase):
         hsv[90:590, 0:155] = (0, 100, 100)
         frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
+        self.assertFalse(mysterious_merchant_screen_is_visible(frame))
+        frame[61:89, 154:443] = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_title.png"))
+
         self.assertTrue(mysterious_merchant_screen_is_visible(frame))
+
+    def test_merchant_rejects_vip_offers_and_locates_merchant_tab(self):
+        fixtures = Path(__file__).parent / "assets/merchant"
+        vip = cv2.imread(str(fixtures / "vip_grid.png"))
+        merchant = cv2.imread(str(fixtures / "merchant_grid.png"))
+        self.assertFalse(mysterious_merchant_screen_is_visible(vip))
+        self.assertEqual(detect_mysterious_merchant_non_gem_offer_targets(vip), [])
+        self.assertEqual(detect_shop_merchant_tab_target(vip), (68, 424))
+        self.assertTrue(mysterious_merchant_screen_is_visible(merchant))
+
+    def test_merchant_prices_follow_scroll_and_exclude_gems_and_footer(self):
+        hsv = np.full((720, 1280, 3), (20, 100, 80), dtype=np.uint8)
+        hsv[90:590, 0:155] = (0, 100, 100)
+        hsv[369:406, 601:756] = (20, 180, 220)
+        hsv[535:572, 293:448] = (20, 180, 220)
+        hsv[369:406, 293:448] = (140, 150, 200)
+        hsv[535:572, 909:1064] = (140, 150, 200)
+        hsv[625:666, 909:1064] = (20, 180, 220)
+        frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        frame[61:89, 154:443] = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_title.png"))
+
+        self.assertEqual(detect_mysterious_merchant_non_gem_offer_targets(frame),
+                         [(678, 388), (370, 554)])
+        self.assertEqual(detect_mysterious_merchant_non_gem_offer_targets(
+            cv2.resize(frame, (640, 360))), [(339, 194), (185, 277)])
 
     def test_detects_research_collect_or_confirm_button(self):
         frame = np.full((720, 1280, 3), (35, 40, 45), dtype=np.uint8)
@@ -630,13 +702,20 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertIsNone(detect_game_event_overlay_close_target(frame))
 
     def test_detects_final_igg_game_confirmation(self):
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = np.full((720, 1280, 3), 35, dtype=np.uint8)
         cv2.rectangle(frame, (320, 164), (960, 574), (205, 205, 205), thickness=-1)
         cv2.rectangle(frame, (363, 484), (629, 533), (80, 105, 125), thickness=-1)
         cv2.rectangle(frame, (652, 484), (917, 533), (45, 185, 240), thickness=-1)
 
+        self.assertIsNone(detect_igg_game_login_ok_target(frame))
+        marker = cv2.imread(str(Path(__file__).parents[1] / "buzzbot/assets/accounts/igg_id_confirmation_marker.png"))
+        frame[321:346, 610:693] = marker
+
         self.assertEqual(detect_igg_game_login_ok_target(frame), (784, 508))
         self.assertIsNone(detect_igg_game_login_ok_target(np.zeros_like(frame)))
+        stale_unity_frame = frame.copy()
+        stale_unity_frame[:150] = 0
+        self.assertIsNone(detect_igg_game_login_ok_target(stale_unity_frame))
 
         lighter_overlay = frame.copy()
         lighter_overlay[:150, :] = 50

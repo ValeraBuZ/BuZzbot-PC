@@ -106,7 +106,7 @@ class RadarAutomationTests(unittest.TestCase):
 
     @patch(
         "buzzbot_app.detect_shop_radial_action_target",
-        return_value=(471, 225),
+        return_value=(471, 385),
     )
     @patch(
         "buzzbot_app.detect_shop_selection_marker_target",
@@ -114,7 +114,7 @@ class RadarAutomationTests(unittest.TestCase):
     )
     @patch(
         "buzzbot_app.detect_merchant_shop_feature_target",
-        return_value=((471, 140), 27),
+        return_value=((471, 300), 27),
     )
     @patch("buzzbot_app.mysterious_merchant_screen_is_visible", return_value=False)
     @patch(
@@ -161,16 +161,23 @@ class RadarAutomationTests(unittest.TestCase):
         )
         task = {"id": "mysterious_merchant", "settings": {}}
 
+        # The catalogue sometimes closes itself after the Shop card tap.
+        # Its old Back position must not open the commander profile then.
+        bot.routine_completed_steps.discard("merchant_build_menu_closed")
+        self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
+        self.assertIn("merchant_build_menu_closed", bot.routine_completed_steps)
+        self.assertEqual(taps, [])
+
         self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
         self.assertIn("merchant_shop_building_tapped", bot.routine_completed_steps)
         self.assertNotIn("merchant_shop_open_requested", bot.routine_completed_steps)
-        self.assertEqual(bot.routine_merchant_shop_target, (471, 140))
+        self.assertEqual(bot.routine_merchant_shop_target, (471, 300))
         radial_detector.assert_not_called()
 
         self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
         radial_detector.assert_called_once_with(
             ANY,
-            (471, 140),
+            (471, 300),
         )
         self.assertIn("merchant_shop_open_requested", bot.routine_completed_steps)
         self.assertEqual(
@@ -178,6 +185,27 @@ class RadarAutomationTests(unittest.TestCase):
             ["merchant_full_shop_marker", "merchant_shop_radial_action"],
         )
         self.assertEqual(deferred, [])
+
+        # The same verified building at the edge must be moved away from the
+        # HUD before a tap; a clipped radial menu is not an absent merchant.
+        bot.routine_completed_steps.discard("merchant_shop_building_tapped")
+        bot.routine_completed_steps.discard("merchant_shop_open_requested")
+        _feature_detector.return_value = ((1080, 150), 27)
+        radial_detector.reset_mock()
+        swipes = []
+        bot.input_backend = "adb"
+        bot.adb_client = SimpleNamespace(swipe=lambda *args: swipes.append(args))
+        bot._invalidate_capture = lambda: None
+        bot._interruptible_sleep = lambda _seconds: None
+        bot.set_status_message = lambda *_args, **_kwargs: None
+        before_taps = len(taps)
+
+        self.assertTrue(bot._try_mysterious_merchant_visual_fallback(task))
+
+        self.assertEqual(len(swipes), 1)
+        self.assertEqual(len(taps), before_taps)
+        self.assertNotIn("merchant_shop_building_tapped", bot.routine_completed_steps)
+        radial_detector.assert_not_called()
 
     def test_missing_merchant_is_deferred_without_blocking_next_saved_task(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -626,14 +654,22 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertEqual(bot.current_routine_index, 1)
         self.assertEqual(bot.routine_forced_task_queue, [])
 
-    def test_busy_squad_does_not_skip_the_remaining_resource_tasks(self):
+    def test_empty_resource_squad_skips_gathering_for_only_the_current_pass(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.routine_tasks = [
-            {"id": "food", "group": "food", "enabled": True},
-            {"id": "wood", "group": "wood", "enabled": True},
-            {"id": "metal", "group": "metal", "enabled": True},
-            {"id": "oil", "group": "oil", "enabled": True},
+            {"id": "food", "group": "food", "enabled": True, "uses_march": True},
+            {"id": "wood", "group": "wood", "enabled": True, "uses_march": True},
+            {"id": "metal", "group": "metal", "enabled": True, "uses_march": True},
+            {"id": "oil", "group": "oil", "enabled": True, "uses_march": True},
         ]
+        bot.groups = {task["group"]: True for task in bot.routine_tasks}
+        bot.search_images = [
+            {"group": task["group"], "enabled": True}
+            for task in bot.routine_tasks
+        ]
+        bot.account_switch_task = None
+        bot.account_rotation_enabled = True
+        bot.account_pass_started_at = 50.0
         bot.current_routine_index = 1
         bot.current_routine_task_id = "wood"
         bot.routine_next_run = {}
@@ -660,6 +696,20 @@ class RadarAutomationTests(unittest.TestCase):
         self.assertEqual(bot.routine_deployment_blocked_until, 0.0)
         self.assertEqual(bot.current_routine_index, 2)
         self.assertEqual(bot.routine_next_run["wood"], 160.0)
+        self.assertEqual(
+            bot.routine_last_outcome["reason"],
+            "resource_squads_exhausted_for_pass",
+        )
+        self.assertTrue(bot._resource_squads_exhausted_for_current_pass())
+        self.assertFalse(
+            any(task["enabled"] for task in bot._scheduler_routine_tasks())
+        )
+
+        bot.account_pass_started_at = 51.0
+        self.assertFalse(bot._resource_squads_exhausted_for_current_pass())
+        self.assertTrue(
+            all(task["enabled"] for task in bot._scheduler_routine_tasks())
+        )
 
     def test_busy_squad_keeps_dispatch_until_full_radar_in_place(self):
         bot = AutoClicker.__new__(AutoClicker)

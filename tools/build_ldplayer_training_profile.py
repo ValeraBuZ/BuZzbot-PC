@@ -27,6 +27,7 @@ from buzzbot.routines import (
     upgrade_strict_runtime_metadata,
 )
 from buzzbot.version import APP_VERSION
+from buzzbot.alliance_gifts import ASSET_DIR as GIFT_ASSET_DIR, gift_profile_images
 
 
 TRAINING_DIR = PROJECT_ROOT / "build" / "training"
@@ -1391,6 +1392,10 @@ def build_profile(destination):
         "images": [],
     }
     payloads = []
+    for image in gift_profile_images():
+        asset_name = image.pop("asset_name")
+        manifest["images"].append(image)
+        payloads.append((GIFT_ASSET_DIR / f"{asset_name}.png", image["path"]))
 
     for level, (source_name, box) in RESOURCE_RESULT_LEVEL_TEMPLATES.items():
         uid = str(uuid.uuid5(PROFILE_NAMESPACE, f"resource_result_level:{level}"))

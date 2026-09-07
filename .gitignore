@@ -11,6 +11,7 @@ img/
 backups/
 reports/
 test_runs/
+live_diagnostics/
 tmp/
 build/
 dist/

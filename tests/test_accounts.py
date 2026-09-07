@@ -126,6 +126,23 @@ class AccountProfileTests(unittest.TestCase):
             self.assertTrue(profile["task_settings"]["trucks"]["avoid_gems"])
         self.assertEqual(profiles[0]["task_settings"]["trucks"]["max_dispatches"], 2)
 
+    def test_sparse_profile_does_not_inherit_another_accounts_runtime_settings(self):
+        tasks = [
+            {"id": "gathering_boost", "settings": {"boost_hours": 24, "active_until": 9000}},
+            {"id": "heal", "settings": {"troop_count": 500, "_collection_pending": True}},
+        ]
+        apply_tasks({"task_settings": {"gathering_boost": {"boost_hours": 8}}}, tasks)
+        self.assertEqual(tasks[0]["settings"], {"boost_hours": 8})
+        self.assertEqual(tasks[1]["settings"], {"troop_count": 500})
+
+    def test_account_switch_restores_its_own_runtime_settings_without_aliasing(self):
+        tasks = [{"id": "gathering_boost", "settings": {"boost_hours": 8, "active_until": 9000}}]
+        profile = {"task_settings": {"gathering_boost": {"active_until": 4000}}}
+        apply_tasks(profile, tasks)
+        self.assertEqual(tasks[0]["settings"]["active_until"], 4000)
+        tasks[0]["settings"]["active_until"] = 5000
+        self.assertEqual(profile["task_settings"]["gathering_boost"]["active_until"], 4000)
+
     def test_rotation_uses_one_enabled_profile_at_a_time(self):
         profiles = normalize_account_profiles([
             {"id": "a", "name": "A", "enabled": True},

@@ -476,17 +476,40 @@ def detect_shop_selection_marker_target(
 
 
 def detect_shop_radial_action_target(frame_bgr, building_target=None):
-    """Return the middle Shop action after the building is selected.
+    """Return the ordinary Shop action after the building is selected.
 
-    Selection centres the building and places four bright-green direction
-    arrows around it.  Its three radial actions then appear below: Information,
-    Shop, and Beast Shop.  The ordinary Shop is the middle action.  Requiring
-    all four arrows prevents bottom navigation buttons from being mistaken for
-    the radial menu.
+    Prefer the labelled action on upgraded buildings with an Armory button.
+    Low-level Shop has three actions and four green selection arrows, allowing
+    its ordinary Shop action to be located at the centre of that radial menu.
     """
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
+    if building_target:
+        building_x = int(round(float(building_target[0]) / max(scale_x, 1e-6)))
+        building_y = int(round(float(building_target[1]) / max(scale_y, 1e-6)))
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        asset_dir = Path(__file__).parent / "assets/merchant"
+        title = cv2.imread(str(asset_dir / "merchant_building_title.png"), cv2.IMREAD_GRAYSCALE)
+        label = cv2.imread(str(asset_dir / "merchant_shop_action_label.png"), cv2.IMREAD_GRAYSCALE)
+        def label_location(template, bounds, threshold):
+            if template is None:
+                return None
+            left, top, right, bottom = bounds
+            search = gray[top:bottom, left:right]
+            if search.shape[0] < template.shape[0] or search.shape[1] < template.shape[1]:
+                return None
+            _, score, _, location = cv2.minMaxLoc(cv2.matchTemplate(search, template, cv2.TM_CCOEFF_NORMED))
+            return (left + location[0] + template.shape[1] / 2, top + location[1] + template.shape[0] / 2) if score >= threshold else None
+        title_location = label_location(title, (max(0, building_x - 220), max(0, building_y - 170), min(1280, building_x + 220), max(1, building_y - 45)), 0.82)
+        # The action text floats over the map, so camera movement changes its
+        # background. Both labels are required in their separate positions.
+        action_location = label_location(label, (max(0, building_x - 250), min(719, building_y + 40), min(1280, building_x + 250), min(650, building_y + 240)), 0.74)
+        if title_location is not None and action_location is not None:
+            # Upgraded Shop adds Armory as a fourth radial action. Its ordinary
+            # Shop is then left of centre; use the explicit label, together
+            # with the selected building title, instead of the old midpoint.
+            return round(action_location[0] * scale_x), round((action_location[1] - 40) * scale_y)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # The arrows are a narrow yellow-green.  A broader green range also picks
     # up vegetation and illuminated facade details, joining an arrow to the
@@ -745,6 +768,31 @@ def detect_merchant_shop_feature_target(
 
 def mysterious_merchant_screen_is_visible(frame_bgr):
     """Recognise the Mysterious Merchant offer grid."""
+    if not _shop_offer_grid_is_visible(frame_bgr):
+        return False
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    marker = cv2.imread(str(Path(__file__).parent / "assets/merchant/merchant_title.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    header = cv2.cvtColor(frame[55:98, 140:480], cv2.COLOR_BGR2GRAY)
+    return float(np.max(cv2.matchTemplate(header, marker, cv2.TM_CCOEFF_NORMED))) >= 0.82
+
+
+def detect_shop_merchant_tab_target(frame_bgr):
+    """Locate the merchant tab when Shop remembered another subsection."""
+    if not _shop_offer_grid_is_visible(frame_bgr):
+        return None
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    marker = cv2.imread(str(Path(__file__).parent / "assets/merchant/merchant_tab.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return None
+    tabs = cv2.cvtColor(frame[350:490, :135], cv2.COLOR_BGR2GRAY)
+    if float(np.max(cv2.matchTemplate(tabs, marker, cv2.TM_CCOEFF_NORMED))) < 0.75:
+        return None
+    return int(round(68 * scale_x)), int(round(424 * scale_y))
+
+
+def _shop_offer_grid_is_visible(frame_bgr):
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return False
@@ -831,10 +879,21 @@ def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
         return []
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     candidates = []
-    for center_y in (270, 460, 640):
-        for center_x in (320, 620, 920):
-            x1, x2 = center_x - 105, center_x + 105
-            y1, y2 = center_y - 34, center_y + 34
+    # Price bars move vertically when the offer list scrolls. Locate their
+    # gold background inside the three price columns, excluding item artwork
+    # and the fixed gem-funded refresh control below the scroll viewport.
+    for x1, x2 in ((293, 448), (601, 756), (909, 1064)):
+        stripe = hsv[155:585, x1:x2]
+        gold = (
+            (stripe[:, :, 0] >= 10) & (stripe[:, :, 0] <= 40)
+            & (stripe[:, :, 1] >= 70) & (stripe[:, :, 2] >= 110)
+        )
+        rows = np.mean(gold, axis=1) >= 0.35
+        edges = np.diff(np.r_[False, rows, False].astype(np.int8))
+        for start, end in zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)):
+            if not 20 <= end - start <= 55:
+                continue
+            y1, y2 = int(start) + 155, int(end) + 155
             region = hsv[y1:y2, x1:x2]
             purple = (
                 (region[:, :, 0] >= 115)
@@ -842,20 +901,15 @@ def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
                 & (region[:, :, 1] >= 35)
                 & (region[:, :, 2] >= 65)
             )
-            resource = (
-                (region[:, :, 0] >= 3)
-                & (region[:, :, 0] <= 42)
-                & (region[:, :, 1] >= 45)
-                & (region[:, :, 2] >= 70)
-            )
             # Any meaningful purple price area vetoes the offer. Ambiguous
             # buttons are skipped; this intentionally favours safety over
             # exhausting every offer.
-            if float(np.mean(purple)) <= 0.08 and float(np.mean(resource)) >= 0.10:
+            if float(np.mean(purple)) <= 0.05:
                 candidates.append(
-                    (int(round(center_x * scale_x)), int(round(center_y * scale_y)))
+                    (int(round((x1 + x2) / 2 * scale_x)),
+                     int(round((y1 + y2) / 2 * scale_y)))
                 )
-    return candidates
+    return sorted(candidates, key=lambda point: (point[1], point[0]))
 
 
 def detect_login_session_expired_ok_target(frame_bgr):
@@ -1370,10 +1424,25 @@ def detect_igg_game_login_ok_target(frame_bgr):
     )
     if (
         float(np.mean(outside <= 70)) < 0.75
+        # Android can expose Unity's previous confirmation frame against a
+        # black background while closing the SDK WebView. It is not yet an
+        # interactive game dialog; accepting it can leave the old account.
+        or float(np.mean(outside)) < 20.0
         or float(np.mean(dialog >= 145)) < 0.55
         or float(np.mean(neutral_cancel)) < 0.45
         or float(np.mean(gold_ok)) < 0.55
     ):
+        return None
+    # Purchase confirmations use the same panel and buttons. Only the IGG
+    # prompt contains this text; geometry alone must never authorize login.
+    marker = cv2.imread(
+        str(Path(__file__).parent / "assets/accounts/igg_id_confirmation_marker.png"),
+        cv2.IMREAD_GRAYSCALE,
+    )
+    if marker is None:
+        return None
+    match = cv2.matchTemplate(gray[260:430, 370:930], marker, cv2.TM_CCOEFF_NORMED)
+    if float(np.max(match)) < 0.82:
         return None
     return int(round(784 * scale_x)), int(round(508 * scale_y))
 

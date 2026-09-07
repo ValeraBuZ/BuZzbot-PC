@@ -101,6 +101,7 @@ from buzzbot.matching import (
     detect_shop_radial_action_target,
     detect_mysterious_merchant_absent_ok_target,
     detect_mysterious_merchant_non_gem_offer_targets,
+    detect_shop_merchant_tab_target,
     mysterious_merchant_screen_is_visible,
     settlement_building_catalogue_is_visible,
     detect_truck_occupied_slot_targets,
@@ -125,9 +126,11 @@ from buzzbot.matching import (
     truck_express_overview_is_visible,
     zombie_camp_checkbox_is_checked,
 )
+from buzzbot.alliance_gifts import AllianceGiftFlow
 from buzzbot.routines import (
     LEGACY_RADAR_TEMPLATE_UIDS,
     PROFILE_NAMESPACE,
+    RESOURCE_TASK_IDS,
     completed_runtime_steps_for_image,
     default_routine_tasks,
     effective_active_marches,
@@ -256,6 +259,7 @@ GAME_LOGIN_RESTART_SECONDS = 150.0
 GAME_LOGIN_MAX_RESTARTS = 2
 GAME_LOGIN_WEBVIEW_GRACE_SECONDS = 60.0
 WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collective_mind"}
+RESOURCE_SQUADS_EXHAUSTED_PASS_KEY = "__resource_squads_exhausted_pass__"
 # The deployment panel briefly disappears after a march. Ignore only that
 # transient false 0/5; every visible positive count remains authoritative.
 MARCH_OBSERVER_GRACE_SECONDS = 8.0
@@ -2164,6 +2168,8 @@ class AutoClicker:
         """Recover the one-button in-game login/network error without looping Back."""
         if not self.uses_adb or not task or task.get("id") == "game_login":
             return False
+        if task.get("id") == "__account_switch__":
+            return self._try_account_switch_connection_recovery(task)
         try:
             frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
@@ -2939,7 +2945,7 @@ class AutoClicker:
                     ensure_account_task_defaults(
                         self.account_profiles,
                         self.routine_tasks,
-                        enabled_task_ids=("mysterious_merchant", "trucks"),
+                        enabled_task_ids=("mysterious_merchant", "trucks", "alliance_gifts"),
                     )
                     self._migrate_account_logins_to_credential_store()
                     if not self.is_multi_worker:
@@ -4330,14 +4336,44 @@ class AutoClicker:
         self.save_config()
         return True
 
+    def _resource_squads_exhausted_for_current_pass(self):
+        """Keep a confirmed empty gathering squad scoped to one account pass."""
+        started_at = float(getattr(self, "account_pass_started_at", 0.0) or 0.0)
+        if started_at <= 0.0:
+            return False
+        next_run = getattr(self, "routine_next_run", {})
+        try:
+            exhausted_at = float(
+                next_run.get(RESOURCE_SQUADS_EXHAUSTED_PASS_KEY, 0.0) or 0.0
+            )
+        except (TypeError, ValueError):
+            return False
+        return exhausted_at == started_at
+
+    def _mark_resource_squads_exhausted_for_current_pass(self):
+        if (
+            not bool(getattr(self, "account_rotation_enabled", False))
+            or getattr(self, "routine_only_task_id", None) is not None
+        ):
+            return False
+        started_at = float(getattr(self, "account_pass_started_at", 0.0) or 0.0)
+        if started_at <= 0.0:
+            return False
+        self.routine_next_run[RESOURCE_SQUADS_EXHAUSTED_PASS_KEY] = started_at
+        return True
+
     def _scheduler_routine_tasks(self):
         if self.routine_only_task_id == "__account_switch__" and self.account_switch_task:
             return [dict(self.account_switch_task)]
+        resource_squads_exhausted = (
+            self.routine_only_task_id is None
+            and self._resource_squads_exhausted_for_current_pass()
+        )
         tasks = []
         for task in self.routine_tasks:
             runtime_task = dict(task)
             runtime_task["group"] = effective_task_group(task)
-            has_templates = task.get("id") in {"game_login", "mysterious_merchant", "trucks"} or any(
+            has_templates = task.get("id") in {"game_login", "mysterious_merchant", "trucks", "alliance_gifts"} or any(
                 image.get("group") == runtime_task["group"] and image.get("enabled", True)
                 for image in self.search_images
             )
@@ -4346,6 +4382,10 @@ class AutoClicker:
                 and self.groups.get(runtime_task.get("group"), True)
                 and (self.routine_only_task_id in (None, task.get("id")))
                 and has_templates
+                and not (
+                    resource_squads_exhausted
+                    and task.get("id") in RESOURCE_TASK_IDS
+                )
             )
             # The radar block must always reach its final squad check.  The
             # task itself can then settle safely when every squad is busy and
@@ -4495,6 +4535,14 @@ class AutoClicker:
                 return task
             self.current_routine_task_id = None
 
+        if (
+            self.account_rotation_enabled
+            and self.routine_only_task_id is None
+            and self._account_rotation_cycle_ready()
+            and now < float(getattr(self, "account_switch_retry_at", 0.0) or 0.0)
+        ):
+            return None
+
         if self._account_rotation_switch_due(now):
             current_profile = self.get_current_account() or {}
             next_profile = next_enabled_account(
@@ -4542,6 +4590,30 @@ class AutoClicker:
             )
             self._skip_satisfied_gathering_boost(boost_deadline, now)
         runtime_tasks = self._scheduler_routine_tasks()
+        # A task can also become unavailable only at runtime (for example,
+        # its group or templates are missing).  The saved-task advancement
+        # below cannot see that state, so keep this final guard before the
+        # cyclic scheduler can wrap to the first task and repeat the pass.
+        if (
+            self.account_rotation_enabled
+            and self.routine_only_task_id is None
+            and not self.routine_forced_task_queue
+            and not bool(getattr(self, "routine_radar_return_hold", False))
+            and not bool(getattr(self, "routine_pass_completed", False))
+            and runtime_tasks
+            and int(self.current_routine_index or 0) > 0
+            and not any(
+                is_task_effectively_enabled(candidate)
+                for candidate in runtime_tasks[int(self.current_routine_index):]
+            )
+        ):
+            self.current_routine_index = 0
+            self.routine_pass_completed = True
+            logger.info(
+                "Saved routine pass completed after skipping inactive trailing tasks; account rotation is due now"
+            )
+            self.save_config()
+            return None
         forced_index = None
         while self.routine_forced_task_queue:
             forced_task_id = str(self.routine_forced_task_queue[0] or "")
@@ -5199,7 +5271,21 @@ class AutoClicker:
                 return
         previous_index = int(self.current_routine_index or 0) % len(self.routine_tasks)
         self.current_routine_index = (previous_index + 1) % len(self.routine_tasks)
-        if self.current_routine_index == 0 and self.routine_only_task_id is None:
+        inactive_saved_tail = bool(
+            self.current_routine_index > 0
+            and not any(
+                is_task_effectively_enabled(candidate)
+                for candidate in self.routine_tasks[self.current_routine_index:]
+            )
+        )
+        if (
+            self.routine_only_task_id is None
+            and (self.current_routine_index == 0 or inactive_saved_tail)
+        ):
+            # Disabled tasks deliberately remain at the end of the saved
+            # list.  Crossing the last enabled task is the real pass boundary
+            # even though the physical list index has not wrapped yet.
+            self.current_routine_index = 0
             self.routine_pass_completed = True
             logger.info("Saved routine pass completed; account rotation is due now")
 
@@ -5404,6 +5490,7 @@ class AutoClicker:
 
         if task.get("id") in {
             "alliance_donations",
+            "alliance_gifts",
             "gathering_boost",
             "mail_rewards",
             "completed_tasks",
@@ -6273,16 +6360,24 @@ class AutoClicker:
         self._interruptible_sleep(5.0)
         return True
 
-    def _try_account_switch_igg_game_confirmation(self, task):
+    def _try_account_switch_igg_game_confirmation(self, task, frame_bgr=None):
         if task.get("id") != "__account_switch__":
             return False
         try:
-            frame, _origin = self._capture_screen_bgr(force=True)
+            frame = frame_bgr
+            if frame is None:
+                frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("IGG game confirmation could not capture the screen")
             return False
 
         target = detect_igg_game_login_ok_target(frame)
+        if (
+            target is not None
+            and task.get("settings", {}).get("login_method") == "igg"
+            and "account_switch_igg_id_selected" not in self.routine_completed_steps
+        ):
+            return False
         login_progressed = (
             bool(self.account_switch_selected_at)
             or "account_switch_igg_game_confirmed" in self.routine_completed_steps
@@ -6338,12 +6433,10 @@ class AutoClicker:
             return False
         settings = task.get("settings", {})
         if settings.get("login_method") == "igg":
-            if "account_switch_igg_game_confirmed" in self.routine_completed_steps:
-                return True
-            return {
-                "account_switch_igg_login_submitted",
-                "account_switch_igg_id_selected",
-            }.issubset(self.routine_completed_steps)
+            # The WebView authenticates the IGG account first; the game then
+            # asks separately whether to load its ID. Returning to the old
+            # settlement before that final OK is not a completed switch.
+            return "account_switch_igg_game_confirmed" in self.routine_completed_steps
         return True
 
     def _try_account_switch_igg_rejected_login(self, task):
@@ -6351,6 +6444,7 @@ class AutoClicker:
             task.get("id") != "__account_switch__"
             or task.get("settings", {}).get("login_method") != "igg"
             or not self.uses_adb
+            or "account_switch_igg_id_selected" in self.routine_completed_steps
         ):
             return False
         try:
@@ -6650,6 +6744,11 @@ class AutoClicker:
     def _pause_for_manual_account_verification(self, task):
         if task.get("id") != "__account_switch__" or not self.uses_adb:
             return False
+        if "account_switch_igg_id_selected" in self.routine_completed_steps:
+            # The SDK WebView has handed control to the game's confirmation.
+            # Inspect that phase visually; reopening accessibility inspection
+            # here can disturb the handoff on LDPlayer.
+            return False
         try:
             ui_xml = self.adb_client.ui_xml()
         except AdbError:
@@ -6763,6 +6862,7 @@ class AutoClicker:
             task.get("id") != "__account_switch__"
             or settings.get("login_method") != "igg"
             or not self.uses_adb
+            or "account_switch_igg_id_selected" in self.routine_completed_steps
         ):
             return False
         chooser_index = min(20, max(1, int(settings.get("chooser_index", 1))))
@@ -6802,7 +6902,20 @@ class AutoClicker:
         self.routine_completed_steps.add("account_switch_igg_id_selected")
         self.account_switch_selected_at = time.time()
         logger.info("Saved IGG ID row %s selected at %s", chooser_index, target)
-        self._interruptible_sleep(6.0)
+        # Keep this SDK-to-game transition atomic. The final native dialog
+        # can appear while the WebView is closing; handing control back to
+        # generic checks before its OK was handled used to cancel the switch.
+        for _attempt in range(24):
+            if self.stop_event.is_set():
+                break
+            frame, _origin = self._capture_screen_bgr(force=True)
+            if detect_igg_game_login_ok_target(frame) is not None:
+                self._save_routine_calibration_frame(
+                    "__account_switch__", "igg_confirmation", frame
+                )
+                if self._try_account_switch_igg_game_confirmation(task, frame_bgr=frame):
+                    return True
+            self._interruptible_sleep(0.5)
         return True
 
     def _try_account_switch_return_to_main(self, task):
@@ -6812,18 +6925,12 @@ class AutoClicker:
             or not self.account_switch_selected_at
         ):
             return False
-        login_progressed = bool(
-            {
-                "account_switch_igg_login_submitted",
-                "account_switch_igg_game_confirmed",
-            }
-            & self.routine_completed_steps
-        )
+        login_progressed = "account_switch_igg_game_confirmed" in self.routine_completed_steps
         # A runner can be resumed while the saved-ID chooser is already open.
         # Selecting its only row may take noticeably longer to reveal the IGG
         # confirmation page.  Returning after the ordinary eight-second grace
         # abandons that page and leaves the switch permanently half-complete.
-        return_grace = 8.0 if login_progressed else 30.0
+        return_grace = 60.0 if login_progressed else 30.0
         if time.time() - self.account_switch_selected_at < return_grace:
             return False
         if self._is_game_home_visible():
@@ -6867,7 +6974,10 @@ class AutoClicker:
             return False
         try:
             if self.uses_adb:
-                self.adb_client.tap(target_x, target_y)
+                if coord_key[0] == "account_switch_igg_game_confirm":
+                    self.adb_client.long_press(target_x, target_y, duration_ms=150)
+                else:
+                    self.adb_client.tap(target_x, target_y)
             else:
                 pyautogui.click(target_x, target_y)
         except Exception:
@@ -7298,16 +7408,89 @@ class AutoClicker:
             logger.exception("Could not save %s calibration frame for %s", stage, task_id)
             return None
 
+    def _try_alliance_gifts_visual_fallback(self, task):
+        if task.get("id") != "alliance_gifts":
+            return False
+        if "gifts_flow_initialized" not in self.routine_completed_steps:
+            self.routine_gifts_flow = AllianceGiftFlow(dict(task.get("settings", {})), time.time())
+            self.routine_completed_steps.add("gifts_flow_initialized")
+        flow = self.routine_gifts_flow
+        if "gifts_alliance_open" not in self.routine_completed_steps:
+            if time.time() - flow.started_at > 60:
+                self._defer_current_routine_unavailable("не удалось открыть альянс", time.time())
+                return True
+            if not self._is_game_home_visible():
+                self._return_to_main_screen(require_settlement=True)
+                return True
+            frame, _origin = self._capture_screen_bgr(force=True)
+            height, width = frame.shape[:2]
+            target = (int(width * 970 / 1280), int(height * 650 / 720))
+            if self._tap_routine_fallback(target, ("gifts_open_alliance", *target), "Подарки: открываю альянс"):
+                self.routine_completed_steps.add("gifts_alliance_open")
+                self._interruptible_sleep(1.5)
+            return True
+        frame, _origin = self._capture_screen_bgr(force=True)
+        previous_gift_count = flow.purchase_count
+        action = flow.next_action(frame, time.time())
+        if flow.purchase_count > previous_gift_count:
+            logger.info("Alliance purchase gift confirmed: %s", flow.purchase_count)
+        if action.kind == "complete":
+            self.routine_completed_steps.add("alliance_gifts_complete")
+            self._save_routine_calibration_frame("alliance_gifts", "completed", frame)
+            logger.info("Alliance gifts complete: activity=%s, purchase gifts=%s", flow.activity_result, flow.purchase_count)
+            self._finish_current_routine(time.time())
+            return True
+        if action.kind == "unavailable":
+            self._save_routine_calibration_frame("alliance_gifts", "unrecognized", frame)
+            self._defer_current_routine_unavailable(action.message, time.time())
+            return True
+        if action.kind == "wait":
+            self._interruptible_sleep(0.3)
+            return True
+        if action.kind == "swipe":
+            x1, y1, x2, y2 = action.target
+            if self.uses_adb:
+                self.adb_client.swipe(x1, y1, x2, y2, 600)
+            else:
+                pyautogui.moveTo(x1, y1)
+                pyautogui.dragTo(x2, y2, duration=0.6, button="left")
+            self._invalidate_capture()
+            self.routine_last_action_time = time.time()
+            self.set_status_message(action.message, force=True)
+            flow.record(action, frame, time.time())
+            self._interruptible_sleep(1.0)
+            return True
+        if action.kind in {"collect_all", "dismiss", "claim"}:
+            self._save_routine_calibration_frame("alliance_gifts", action.kind, frame)
+        if action.target is not None and self._tap_routine_fallback(
+            action.target,
+            ("alliance_gifts", flow.action_number, action.kind, *action.target),
+            action.message,
+        ):
+            flow.record(action, frame, time.time())
+            self._interruptible_sleep(0.5)
+        return True
+
     def _try_trucks_visual_fallback(self, task):
         if task.get("id") != "trucks":
             return False
         settings = task.setdefault("settings", {})
         if "trucks_open" not in self.routine_completed_steps:
-            if not (
-                self._is_main_screen_visible()
-                or self._is_settlement_screen_visible()
-            ):
-                return False
+            # The bottom-left control has a different meaning on the world
+            # map: at these coordinates it opens world search, not the
+            # settlement building catalogue.  A resource task can leave the
+            # account on the world map immediately before Merchant, so prove
+            # that the settlement is active before touching this control.
+            if not self._is_settlement_screen_visible():
+                if not self._is_main_screen_visible():
+                    return False
+                if not self._switch_to_settlement_screen():
+                    return False
+                self.routine_merchant_build_menu_requested_at = 0.0
+                logger.info(
+                    "Merchant fallback restored the settlement before opening the building catalogue"
+                )
+                return True
             try:
                 frame, _origin = self._capture_screen_bgr(force=True)
             except Exception:
@@ -7788,6 +7971,19 @@ class AutoClicker:
             logger.exception("Merchant fallback could not inspect the store building")
             return False
         merchant_screen_visible = mysterious_merchant_screen_is_visible(frame)
+        if (
+            not merchant_screen_visible
+            and "merchant_shop_open_requested" in self.routine_completed_steps
+            and "merchant_tab_requested" not in self.routine_completed_steps
+        ):
+            tab_target = detect_shop_merchant_tab_target(frame)
+            if tab_target is not None and self._tap_routine_fallback(
+                tab_target,
+                ("merchant_tab", *tab_target),
+                "Магазин: выбираю вкладку таинственного торговца",
+            ):
+                self.routine_completed_steps.add("merchant_tab_requested")
+                return True
         if merchant_screen_visible and (
             self._is_main_screen_visible() or self._is_settlement_screen_visible()
         ):
@@ -7838,6 +8034,22 @@ class AutoClicker:
                 targets = detect_mysterious_merchant_non_gem_offer_targets(frame)
             purchases = self.routine_action_counts.get("max_purchases", 0)
             maximum = max(1, min(20, int(settings.get("max_purchases", 20) or 20)))
+            scrolls = self.routine_action_counts.get("merchant_offer_scrolls", 0)
+            if not targets and purchases < maximum and scrolls < 3:
+                height, width = frame.shape[:2]
+                start = (int(width * 810 / 1280), int(height * 540 / 720))
+                end = (start[0], int(height * 325 / 720))
+                if self.uses_adb:
+                    self.adb_client.swipe(*start, *end, 600)
+                else:
+                    pyautogui.moveTo(*start)
+                    pyautogui.dragTo(*end, duration=0.6, button="left")
+                self.routine_action_counts["merchant_offer_scrolls"] = scrolls + 1
+                self._invalidate_capture()
+                self.routine_last_action_time = time.time()
+                self._interruptible_sleep(0.8)
+                self.set_status_message("Таинственный торговец: проверяю нижние предложения", force=True)
+                return True
             if purchases >= maximum or not targets:
                 self.routine_completed_steps.add("merchant_complete")
                 logger.info(
@@ -8030,6 +8242,13 @@ class AutoClicker:
         self._save_routine_calibration_frame("mysterious_merchant", "shop_selected", frame)
 
         if "merchant_build_menu_closed" not in self.routine_completed_steps:
+            if self._is_settlement_screen_visible():
+                # Selecting an existing catalogue card can close the panel
+                # itself. Its former Back position is then the commander
+                # portrait; tapping it would leave the settlement again.
+                self.routine_completed_steps.add("merchant_build_menu_closed")
+                logger.info("Merchant catalogue already closed on the settlement")
+                return True
             target = (
                 int(round(width * 34 / 1280.0)),
                 int(round(height * 34 / 720.0)),
@@ -8204,16 +8423,34 @@ class AutoClicker:
             building_score = -1.0
             shop_marker_target = None
             feature_inliers = 0
-            if building_template is not None and building_template.size:
-                building_target, feature_inliers = detect_merchant_shop_feature_target(
-                    frame,
-                    building_template,
-                    # Live accounts consistently produce 23-31 inliers for
-                    # the real Shop.  A lower threshold used to admit the
-                    # visually similar Equipment Repair building.
-                    min_inliers=18,
-                    search_bounds=(80, 75, 1210, 620),
+            force_scan_move = bool(
+                getattr(self, "routine_merchant_force_scan_move", False)
+            )
+            if force_scan_move:
+                # The previous candidate was already disproved by its radial
+                # actions.  Move the camera before running any detector again;
+                # otherwise the same high-inlier false facade (live: Equipment
+                # Repair) can be selected forever from an unchanged frame.
+                self.routine_merchant_force_scan_move = False
+                logger.info(
+                    "Merchant search is moving past the previously rejected building candidate"
                 )
+            if (
+                not force_scan_move
+                and building_template is not None
+                and building_template.size
+            ):
+                for candidate_name in ("merchant_shop_building.jpg", "merchant_shop_building_upgraded.jpg"):
+                    candidate_template = cv2.imread(str(MERCHANT_ASSET_DIR / candidate_name))
+                    candidate_target, candidate_inliers = detect_merchant_shop_feature_target(
+                        frame, candidate_template, min_inliers=10,
+                        search_bounds=(80, 75, 1210, 620),
+                    )
+                    if candidate_target is not None and (building_target is None or candidate_inliers > feature_inliers):
+                        building_target, feature_inliers = candidate_target, candidate_inliers
+                        building_template = candidate_template
+                    elif building_target is None:
+                        feature_inliers = max(feature_inliers, candidate_inliers)
                 logger.info(
                     "Merchant Shop feature match inliers=%s target=%s",
                     feature_inliers,
@@ -8234,19 +8471,19 @@ class AutoClicker:
                         shop_marker_target,
                     )
                     if shop_marker_target is None:
-                        # A maxed building catalogue displays crossed-out cards
-                        # and does not place its selection marker at all.  The
-                        # high-confidence facade match is still a valid
-                        # candidate; the next iteration verifies Shop's real
-                        # four-arrow radial menu before opening anything.  If
-                        # that verification fails, the scan continues without
-                        # completing or deferring the merchant task.
+                        # A completed catalogue need not leave a gold marker.
+                        # A verified facade can still be selected; the next
+                        # frame must independently prove its Shop radial menu.
                         logger.info(
-                            "Merchant feature candidate accepted without the "
-                            "catalogue marker for radial verification (%s inliers)",
+                            "Verified Shop facade selected for radial verification (%s inliers)",
                             feature_inliers,
                         )
-            if building_target is None and building_template is not None and building_template.size:
+            if (
+                not force_scan_move
+                and building_target is None
+                and building_template is not None
+                and building_template.size
+            ):
                 building_target, building_score = detect_merchant_shop_building_target(
                     frame,
                     building_template,
@@ -8259,6 +8496,28 @@ class AutoClicker:
                 building_target,
             )
             if building_target is not None:
+                reference_x = building_target[0] * 1280.0 / width
+                reference_y = building_target[1] * 720.0 / height
+                if not (240 <= reference_x <= 1000 and 210 <= reference_y <= 410):
+                    # A correct facade near the HUD/side panels can have its
+                    # radial actions clipped. Bring it into the free map area
+                    # and detect it again before selecting the building.
+                    start = (int(width / 2), int(height * 400 / 720))
+                    end = (
+                        int(max(200, min(1080, 1280 - reference_x)) * width / 1280),
+                        int(max(200, min(580, 730 - reference_y)) * height / 720),
+                    )
+                    if self.uses_adb:
+                        self.adb_client.swipe(*start, *end, 500)
+                    else:
+                        pyautogui.moveTo(*start)
+                        pyautogui.dragTo(*end, duration=0.5, button="left")
+                    self._invalidate_capture()
+                    self.routine_last_action_time = time.time()
+                    self._interruptible_sleep(0.8)
+                    self.set_status_message("Таинственный торговец: перемещаю магазин в центр экрана", force=True)
+                    logger.info("Merchant facade recentered from %s before radial verification", building_target)
+                    return True
                 tap_target = shop_marker_target or building_target
                 if not self._tap_routine_fallback(
                     tap_target,
@@ -8287,20 +8546,20 @@ class AutoClicker:
                     retry_delay=60.0,
                 )
                 return True
-            best_target, sign_score = detect_merchant_shop_building_target(
-                frame,
-                sign_template,
-                # Alternate Shop levels have a different facade, but their
-                # real roof word remains a strong 0.45 match.  Unrelated live
-                # settlement signs stayed at 0.32 or below, so never restore
-                # the old permissive action threshold.
-                min_score=0.40,
-                search_bounds=(180, 110, 1180, 590),
-            )
+            best_target = None
+            sign_score = -1.0
+            if not force_scan_move:
+                best_target, sign_score = detect_merchant_shop_building_target(
+                    frame,
+                    sign_template,
+                    # Alternate Shop levels have a different facade, but their
+                    # real roof word remains a strong 0.45 match.  Unrelated live
+                    # settlement signs stayed at 0.32 or below, so never restore
+                    # the old permissive action threshold.
+                    min_score=0.40,
+                    search_bounds=(180, 110, 1180, 590),
+                )
             shop_match_confirmed = best_target is not None and sign_score >= 0.40
-            if getattr(self, "routine_merchant_force_scan_move", False):
-                self.routine_merchant_force_scan_move = False
-                shop_match_confirmed = False
             logger.info(
                 "Merchant Shop sign match score=%.3f target=%s",
                 sign_score,
@@ -8312,9 +8571,9 @@ class AutoClicker:
             )
             if not shop_match_confirmed:
                 scan_index = int(getattr(self, "routine_merchant_scan_index", 0) or 0)
-                # Catalogue selection already centred Shop.  A short bounded
-                # correction is sufficient; the old 96-step shelter snake only
-                # hid bad catalogue coordinates and wasted several minutes.
+                # A maxed catalogue card does not always centre its building.
+                # Try the short local route first, then sweep the shelter from
+                # a reproducible corner using the verified facade reference.
                 scan_pattern = (
                     "down",
                     "down",
@@ -8324,29 +8583,8 @@ class AutoClicker:
                     "up",
                     "up",
                     "left",
-                )
+                ) + HEALING_CAMERA_SCAN_PATTERN
                 if scan_index >= len(scan_pattern):
-                    if self.routine_only_task_id == "mysterious_merchant":
-                        self.routine_merchant_scan_index = 0
-                        self.routine_completed_steps.difference_update(
-                            {
-                                "merchant_build_menu_open",
-                                "merchant_catalog_reset",
-                                "merchant_catalog_scrolled",
-                                "merchant_shop_card_tapped",
-                                "merchant_build_menu_closed",
-                                "merchant_catalog_selection_marker_checked",
-                                "merchant_arrival_marker_checked",
-                                "merchant_event_panel_checked",
-                                "merchant_selected_building_revealed",
-                                "merchant_shop_building_tapped",
-                            }
-                        )
-                        logger.warning(
-                            "Merchant Shop was not found in one route; restarting the search immediately"
-                        )
-                        self._interruptible_sleep(0.7)
-                        return True
                     self._defer_current_routine_unavailable(
                         "здание магазина не найдено после полного обхода убежища",
                         time.time(),
@@ -9959,19 +10197,40 @@ class AutoClicker:
 
         retry_delay = 60.0
         self.routine_next_run[task["id"]] = now + retry_delay
-        logger.info(
-            "Routine %s reached the squad screen while every squad is busy; retrying in %.0f seconds",
-            task.get("id"),
-            retry_delay,
+        resource_squads_exhausted = bool(
+            str(task.get("id") or "") in RESOURCE_TASK_IDS
+            and self._mark_resource_squads_exhausted_for_current_pass()
         )
+        if resource_squads_exhausted:
+            logger.info(
+                "Routine %s confirmed that no troops or squads remain for gathering; remaining resource tasks are skipped for this account pass",
+                task.get("id"),
+            )
+        else:
+            logger.info(
+                "Routine %s reached the squad screen while every squad is busy; retrying in %.0f seconds",
+                task.get("id"),
+                retry_delay,
+            )
         self._return_to_main_screen(max_back_steps=3)
-        self.set_status_message(
-            "Все отряды заняты походами или лагерем. Повтор через 60 сек",
-            force=True,
-        )
+        if resource_squads_exhausted:
+            self.set_status_message(
+                "Свободных войск для сбора нет: остальные ресурсы пропущены на этом аккаунте",
+                force=True,
+            )
+        else:
+            self.set_status_message(
+                "Все отряды заняты походами или лагерем. Повтор через 60 сек",
+                force=True,
+            )
         self.routine_last_outcome = {
             "task_id": str(task.get("id") or ""),
             "outcome": "deferred_no_squad",
+            "reason": (
+                "resource_squads_exhausted_for_pass"
+                if resource_squads_exhausted
+                else "all_squads_busy"
+            ),
             "completed_steps": sorted(self.routine_completed_steps),
             "actions": int(self.routine_current_action_count),
         }
@@ -10248,7 +10507,7 @@ class AutoClicker:
             self._show_notification('warning', 'routine_no_enabled')
             return False
         if not any(
-            task.get("id") == "game_login"
+            task.get("id") in {"game_login", "alliance_gifts"}
             or self.get_routine_templates(task, active_only=True)
             for task in enabled_tasks
         ):
@@ -10840,6 +11099,14 @@ class AutoClicker:
                     if current_routine_task is None:
                         time.sleep(max(0.1, min(0.5, self.sleep_not_found)))
                         continue
+                    if (
+                        current_routine_task.get("id") == "__account_switch__"
+                        and self._try_account_switch_igg_game_confirmation(current_routine_task)
+                    ):
+                        # Resolve the game-owned confirmation before generic
+                        # dialogs, accessibility checks or navigation recovery
+                        # can dismiss it and expose the previous settlement.
+                        continue
                     if self._try_global_login_connection_recovery(current_routine_task):
                         continue
                     if (
@@ -10970,6 +11237,13 @@ class AutoClicker:
                         and self._try_trucks_visual_fallback(current_routine_task)
                     ):
                         continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task
+                    and self._try_alliance_gifts_visual_fallback(current_routine_task)
+                ):
+                    continue
 
                 if not active_images:
                     self.set_status_message("Нет активных областей", force=True)
@@ -17122,6 +17396,11 @@ def should_autostart_boost_only(argv=None):
     return any(str(arg).strip().lower() == "--boost-only" for arg in args)
 
 
+def should_autostart_alliance_gifts_only(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    return any(str(arg).strip().lower() == "--alliance-gifts-only" for arg in args)
+
+
 def should_autostart_all_emulators(argv=None):
     args = sys.argv[1:] if argv is None else argv
     return any(str(arg).strip().lower() == "--autostart-all" for arg in args)
@@ -17303,6 +17582,9 @@ def main():
     elif should_autostart_boost_only():
         logger.info("Boost-only diagnostic requested: all other tasks are suspended")
         root.after(1500, lambda: bot.start_task_only("gathering_boost"))
+    elif should_autostart_alliance_gifts_only():
+        logger.info("Alliance gifts diagnostic requested: all other tasks are suspended")
+        root.after(1500, lambda: bot.start_task_only("alliance_gifts"))
     elif should_autostart_routines():
         if should_start_fresh_pass():
             logger.info(
