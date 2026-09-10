@@ -36,6 +36,10 @@ class MainActivity : Activity() {
     private lateinit var visualQualitySpinner: Spinner
     private val featureChecks = linkedMapOf<BotFeature, CheckBox>()
     private var startAfterCapturePermission = false
+    private val autoStartHandler = Handler(Looper.getMainLooper())
+    private var pendingAutoStart: Runnable? = null
+    private var removeStatusListener: (() -> Unit)? = null
+    private var removeStopListener: (() -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +47,11 @@ class MainActivity : Activity() {
         val installResult = BuiltInTemplateInstaller.install(this)
         val savedSettings = BotFeatureStore.load(this)
 
-        BotEngine.onStatusChanged = { status ->
+        removeStopListener = BotEngine.addStopListener {
+            runOnUiThread { cancelPendingAutoStart() }
+        }
+
+        removeStatusListener = BotEngine.addStatusListener { status ->
             runOnUiThread {
                 if (::statusView.isInitialized) {
                     statusView.text = status
@@ -118,6 +126,7 @@ class MainActivity : Activity() {
             startSelectedTasks()
         })
         container.addView(fullButton("Остановить бота") {
+            cancelPendingAutoStart()
             BotEngine.stop()
             ScreenCaptureService.stopVisualLoop()
         })
@@ -179,19 +188,29 @@ class MainActivity : Activity() {
 
         if (startAfterCapturePermission) {
             startAfterCapturePermission = false
-            Handler(Looper.getMainLooper()).postDelayed(
-                {
-                    ScreenCaptureService.startVisualLoop()
-                    launchGame()
-                },
-                800L,
-            )
+            val startAction = Runnable {
+                pendingAutoStart = null
+                ScreenCaptureService.startVisualLoop()
+                launchGame()
+            }
+            pendingAutoStart = startAction
+            autoStartHandler.postDelayed(startAction, 800L)
         }
     }
 
     override fun onDestroy() {
-        BotEngine.onStatusChanged = null
+        cancelPendingAutoStart()
+        removeStatusListener?.invoke()
+        removeStatusListener = null
+        removeStopListener?.invoke()
+        removeStopListener = null
         super.onDestroy()
+    }
+
+    private fun cancelPendingAutoStart() {
+        startAfterCapturePermission = false
+        pendingAutoStart?.let(autoStartHandler::removeCallbacks)
+        pendingAutoStart = null
     }
 
     private fun startSelectedTasks() {
@@ -225,6 +244,7 @@ class MainActivity : Activity() {
     }
 
     private fun requestVisualCapture(autoStart: Boolean) {
+        cancelPendingAutoStart()
         startAfterCapturePermission = autoStart
         val manager = getSystemService(MediaProjectionManager::class.java)
         startActivityForResult(manager.createScreenCaptureIntent(), SCREEN_CAPTURE_REQUEST_CODE)

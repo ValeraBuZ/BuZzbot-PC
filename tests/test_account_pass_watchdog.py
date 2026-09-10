@@ -10,6 +10,63 @@ from buzzbot_app import (
 
 
 class AccountPassWatchdogTests(unittest.TestCase):
+    def test_completed_pass_with_no_peer_on_same_emulator_resumes_local_work(self):
+        for rotation_enabled in (True, False):
+            with self.subTest(rotation_enabled=rotation_enabled):
+                bot = AutoClicker.__new__(AutoClicker)
+                bot.current_routine_task_id = None
+                bot.routine_only_task_id = None
+                bot.account_rotation_enabled = rotation_enabled
+                bot.routine_pass_completed = True
+                bot.routine_forced_task_queue = []
+                bot.routine_radar_return_hold = False
+                bot.account_switch_retry_at = 0.0
+                bot.current_account_id = 'focus'
+                bot.account_profiles = [
+                    {'id':'focus', 'enabled':True, 'ldplayer_index':6},
+                    {'id':'farm', 'enabled':True, 'ldplayer_index':1},
+                ]
+                bot.get_current_account = lambda: bot.account_profiles[0]
+                calls = []
+                bot._resume_single_account_pass = lambda now: calls.append(now) or False
+                bot.get_active_marches = lambda now: self.fail('Daily login must not become the waiting task')
+                self.assertIsNone(bot._begin_due_routine(200.0))
+                self.assertEqual(calls, [200.0])
+
+    def test_single_account_restarts_for_due_donations_without_resetting_daily_login(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        bot.routine_tasks = [
+            {"id": "game_login", "enabled": True},
+            {"id": "alliance_donations", "enabled": True},
+        ]
+        bot._scheduler_routine_tasks = lambda: bot.routine_tasks
+        bot.routine_next_run = {"game_login": 86500.0, "alliance_donations": 100.0}
+        bot.routine_pass_completed = True
+        bot.current_routine_index = 0
+        bot.current_account_id = "only-profile"
+        bot.save_config = lambda: None
+
+        self.assertTrue(bot._resume_single_account_pass(200.0))
+        self.assertFalse(bot.routine_pass_completed)
+        self.assertEqual(bot.account_pass_started_at, 200.0)
+        self.assertEqual(bot.current_routine_index, 0)
+        self.assertEqual(bot.routine_next_run, {"game_login": 86500.0, "alliance_donations": 100.0})
+
+    def test_single_account_waits_for_earliest_cooldown_and_keeps_pass_closed(self):
+        bot = AutoClicker.__new__(AutoClicker)
+        tasks = [{"id": "game_login", "enabled": True}, {"id": "alliance_donations", "enabled": True}]
+        bot._scheduler_routine_tasks = lambda: tasks
+        bot.routine_next_run = {"game_login": 86500.0, "alliance_donations": 300.0}
+        bot.routine_pass_completed = True
+        bot.lang = "ru"
+        bot.get_routine_task_name = lambda task: task["id"]
+        messages = []
+        bot.set_status_message = lambda message: messages.append(message)
+        bot.save_config = lambda: self.fail("Idle pass should not be saved repeatedly")
+        self.assertFalse(bot._resume_single_account_pass(200.0))
+        self.assertTrue(bot.routine_pass_completed)
+        self.assertIn("alliance_donations", messages[-1])
+
     def test_switch_retry_wait_does_not_restart_completed_pass(self):
         bot = AutoClicker.__new__(AutoClicker)
         bot.current_routine_task_id = None

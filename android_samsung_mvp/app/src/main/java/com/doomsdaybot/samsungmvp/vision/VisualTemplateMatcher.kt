@@ -112,6 +112,9 @@ object VisualTemplateMatcher {
         val maxX = frame.width - template.width
         var y = 0
         while (y <= maxY) {
+            if (Thread.currentThread().isInterrupted) {
+                return null
+            }
             var x = 0
             while (x <= maxX) {
                 val score = scoreAt(framePixels, frame.width, templatePixels, template.width, template.height, x, y, sampleStep)

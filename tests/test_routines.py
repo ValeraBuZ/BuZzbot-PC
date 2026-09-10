@@ -639,7 +639,8 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertIn(donate_uid, by_uid[donation_close_uid]["skip_if_visible_uids"])
         self.assertEqual(by_uid[donation_close_uid]["runtime_step"], "project_closed")
         self.assertTrue(by_uid[donation_close_uid]["repeat_runtime_step"])
-        self.assertTrue(by_uid[donation_close_uid]["completes_routine"])
+        self.assertFalse(by_uid[donation_close_uid]["completes_routine"])
+        self.assertTrue(by_uid[donation_close_uid]["defer_when_limit_reached"])
         self.assertLessEqual(by_uid[donation_project_uid]["confidence"], 0.74)
         self.assertEqual(by_uid[donation_project_uid]["orb_match_threshold"], 3)
         self.assertEqual(by_uid[donation_marked_uid]["action"], "alliance_marked_project")
@@ -658,7 +659,7 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertGreaterEqual(donation_task["timeout_seconds"], 45.0)
         self.assertEqual(donation_task["completion_runtime_step"], "all_projects_checked")
 
-    def test_donation_exhaustion_completes_only_after_project_close_and_timeout(self):
+    def test_donation_exhaustion_requires_explicit_limit_confirmation(self):
         task = {
             "id": "alliance_donations",
             "timeout_seconds": 45.0,
@@ -669,8 +670,11 @@ class RoutineTaskTests(unittest.TestCase):
         self.assertFalse(
             donation_exhaustion_is_complete(task, {"project_closed"}, 14.9)
         )
-        self.assertTrue(
+        self.assertFalse(
             donation_exhaustion_is_complete(task, {"project_closed"}, 15.0)
+        )
+        self.assertTrue(
+            donation_exhaustion_is_complete(task, {"donations_exhausted"}, 15.0)
         )
         self.assertFalse(
             donation_exhaustion_is_complete(

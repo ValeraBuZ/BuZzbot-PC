@@ -141,8 +141,14 @@ class FloatingOverlayController(
         })
         panel.addView(buttonRow("Пауза", "Дальше", "Скрыть") { action ->
             when (action) {
-                "Пауза" -> BotEngine.pause()
-                "Дальше" -> BotEngine.resume()
+                "Пауза" -> {
+                    BotEngine.pause()
+                    ScreenCaptureService.pauseVisualLoop()
+                }
+                "Дальше" -> {
+                    BotEngine.resume()
+                    ScreenCaptureService.resumeVisualLoop()
+                }
                 "Скрыть" -> hide()
             }
         })

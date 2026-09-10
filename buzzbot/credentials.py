@@ -2,16 +2,23 @@ from __future__ import annotations
 
 import base64
 import ctypes
+from contextlib import contextmanager
 from ctypes import wintypes
+import hashlib
 import json
 import os
 from pathlib import Path
+import threading
+
+from buzzbot.device_lock import DeviceLease
+from buzzbot.storage import atomic_write_json
 
 
 CRYPTPROTECT_UI_FORBIDDEN = 0x1
 # Keep the original entropy so credentials saved by older BuZzbot versions
 # remain readable after adding IGG Account support.
 _ENTROPY = b"BuZzbot Google credentials v1"
+_CREDENTIAL_EDIT_LOCK = threading.RLock()
 
 
 class CredentialError(RuntimeError):
@@ -99,27 +106,41 @@ class CredentialStore:
         self._protect = protector or protect_with_dpapi
         self._unprotect = unprotector or unprotect_with_dpapi
 
+    @contextmanager
+    def _edit(self):
+        # Atomic replacement alone cannot protect a read/modify/write operation
+        # shared by the GUI, Hub and other portable processes.
+        with _CREDENTIAL_EDIT_LOCK:
+            identity = os.path.normcase(str(self.path.resolve())).encode("utf-8")
+            lease = DeviceLease(
+                hashlib.sha256(identity).hexdigest(), lock_root=self.path.parent / ".locks"
+            )
+            try:
+                if not lease.acquire():
+                    raise CredentialError("Хранилище паролей изменяется другим процессом. Повторите сохранение.")
+                yield
+            except OSError as exc:
+                raise CredentialError(f"Не удалось изменить хранилище паролей: {exc}") from exc
+            finally:
+                lease.release()
+
     def _load(self):
         if not self.path.is_file():
             return {"version": 1, "credentials": {}}
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise CredentialError(f"Не удалось прочитать хранилище паролей: {exc}") from exc
-        credentials = payload.get("credentials", {}) if isinstance(payload, dict) else {}
+        if not isinstance(payload, dict):
+            raise CredentialError("Некорректный формат хранилища паролей.")
+        credentials = payload.get("credentials", {})
         if not isinstance(credentials, dict):
-            credentials = {}
+            raise CredentialError("Некорректный формат хранилища паролей.")
         return {"version": 1, "credentials": credentials}
 
     def _save(self, payload):
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
-            temp_path.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            os.replace(temp_path, self.path)
+            atomic_write_json(self.path, payload)
         except OSError as exc:
             raise CredentialError(f"Не удалось сохранить зашифрованный пароль: {exc}") from exc
 
@@ -141,9 +162,10 @@ class CredentialStore:
         if not value:
             raise CredentialError("Пароль не может быть пустым.")
         protected = self._protect(value.encode("utf-8"))
-        payload = self._load()
-        payload["credentials"][account_key] = base64.b64encode(protected).decode("ascii")
-        self._save(payload)
+        with self._edit():
+            payload = self._load()
+            payload["credentials"][account_key] = base64.b64encode(protected).decode("ascii")
+            self._save(payload)
 
     def get_password(self, account_id):
         account_key = str(account_id or "").strip()
@@ -153,13 +175,14 @@ class CredentialStore:
         try:
             protected = base64.b64decode(encoded, validate=True)
             return self._unprotect(protected).decode("utf-8")
-        except (ValueError, UnicodeDecodeError, OSError) as exc:
+        except (TypeError, ValueError, UnicodeDecodeError, OSError) as exc:
             raise CredentialError(f"Не удалось расшифровать пароль профиля: {exc}") from exc
 
     def delete_password(self, account_id):
         account_key = str(account_id or "").strip()
-        payload = self._load()
-        removed = payload["credentials"].pop(account_key, None) is not None
-        if removed:
-            self._save(payload)
+        with self._edit():
+            payload = self._load()
+            removed = payload["credentials"].pop(account_key, None) is not None
+            if removed:
+                self._save(payload)
         return removed

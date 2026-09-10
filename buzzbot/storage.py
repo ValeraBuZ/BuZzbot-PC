@@ -3,8 +3,54 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
+import tempfile
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
+
+
+_SAVE_LOCK = threading.RLock()
+
+
+def _replace_with_windows_retry(source, destination):
+    """Briefly retry a Windows sharing/access denial, retaining atomic replace."""
+    delays = (0.05, 0.10, 0.20)
+    for attempt in range(len(delays) + 1):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError as exc:
+            if (
+                sys.platform != "win32"
+                or getattr(exc, "winerror", None) not in {5, 32, 33}
+                or attempt == len(delays)
+            ):
+                raise
+            time.sleep(delays[attempt])
+
+
+def atomic_write_json(path, data):
+    """Replace a complete JSON document without truncating the previous file."""
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    path = Path(path)
+    ensure_directory(path.parent)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temp_path = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _replace_with_windows_retry(temp_path, path)
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+    return path
 
 
 def ensure_directory(path):
@@ -25,6 +71,9 @@ def _trim_old_files(directory, pattern, keep_last):
 
 
 def save_json_with_backup(path, data, backup_dir=None, keep_backups=10):
+    # Validate before changing backups or touching an existing document.
+    json.dumps(data, ensure_ascii=False)
+    keep_backups = max(0, int(keep_backups))
     path = Path(path)
     ensure_directory(path.parent)
 
@@ -32,24 +81,12 @@ def save_json_with_backup(path, data, backup_dir=None, keep_backups=10):
         backup_dir = path.parent / "backups" / path.stem
     backup_dir = ensure_directory(backup_dir)
 
-    if path.exists():
-        backup_path = backup_dir / f"{path.stem}_{_timestamp()}{path.suffix}"
-        shutil.copy2(path, backup_path)
+    with _SAVE_LOCK:
+        if path.exists():
+            backup_path = backup_dir / f"{path.stem}_{_timestamp()}{path.suffix}"
+            shutil.copy2(path, backup_path)
+        atomic_write_json(path, data)
         _trim_old_files(backup_dir, f"{path.stem}_*{path.suffix}", keep_backups)
-
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    with temp_path.open("w", encoding="utf-8") as file_obj:
-        json.dump(data, file_obj, ensure_ascii=False, indent=2)
-    try:
-        temp_path.replace(path)
-    except PermissionError:
-        with path.open("w", encoding="utf-8") as file_obj:
-            json.dump(data, file_obj, ensure_ascii=False, indent=2)
-        temp_path.unlink(missing_ok=True)
-    except OSError:
-        with path.open("w", encoding="utf-8") as file_obj:
-            json.dump(data, file_obj, ensure_ascii=False, indent=2)
-        temp_path.unlink(missing_ok=True)
     return path
 
 

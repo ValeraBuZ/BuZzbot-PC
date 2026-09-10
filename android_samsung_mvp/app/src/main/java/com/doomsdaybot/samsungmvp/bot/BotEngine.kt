@@ -2,7 +2,6 @@ package com.doomsdaybot.samsungmvp.bot
 
 import android.graphics.Rect
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 object BotEngine {
@@ -13,8 +12,9 @@ object BotEngine {
     var onStatusChanged: ((String) -> Unit)? = null
 
     private val statusListeners = CopyOnWriteArrayList<(String) -> Unit>()
-    private val running = AtomicBoolean(false)
-    private val paused = AtomicBoolean(false)
+    private val stopListeners = CopyOnWriteArrayList<() -> Unit>()
+    private val loopControl = LoopControl()
+    private var worker: Thread? = null
     @Volatile
     private var rules: List<BotRule> = emptyList()
 
@@ -34,6 +34,11 @@ object BotEngine {
 
     fun setRules(value: List<BotRule>) {
         rules = value
+    }
+
+    fun addStopListener(listener: () -> Unit): () -> Unit {
+        stopListeners.add(listener)
+        return { stopListeners.remove(listener) }
     }
 
     fun inspectCurrentScreen(service: BotAccessibilityService, rules: List<BotRule> = this.rules) {
@@ -57,55 +62,66 @@ object BotEngine {
         )
     }
 
+    @Synchronized
     fun start(service: BotAccessibilityService, rules: List<BotRule>) {
+        if (worker?.isAlive == true) {
+            setStatus("Previous loop is still running or stopping.")
+            return
+        }
         if (rules.none { it.enabled }) {
             setStatus("No enabled rules.")
             return
         }
 
-        if (!running.compareAndSet(false, true)) {
+        if (!loopControl.start()) {
             setStatus("Already running.")
             return
         }
 
-        paused.set(false)
         setRules(rules)
         setStatus("Running with ${rules.count { it.enabled }} rule(s).")
-        thread(name = "BotEngine", isDaemon = true) {
+        worker = thread(name = "BotEngine", isDaemon = true, start = false) {
             try {
                 loop(service)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (error: Exception) {
+                android.util.Log.e("BotEngine", "Loop failed", error)
             } finally {
-                running.set(false)
+                loopControl.stop()
                 setStatus("Stopped.")
             }
         }
+        worker?.start()
     }
 
+    @Synchronized
     fun stop() {
-        running.set(false)
+        loopControl.stop()
+        worker?.interrupt()
+        stopListeners.forEach { listener -> listener() }
         setStatus("Stopping.")
     }
 
     fun pause() {
-        if (!running.get()) {
+        if (!loopControl.pause()) {
             setStatus("Not running.")
             return
         }
-        paused.set(true)
         setStatus("Paused.")
     }
 
     fun resume() {
-        if (!running.get()) {
+        if (!loopControl.resume()) {
             setStatus("Not running.")
             return
         }
-        paused.set(false)
         setStatus("Running.")
     }
 
+    @Synchronized
     fun runOnce(service: BotAccessibilityService, rules: List<BotRule>) {
-        if (running.get()) {
+        if (worker?.isAlive == true) {
             setStatus("Stop the loop before Test once.")
             return
         }
@@ -119,8 +135,8 @@ object BotEngine {
     }
 
     private fun loop(service: BotAccessibilityService) {
-        while (running.get()) {
-            if (paused.get()) {
+        while (loopControl.isRunning) {
+            if (loopControl.isPaused) {
                 Thread.sleep(300)
                 continue
             }
@@ -151,7 +167,11 @@ object BotEngine {
 
         val bounds = Rect()
         target.node.getBoundsInScreen(bounds)
-        val tapped = service.tapCenter(bounds)
+        val tapped = if (sleepAfterTap) {
+            loopControl.runIfActive { service.tapCenter(bounds) } ?: return false
+        } else {
+            service.tapCenter(bounds)
+        }
         setStatus("Found '${target.rule.name}' at ${bounds.centerX()}, ${bounds.centerY()}. Tap=$tapped")
         if (sleepAfterTap) {
             Thread.sleep(target.rule.delayMs.coerceAtLeast(100L))

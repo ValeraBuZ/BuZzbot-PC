@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+import logging
 from pathlib import Path
 import sys
 import threading
@@ -12,6 +13,9 @@ from PIL import Image, ImageTk
 
 from buzzbot.accounts import mask_account_login
 from buzzbot.routines import effective_task_group, task_setting_specs
+
+
+logger = logging.getLogger("BuZzbot")
 
 
 CATEGORY_TITLES = {
@@ -1681,7 +1685,7 @@ def build_compact_ui(root, bot):
                         value=branch_labels.get(task.get("settings", {}).get("branch", "off"), "Выкл")
                     )
 
-                    def select_research_branch(_event=None, current_task=task, variable=branch_var):
+                    def select_research_branch(_event=None, current_task=task, variable=branch_var, reverse_branches=reverse_branches):
                         branch = reverse_branches.get(variable.get(), "off")
                         current_task.setdefault("settings", {})["branch"] = branch
                         current_task["enabled"] = branch != "off"

@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 
 def parse_time_to_minutes(time_value):
-    if not time_value or ":" not in time_value:
+    if not isinstance(time_value, str) or ":" not in time_value:
         return None
     try:
         hours, minutes = map(int, time_value.split(":"))

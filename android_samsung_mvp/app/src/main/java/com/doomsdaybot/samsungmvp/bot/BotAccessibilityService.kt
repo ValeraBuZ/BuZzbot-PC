@@ -6,6 +6,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.doomsdaybot.samsungmvp.vision.ScreenCaptureService
 
 class BotAccessibilityService : AccessibilityService() {
     private var overlayController: FloatingOverlayController? = null
@@ -19,10 +20,14 @@ class BotAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
 
     override fun onInterrupt() {
+        BotEngine.stop()
+        ScreenCaptureService.stopVisualLoop()
         BotEngine.setStatus("Accessibility service interrupted.")
     }
 
     override fun onDestroy() {
+        BotEngine.stop()
+        ScreenCaptureService.stopVisualLoop()
         overlayController?.destroy()
         overlayController = null
         if (instance === this) {

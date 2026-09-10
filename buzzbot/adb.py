@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import time
+import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -41,12 +43,12 @@ class AdbClient:
         self.serial = str(serial or "").strip()
         self._runner = runner or subprocess.run
 
-    def _run(self, args, *, binary=False, timeout=10):
+    def _run(self, args, *, binary=False, timeout=10, device_specific=True):
         if self.adb_path is None:
             raise AdbError("ADB не найден. Укажите путь к adb.exe.")
 
         command = [str(self.adb_path)]
-        if self.serial:
+        if device_specific and self.serial:
             command.extend(["-s", self.serial])
         command.extend(str(arg) for arg in args)
 
@@ -125,8 +127,8 @@ class AdbClient:
         ], timeout=5)
 
     def input_text(self, value):
-        escaped = str(value).replace("%", "\\%").replace(" ", "%s")
-        self._run(["shell", "input", "text", escaped], timeout=5)
+        escaped = str(value).replace(" ", "%s")
+        self._run(["shell", "input", "text", shlex.quote(escaped)], timeout=5)
 
     def input_private_text(self, value):
         """Enter sensitive text without placing it in the host process command line."""
@@ -164,11 +166,15 @@ class AdbClient:
         try:
             process = subprocess.Popen(command, **kwargs)
             _stdout, stderr = process.communicate(script, timeout=10)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.communicate()
+            raise AdbError("Превышено время безопасного ввода ADB.") from exc
         except (OSError, subprocess.SubprocessError) as exc:
             raise AdbError(f"Не удалось выполнить безопасный ввод ADB: {exc}") from exc
         if process.returncode != 0:
-            message = (stderr or b"").decode("utf-8", errors="replace").strip()
-            raise AdbError(message or "Безопасный ввод ADB завершился с ошибкой.")
+            # The shell may echo a secret on failure; never include its output.
+            raise AdbError("Безопасный ввод ADB завершился с ошибкой.")
 
     def keyevent(self, key_code):
         self._run(["shell", "input", "keyevent", int(key_code)], timeout=5)
@@ -246,12 +252,7 @@ class AdbClient:
         return output
 
     def list_devices(self):
-        original_serial = self.serial
-        self.serial = ""
-        try:
-            output = self._run(["devices", "-l"], timeout=6)
-        finally:
-            self.serial = original_serial
+        output = self._run(["devices", "-l"], timeout=6, device_specific=False)
         devices = []
         for line in str(output or "").splitlines():
             parts = line.strip().split()
@@ -263,33 +264,23 @@ class AdbClient:
         target = str(address or "").strip()
         if not target:
             raise AdbError("Не указан адрес ADB-устройства.")
-        original_serial = self.serial
-        self.serial = ""
-        try:
-            output = self._run(["connect", target], timeout=10)
-        finally:
-            self.serial = original_serial
+        output = self._run(["connect", target], timeout=10, device_specific=False)
         message = str(output or "").strip()
         if "failed" in message.lower() or "unable" in message.lower():
             raise AdbError(message)
         return message
 
     def restart_server(self):
-        original_serial = self.serial
-        self.serial = ""
         try:
-            try:
-                self._run(["kill-server"], timeout=10)
-            except AdbError:
-                pass
-            try:
-                self._run(["start-server"], timeout=10)
-            except AdbError:
-                if not self._terminate_stale_adb_processes():
-                    raise
-                self._run(["start-server"], timeout=10)
-        finally:
-            self.serial = original_serial
+            self._run(["kill-server"], timeout=10, device_specific=False)
+        except AdbError:
+            pass
+        try:
+            self._run(["start-server"], timeout=10, device_specific=False)
+        except AdbError:
+            if not self._terminate_stale_adb_processes():
+                raise
+            self._run(["start-server"], timeout=10, device_specific=False)
 
     def _terminate_stale_adb_processes(self):
         if os.name != "nt" or self.adb_path is None:
@@ -321,7 +312,7 @@ class AdbClient:
 
     def ui_xml(self, attempts=3):
         """Return the accessibility tree, tolerating delayed UIAutomator writes."""
-        remote_path = f"/data/local/tmp/buzzbot_ui_{os.getpid()}.xml"
+        remote_path = f"/data/local/tmp/buzzbot_ui_{os.getpid()}_{uuid.uuid4().hex}.xml"
         last_error = None
         try:
             for attempt in range(max(1, int(attempts))):

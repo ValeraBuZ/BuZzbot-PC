@@ -58,8 +58,11 @@ def normalize_account_profiles(raw_profiles, serial="emulator-5564"):
             continue
         name = str(source.get("name") or f"Аккаунт {index + 1}").strip()
         account_id = str(source.get("id") or _account_id(name)).strip()
-        if account_id in used_ids:
-            account_id = f"{account_id}_{index + 1}"
+        base_id = account_id
+        suffix = index + 1
+        while account_id in used_ids:
+            account_id = f"{base_id}_{suffix}"
+            suffix += 1
         used_ids.add(account_id)
         task_enabled = source.get("task_enabled")
         task_settings = source.get("task_settings")

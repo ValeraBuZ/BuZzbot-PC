@@ -134,6 +134,15 @@ def detect_settlement_event_panel_collapse_target(frame_bgr):
     shows the opposite chevron, so comparing the middle and edge centroids
     prevents this detector from reopening it.
     """
+    return _detect_settlement_event_panel_toggle(frame_bgr, expand=False)
+
+
+def detect_settlement_event_panel_expand_target(frame_bgr):
+    """Find the left-pointing toggle of a collapsed settlement event panel."""
+    return _detect_settlement_event_panel_toggle(frame_bgr, expand=True)
+
+
+def _detect_settlement_event_panel_toggle(frame_bgr, *, expand):
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
@@ -162,7 +171,9 @@ def detect_settlement_event_panel_collapse_target(frame_bgr):
     bottom_x = centroid_x(17, 23)
     if top_x is None or middle_x is None or bottom_x is None:
         return None
-    if middle_x < max(top_x, bottom_x) + 2.5:
+    if expand and middle_x > min(top_x, bottom_x) - 2.5:
+        return None
+    if not expand and middle_x < max(top_x, bottom_x) + 2.5:
         return None
 
     return int(round(463 * scale_x)), int(round(83 * scale_y))
@@ -475,6 +486,40 @@ def detect_shop_selection_marker_target(
     )
 
 
+def detect_training_radial_action_target(frame_bgr, barracks_title_target):
+    """Find the labelled Train action near an independently verified barracks.
+
+    Max-level barracks omit Upgrade, moving Train left. Its label remains
+    below the circular action, so a fixed offset from the title is unsafe.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or barracks_title_target is None:
+        return None
+    title_x = float(barracks_title_target[0]) / max(scale_x, 1e-6)
+    title_y = float(barracks_title_target[1]) / max(scale_y, 1e-6)
+    left = max(0, int(title_x - 300))
+    right = min(1280, int(title_x + 300))
+    top = max(0, int(title_y + 100))
+    bottom = min(650, int(title_y + 410))
+    template = imread_unicode(
+        Path(__file__).parent / "assets/training/training_action_label.png",
+        cv2.IMREAD_GRAYSCALE,
+    )
+    if template is None or right <= left or bottom <= top:
+        return None
+    gray = cv2.cvtColor(frame[top:bottom, left:right], cv2.COLOR_BGR2GRAY)
+    if gray.shape[0] < template.shape[0] or gray.shape[1] < template.shape[1]:
+        return None
+    _, score, _, location = cv2.minMaxLoc(
+        cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+    )
+    if score < 0.82:
+        return None
+    label_x = left + location[0] + template.shape[1] / 2
+    label_y = top + location[1] + template.shape[0] / 2
+    return round(label_x * scale_x), round((label_y - 44) * scale_y)
+
+
 def detect_shop_radial_action_target(frame_bgr, building_target=None):
     """Return the ordinary Shop action after the building is selected.
 
@@ -500,16 +545,44 @@ def detect_shop_radial_action_target(frame_bgr, building_target=None):
             if search.shape[0] < template.shape[0] or search.shape[1] < template.shape[1]:
                 return None
             _, score, _, location = cv2.minMaxLoc(cv2.matchTemplate(search, template, cv2.TM_CCOEFF_NORMED))
-            return (left + location[0] + template.shape[1] / 2, top + location[1] + template.shape[0] / 2) if score >= threshold else None
-        title_location = label_location(title, (max(0, building_x - 220), max(0, building_y - 170), min(1280, building_x + 220), max(1, building_y - 45)), 0.82)
-        # The action text floats over the map, so camera movement changes its
-        # background. Both labels are required in their separate positions.
-        action_location = label_location(label, (max(0, building_x - 250), min(719, building_y + 40), min(1280, building_x + 250), min(650, building_y + 240)), 0.74)
-        if title_location is not None and action_location is not None:
-            # Upgraded Shop adds Armory as a fourth radial action. Its ordinary
-            # Shop is then left of centre; use the explicit label, together
-            # with the selected building title, instead of the old midpoint.
-            return round(action_location[0] * scale_x), round((action_location[1] - 40) * scale_y)
+            return (left + location[0] + template.shape[1] / 2, top + location[1] + template.shape[0] / 2, float(score)) if score >= threshold else None
+        title_seen = False
+        best_action = None
+        best_score = -1.0
+        if title is not None and label is not None:
+            # The live IGG 5 menu renders both labels 30% larger than these
+            # reference crops, even though the frame remains 1280x720. Match
+            # both at one coherent UI scale; do not relax either threshold.
+            for ui_scale in np.linspace(0.85, 1.40, 23):
+                scaled_title = cv2.resize(title, None, fx=float(ui_scale), fy=float(ui_scale))
+                scaled_label = cv2.resize(label, None, fx=float(ui_scale), fy=float(ui_scale))
+                title_location = label_location(scaled_title, (max(0, building_x - 220), max(0, building_y - 170), min(1280, building_x + 220), max(1, building_y - 45)), 0.82)
+                if title_location is None:
+                    continue
+                title_seen = True
+                # Ordinary Shop is at/below-left of its title. Armory and
+                # Beast Shop are separate controls to the right; their labels
+                # must not substitute for the ordinary one when it is hidden.
+                half_label = scaled_label.shape[1] / 2
+                action_bounds = (
+                    max(0, building_x - 250, int(title_location[0] - 170 * ui_scale - half_label)),
+                    min(719, building_y + 40),
+                    min(1280, building_x + 250, int(title_location[0] + 20 * ui_scale + half_label)),
+                    min(650, building_y + 240),
+                )
+                action_location = label_location(scaled_label, action_bounds, 0.74)
+                if action_location is None:
+                    continue
+                score = title_location[2] + action_location[2]
+                if score > best_score:
+                    best_score = score
+                    best_action = (action_location[0], action_location[1] - 40 * ui_scale)
+        if best_action is not None:
+            return round(best_action[0] * scale_x), round(best_action[1] * scale_y)
+        if title_seen:
+            # A selected Shop with an unverified ordinary action is not the
+            # unlabeled low-level layout handled by the geometric fallback.
+            return None
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # The arrows are a narrow yellow-green.  A broader green range also picks
     # up vegetation and illuminated facade details, joining an arrow to the
@@ -910,6 +983,53 @@ def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
                      int(round((y1 + y2) / 2 * scale_y)))
                 )
     return sorted(candidates, key=lambda point: (point[1], point[0]))
+
+
+def _game_server_error_text_mask(frame, *, dark=False):
+    """Keep lettering, rather than the title artwork or gold button fill."""
+    if dark:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        return np.clip((110 - gray) * 4, 0, 255).astype(np.uint8)
+    low = np.min(frame, axis=2).astype(np.float32)
+    high = np.max(frame, axis=2).astype(np.float32)
+    mask = np.clip((low - (high - low) * .5 - 80) * 3, 0, 255).astype(np.uint8)
+    return cv2.GaussianBlur(mask, (3, 3), .8)
+
+
+def detect_game_server_connection_error(frame_bgr) -> bool:
+    """Recognize the Russian title-screen connection error and its EXIT label.
+
+    Both cropped text anchors must match their own narrow 1280x720 regions.
+    A generic gold button, an SDK login error, or ordinary loading is not proof
+    of this screen and must not trigger game-restart recovery.
+    """
+    if (not isinstance(frame_bgr, np.ndarray) or frame_bgr.ndim != 3
+            or frame_bgr.shape[2] != 3 or frame_bgr.dtype != np.uint8):
+        return False
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    assets = Path(__file__).parent / "assets" / "accounts"
+    anchors = (
+        ("server_connection_error_text.png", (425, 515, 825, 571), False),
+        ("server_connection_exit_text.png", (515, 596, 750, 657), True),
+    )
+    for filename, (x1, y1, x2, y2), dark in anchors:
+        template = imread_unicode(assets / filename)
+        if template is None:
+            return False
+        template_mask = _game_server_error_text_mask(template, dark=dark)
+        region_mask = _game_server_error_text_mask(frame[y1:y2, x1:x2], dark=dark)
+        if (template_mask.shape[0] > region_mask.shape[0]
+                or template_mask.shape[1] > region_mask.shape[1]
+                or float(np.std(template_mask)) < 1):
+            return False
+        score = cv2.minMaxLoc(cv2.matchTemplate(
+            region_mask, template_mask, cv2.TM_CCOEFF_NORMED,
+        ))[1]
+        if not np.isfinite(score) or score < .90:
+            return False
+    return True
 
 
 def detect_login_session_expired_ok_target(frame_bgr):
@@ -1593,6 +1713,77 @@ def detect_prize_hunt_squad_confirmation_target(frame_bgr):
         return None
 
     return int(round(784 * scale_x)), int(round(508 * scale_y))
+
+
+def detect_alliance_donation_entry_target(frame_bgr, entry_template, confidence=0.88):
+    """Match the stable top of the alliance icon despite its warning badge.
+
+    The canonical entry image includes a dynamic red warning at its lower
+    right. Keep its original threshold and target centre, but search only its
+    unchanged upper pixels in the bottom HUD. The caller must confirm home.
+    """
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None or not isinstance(entry_template, np.ndarray):
+        return None
+    if entry_template.shape != (54, 57, 3):
+        return None
+    try:
+        threshold = float(confidence)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(threshold) or threshold > 1.0:
+        return None
+    threshold = max(0.88, threshold)
+    needle = entry_template[:23, :]
+    # Do not let a changed/custom constant image match every HUD pixel.
+    if float(np.std(needle)) < 1.0:
+        return None
+    left, top, right, bottom = 915, 595, 1020, 705
+    result = cv2.matchTemplate(frame[top:bottom, left:right], needle, cv2.TM_CCOEFF_NORMED)
+    _minimum, score, _minimum_location, location = cv2.minMaxLoc(result)
+    if score < threshold:
+        return None
+    return (
+        int(round((left + location[0] + entry_template.shape[1] // 2) * scale_x)),
+        int(round((top + location[1] + entry_template.shape[0] // 2) * scale_y)),
+    )
+
+
+def alliance_donation_attempts_exhausted(frame_bgr):
+    """Confirm the displayed donation counter is exactly ``: 0/30``.
+
+    This is positive counter recognition, not the absence of an active
+    donation button. The colon is part of the glyph mask so 10/30 and 20/30
+    cannot be mistaken for zero. Unknown layouts remain unconfirmed.
+    """
+    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    if frame is None or frame.shape[2] != 3:
+        return False
+    # Orange glyphs captured from the game's counter at 1280 x 720.
+    glyph_rows = (
+        "..........#####.......###..#####.....#####..",
+        ".........#######......###.#######...#######.",
+        "........###...###....###.###...###.###...###",
+        ".##.....###...###....###.##....###.###...###",
+        "###.....###...###....##........###.###...###",
+        "........###...###...###......####..###...###",
+        "........###...###...###....#####...###...###",
+        "........###...###...##.......####..###...###",
+        "........###...###..###.........###.###...###",
+        "........###...###..##....##....###.###...###",
+        "........###...###.###....###...###.###...###",
+        "###......#######..###....########...#######.",
+        "###.......######..##......######.....######.",
+        ".................###........................",
+    )
+    glyphs = np.array(
+        [[255 if pixel == "#" else 0 for pixel in row] for row in glyph_rows],
+        dtype=np.uint8,
+    )
+    counter = cv2.cvtColor(frame[490:525, 1040:1140], cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(counter, np.array((10, 100, 110)), np.array((40, 255, 255)))
+    score = cv2.minMaxLoc(cv2.matchTemplate(mask, glyphs, cv2.TM_CCOEFF_NORMED))[1]
+    return bool(score >= 0.94)
 
 
 def detect_alliance_marked_project_target(frame_bgr):

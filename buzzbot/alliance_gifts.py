@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
+from buzzbot.matching import imread_unicode
+
 
 def gift_profile_images():
     """Expose the bundled controls in exported training profiles."""
@@ -42,7 +44,7 @@ ASSET_DIR = Path(__file__).parent / "assets" / "alliance_gifts"
 
 @lru_cache(maxsize=24)
 def _template(name):
-    return cv2.imread(str(ASSET_DIR / f"{name}.png"), cv2.IMREAD_GRAYSCALE)
+    return imread_unicode(ASSET_DIR / f"{name}.png", cv2.IMREAD_GRAYSCALE)
 
 
 def _find(frame_bgr, name, bounds, threshold=0.88):

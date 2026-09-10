@@ -14,6 +14,7 @@ import time
 from urllib.parse import unquote, urlparse
 
 from buzzbot.remote_control import remote_data_dir
+from buzzbot.storage import atomic_write_json
 
 
 LOGGER = logging.getLogger("BuZzbot.Hub")
@@ -27,14 +28,7 @@ def default_hub_state_path():
 
 
 def _atomic_write_json(path, payload):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    temp_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    os.replace(temp_path, path)
+    atomic_write_json(path, payload)
 
 
 def _clean_text(value, limit=500):
@@ -53,7 +47,7 @@ class RemoteHubStore:
     def _load(self):
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return
         devices = payload.get("devices", {}) if isinstance(payload, dict) else {}
         if not isinstance(devices, dict):
@@ -67,6 +61,19 @@ class RemoteHubStore:
             self.path,
             {"version": 1, "devices": self._devices},
         )
+
+    def _commit_record_locked(self, device_id, record):
+        # Do not publish a failed command/access update to later requests.
+        previous = self._devices.get(device_id)
+        self._devices[device_id] = record
+        try:
+            self._save_locked()
+        except Exception:
+            if previous is None:
+                del self._devices[device_id]
+            else:
+                self._devices[device_id] = previous
+            raise
 
     def checkin(self, payload):
         if not isinstance(payload, dict):
@@ -86,10 +93,13 @@ class RemoteHubStore:
             "current_task": _clean_text(status.get("current_task"), 120),
             "adb_serial": _clean_text(status.get("adb_serial"), 80),
         }
-        ack_command_id = max(0, int(payload.get("ack_command_id", 0) or 0))
+        try:
+            ack_command_id = max(0, int(payload.get("ack_command_id", 0) or 0))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Некорректный номер подтверждённой команды.") from exc
         now = float(self.time_fn())
         with self._lock:
-            record = self._devices.setdefault(
+            record = deepcopy(self._devices.get(
                 device_id,
                 {
                     "device_id": device_id,
@@ -100,7 +110,7 @@ class RemoteHubStore:
                     "last_seen": 0.0,
                     "status": {},
                 },
-            )
+            ))
             record["device_name"] = device_name
             record["last_seen"] = now
             record["status"] = safe_status
@@ -108,7 +118,7 @@ class RemoteHubStore:
             if isinstance(command, dict) and ack_command_id >= int(command.get("id", 0) or 0):
                 record["command"] = None
                 command = None
-            self._save_locked()
+            self._commit_record_locked(device_id, record)
             return {
                 "ok": True,
                 "server_time": now,
@@ -145,7 +155,8 @@ class RemoteHubStore:
         if action not in ALLOWED_COMMANDS:
             raise ValueError("Недопустимая команда.")
         with self._lock:
-            record = self._get_locked(device_id)
+            device_id = str(device_id)
+            record = deepcopy(self._get_locked(device_id))
             command_id = int(record.get("command_seq", 0) or 0) + 1
             record["command_seq"] = command_id
             record["command"] = {
@@ -153,12 +164,13 @@ class RemoteHubStore:
                 "action": action,
                 "created_at": float(self.time_fn()),
             }
-            self._save_locked()
+            self._commit_record_locked(device_id, record)
             return deepcopy(record["command"])
 
     def set_access(self, device_id, allowed):
         with self._lock:
-            record = self._get_locked(device_id)
+            device_id = str(device_id)
+            record = deepcopy(self._get_locked(device_id))
             record["access_allowed"] = bool(allowed)
             if not allowed:
                 command_id = int(record.get("command_seq", 0) or 0) + 1
@@ -168,7 +180,7 @@ class RemoteHubStore:
                     "action": "stop",
                     "created_at": float(self.time_fn()),
                 }
-            self._save_locked()
+            self._commit_record_locked(device_id, record)
             return bool(record["access_allowed"])
 
 
@@ -270,7 +282,9 @@ class RemoteHubRequestHandler(BaseHTTPRequestHandler):
         header = str(self.headers.get("Authorization") or "")
         prefix = "Bearer "
         supplied = header[len(prefix):] if header.startswith(prefix) else ""
-        return bool(supplied) and hmac.compare_digest(supplied, self.server.auth_token)
+        return bool(supplied) and hmac.compare_digest(
+            supplied.encode("utf-8"), self.server.auth_token.encode("utf-8")
+        )
 
     def _require_auth(self):
         if self._authorized():
@@ -329,7 +343,9 @@ class RemoteHubRequestHandler(BaseHTTPRequestHandler):
                 command = self.server.store.set_command(device_id, payload.get("action"))
                 self._send_json(HTTPStatus.OK, {"ok": True, "command": command})
             else:
-                allowed = self.server.store.set_access(device_id, bool(payload.get("allowed")))
+                if not isinstance(payload.get("allowed"), bool):
+                    raise ValueError("Поле allowed должно быть true или false.")
+                allowed = self.server.store.set_access(device_id, payload["allowed"])
                 self._send_json(HTTPStatus.OK, {"ok": True, "access_allowed": allowed})
         except KeyError as exc:
             self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": str(exc)})
@@ -380,7 +396,9 @@ class RemoteHubRunner:
         self._thread.start()
 
     def stop(self):
-        self.server.shutdown()
+        # shutdown() blocks forever when serve_forever() was never started.
+        if self._thread is not None and self._thread.is_alive():
+            self.server.shutdown()
         self.server.server_close()
         if self._thread is not None:
             self._thread.join(timeout=3.0)

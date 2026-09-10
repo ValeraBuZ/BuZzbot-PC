@@ -10,6 +10,8 @@ import shutil
 import string
 import uuid
 
+from buzzbot.storage import atomic_write_json
+
 
 REPORTS_FOLDER = "BuZzbot Reports"
 INBOX_FOLDER = "Входящие"
@@ -47,7 +49,11 @@ def detect_sync_folders():
         mounted_folder_names = ("My Drive", "Мой диск", "Google Drive")
         for letter in string.ascii_uppercase:
             drive_root = Path(f"{letter}:\\")
-            if not drive_root.is_dir():
+            try:
+                available = drive_root.is_dir()
+            except OSError:
+                available = False
+            if not available:
                 continue
             candidates.extend(drive_root / name for name in mounted_folder_names)
     unique = []
@@ -55,10 +61,11 @@ def detect_sync_folders():
     for candidate in candidates:
         try:
             resolved = candidate.expanduser().resolve()
+            available = resolved.is_dir()
         except OSError:
             continue
         key = os.path.normcase(str(resolved))
-        if key in seen or not resolved.is_dir():
+        if key in seen or not available:
             continue
         seen.add(key)
         unique.append(resolved)
@@ -132,13 +139,7 @@ def save_report_cloud_settings(settings, path=None):
         sync_folder=str(settings.sync_folder or "").strip(),
         device_name=_safe_device_name(settings.device_name),
     )
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = settings_path.with_suffix(settings_path.suffix + ".tmp")
-    temporary.write_text(
-        json.dumps(asdict(normalized), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    os.replace(temporary, settings_path)
+    atomic_write_json(settings_path, asdict(normalized))
     return normalized
 
 

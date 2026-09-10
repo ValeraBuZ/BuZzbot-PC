@@ -77,6 +77,18 @@ exe = EXE(
 """
 
 
+def validate_build_environment():
+    """Reject a Python runtime that would make PyInstaller omit the GUI."""
+    from PyInstaller.utils.hooks.tcl_tk import tcltk_info
+
+    if not tcltk_info.available:
+        raise RuntimeError(
+            "Tcl/Tk is unavailable in this build environment. "
+            "Use a Python installation with working tkinter and access to its Tcl/Tk files. "
+            "PyInstaller would otherwise build an executable without tkinter."
+        )
+
+
 def ensure_clean_target():
     if WORK_ROOT.exists():
         shutil.rmtree(WORK_ROOT, ignore_errors=True)
@@ -280,6 +292,7 @@ def main():
         help="Do not copy config, templates, logs or reports from an older dist build.",
     )
     args = parser.parse_args()
+    validate_build_environment()
     ensure_clean_target()
     write_spec()
     run_pyinstaller()

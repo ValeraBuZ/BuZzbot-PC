@@ -21,10 +21,10 @@ import android.os.HandlerThread
 import android.os.IBinder
 import com.doomsdaybot.samsungmvp.bot.BotAccessibilityService
 import com.doomsdaybot.samsungmvp.bot.BotEngine
+import com.doomsdaybot.samsungmvp.bot.LoopControl
 import com.doomsdaybot.samsungmvp.scenario.BotFeatureStore
 import com.doomsdaybot.samsungmvp.scenario.ScenarioRuntime
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class ScreenCaptureService : Service() {
@@ -37,7 +37,7 @@ class ScreenCaptureService : Service() {
     private var captureHeight = 0
     private var displayWidth = 0
     private var displayHeight = 0
-    private val visualLoopRunning = AtomicBoolean(false)
+    private val visualLoopControl = LoopControl()
     private var visualLoopThread: Thread? = null
     private val scenarioRuntime = ScenarioRuntime()
 
@@ -69,7 +69,10 @@ class ScreenCaptureService : Service() {
                 startProjection(resultCode, resultData)
             }
 
-            ACTION_STOP -> stopProjection()
+            ACTION_STOP -> {
+                stopProjection()
+                stopSelf()
+            }
             ACTION_CAPTURE_ONCE -> captureOnce()
             ACTION_SAVE_SAMPLE -> saveSample()
             ACTION_FIND_TEMPLATE -> findTemplateOnce()
@@ -78,7 +81,8 @@ class ScreenCaptureService : Service() {
             ACTION_STOP_VISUAL_LOOP -> stopVisualLoop()
         }
 
-        return START_STICKY
+        // A restarted process cannot reuse a MediaProjection consent token.
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -153,11 +157,21 @@ class ScreenCaptureService : Service() {
         )
     }
 
+    @Synchronized
     fun tapTemplateOnce() {
+        if (visualLoopThread?.isAlive == true) {
+            BotEngine.setStatus("Сначала останови визуальный цикл.")
+            return
+        }
         tapBestTemplateOnce(fromLoop = false)
     }
 
+    @Synchronized
     fun startVisualLoop() {
+        if (visualLoopThread?.isAlive == true) {
+            BotEngine.setStatus("Предыдущий визуальный цикл ещё работает или останавливается.")
+            return
+        }
         if (imageReader == null) {
             BotEngine.setStatus("Визуальный режим не включён.")
             return
@@ -175,38 +189,57 @@ class ScreenCaptureService : Service() {
             BotEngine.setStatus("Не могу нажимать: сервис Accessibility не включён.")
             return
         }
-        if (!visualLoopRunning.compareAndSet(false, true)) {
+        if (!visualLoopControl.start()) {
             BotEngine.setStatus("Визуальный цикл уже работает.")
             return
         }
 
         scenarioRuntime.reset()
-        visualLoopThread = thread(name = "VisualTemplateLoop", isDaemon = true) {
+        visualLoopThread = thread(name = "VisualTemplateLoop", isDaemon = true, start = false) {
             val labels = settings.enabledFeatures.joinToString { feature -> feature.label }
             BotEngine.setStatus("Запущено: $labels.")
             try {
-                while (visualLoopRunning.get()) {
+                while (visualLoopControl.isRunning) {
+                    if (visualLoopControl.isPaused) {
+                        Thread.sleep(300L)
+                        continue
+                    }
                     val delayAfterTap = tapBestTemplateOnce(fromLoop = true)
                     val delay = delayAfterTap ?: VISUAL_LOOP_IDLE_MS
                     Thread.sleep(delay.coerceAtLeast(150L))
                 }
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
+            } catch (error: Exception) {
+                android.util.Log.e("VisualTemplateLoop", "Visual loop failed", error)
             } finally {
-                visualLoopRunning.set(false)
+                visualLoopControl.stop()
                 BotEngine.setStatus("Визуальный цикл остановлен.")
             }
         }
+        visualLoopThread?.start()
     }
 
+    @Synchronized
     fun stopVisualLoop() {
-        if (!visualLoopRunning.getAndSet(false)) {
+        if (!visualLoopControl.stop()) {
             BotEngine.setStatus("Визуальный цикл не запущен.")
             return
         }
         visualLoopThread?.interrupt()
-        visualLoopThread = null
         BotEngine.setStatus("Останавливаю визуальный цикл.")
+    }
+
+    fun pauseVisualLoop() {
+        if (visualLoopControl.pause()) {
+            BotEngine.setStatus("Визуальный цикл на паузе.")
+        }
+    }
+
+    fun resumeVisualLoop() {
+        if (visualLoopControl.resume()) {
+            BotEngine.setStatus("Визуальный цикл продолжен.")
+        }
     }
 
     private fun tapBestTemplateOnce(fromLoop: Boolean): Long? {
@@ -237,9 +270,17 @@ class ScreenCaptureService : Service() {
         val captureY = match.result.bounds.centerY() + match.template.clickOffsetY * referenceScale
         val targetX = captureX * displayWidth.toFloat() / captureWidth.toFloat()
         val targetY = captureY * displayHeight.toFloat() / captureHeight.toFloat()
-        val tapped = service.tap(targetX, targetY)
-        if (tapped) {
-            scenarioRuntime.recordTap(match.template)
+        val submitTap = {
+            service.tap(targetX, targetY).also { accepted ->
+                if (accepted) {
+                    scenarioRuntime.recordTap(match.template)
+                }
+            }
+        }
+        val tapped = if (fromLoop) {
+            visualLoopControl.runIfActive(submitTap) ?: return null
+        } else {
+            submitTap()
         }
         val prefix = if (fromLoop) "Цикл" else "Нажал"
         BotEngine.setStatus(
@@ -277,6 +318,10 @@ class ScreenCaptureService : Service() {
             var readyMatch: NamedTemplateMatch? = null
 
             templates.forEach { templateInfo ->
+                if (Thread.currentThread().isInterrupted) {
+                    frame.recycle()
+                    return@use null
+                }
                 val template = VisualTemplateStore.loadTemplate(templateInfo) ?: return@forEach
                 val result = VisualTemplateMatcher.findBestMatch(
                     frame,
@@ -346,6 +391,7 @@ class ScreenCaptureService : Service() {
         return File(directory, "latest_visual.png")
     }
 
+    @Synchronized
     private fun startProjection(resultCode: Int, resultData: Intent) {
         stopProjection()
 
@@ -356,8 +402,13 @@ class ScreenCaptureService : Service() {
         projection.registerCallback(
             object : MediaProjection.Callback() {
                 override fun onStop() {
-                    BotEngine.setStatus("Визуальный режим остановлен системой.")
-                    stopProjection()
+                    synchronized(this@ScreenCaptureService) {
+                        // An old callback may arrive after a new capture starts.
+                        if (mediaProjection === projection) {
+                            BotEngine.setStatus("Визуальный режим остановлен системой.")
+                            stopProjection()
+                        }
+                    }
                 }
             },
             workerHandler,
@@ -393,10 +444,10 @@ class ScreenCaptureService : Service() {
         BotEngine.setStatus("Визуальный режим включён: ${captureWidth}x${captureHeight}, ${quality.label}.")
     }
 
+    @Synchronized
     private fun stopProjection() {
-        if (visualLoopRunning.getAndSet(false)) {
+        if (visualLoopControl.stop()) {
             visualLoopThread?.interrupt()
-            visualLoopThread = null
         }
         virtualDisplay?.release()
         virtualDisplay = null
@@ -519,6 +570,14 @@ class ScreenCaptureService : Service() {
                 return
             }
             service.stopVisualLoop()
+        }
+
+        fun pauseVisualLoop() {
+            instance?.pauseVisualLoop()
+        }
+
+        fun resumeVisualLoop() {
+            instance?.resumeVisualLoop()
         }
 
         fun clearTemplates(context: Context) {

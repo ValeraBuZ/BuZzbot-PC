@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import time
+import math
 import uuid
 
 
@@ -1397,13 +1398,10 @@ def upgrade_repeatable_claim_metadata(images, tasks):
         if uid == alliance_close_uid:
             image["runtime_step"] = "project_closed"
             image["repeat_runtime_step"] = True
-            # The close control is guarded by the donation action above.  It
-            # can therefore only be used after the opened project exposes no
-            # further resource donation.  The attempt pool is shared across
-            # alliance projects, so opening five more projects only repeats
-            # the same exhausted state and can consume most of an account
-            # pass.  Finish the task as soon as that state is confirmed.
-            image["completes_routine"] = True
+            # A missing donation template is not evidence that attempts are
+            # exhausted. The project may use a different button layout.
+            image["completes_routine"] = False
+            image["defer_when_limit_reached"] = True
         upgraded += 1
 
     donation_priorities = {
@@ -1592,7 +1590,7 @@ def donation_exhaustion_is_complete(task, completed_steps, idle_seconds):
     """Finish donation scans after an exhausted project yields no next target."""
     if str(task.get("id") or "") != "alliance_donations":
         return False
-    if "project_closed" not in {str(step) for step in completed_steps}:
+    if "donations_exhausted" not in {str(step) for step in completed_steps}:
         return False
     timeout = max(
         1.0,
@@ -2355,6 +2353,8 @@ def _positive_float(value, default, minimum):
     try:
         parsed = float(value)
     except (TypeError, ValueError):
+        return float(default)
+    if not math.isfinite(parsed):
         return float(default)
     return max(float(minimum), parsed)
 

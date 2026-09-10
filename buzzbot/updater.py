@@ -81,6 +81,8 @@ def fetch_update_manifest(url=DEFAULT_MANIFEST_URL, *, opener=None):
         payload = json.loads(data.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise UpdateError("Некорректное описание обновления.") from exc
+    if not isinstance(payload, dict):
+        raise UpdateError("Некорректное описание обновления: ожидался JSON-объект.")
     version = str(payload.get("version") or "").strip()
     checksum = str(payload.get("sha256") or "").strip().lower()
     if not VERSION_RE.fullmatch(version):

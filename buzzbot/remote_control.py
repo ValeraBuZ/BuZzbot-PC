@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import socket
@@ -10,6 +11,8 @@ import threading
 import time
 from urllib import error, request
 import uuid
+
+from buzzbot.storage import atomic_write_json
 
 
 LOGGER = logging.getLogger("BuZzbot.Remote")
@@ -30,20 +33,13 @@ def default_remote_state_path():
 
 
 def _atomic_write_json(path, payload):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    temp_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    os.replace(temp_path, path)
+    atomic_write_json(path, payload)
 
 
 def _read_json(path, default):
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return dict(default)
     return payload if isinstance(payload, dict) else dict(default)
 
@@ -60,7 +56,13 @@ class RemoteSettings:
         device_id = str(self.device_id or "").strip() or str(uuid.uuid4())
         device_name = str(self.device_name or "").strip() or socket.gethostname() or "BuZzbot PC"
         hub_url = str(self.hub_url or "").strip().rstrip("/")
-        heartbeat = min(60.0, max(5.0, float(self.heartbeat_seconds or 10.0)))
+        try:
+            heartbeat = float(self.heartbeat_seconds or 10.0)
+        except (TypeError, ValueError):
+            heartbeat = 10.0
+        if not math.isfinite(heartbeat):
+            heartbeat = 10.0
+        heartbeat = min(60.0, max(5.0, heartbeat))
         return RemoteSettings(
             enabled=bool(self.enabled),
             hub_url=hub_url,
@@ -122,7 +124,10 @@ class RemoteControlClient:
             {"access_allowed": True, "last_command_id": 0},
         )
         self.access_allowed = bool(state.get("access_allowed", True))
-        self.last_command_id = max(0, int(state.get("last_command_id", 0) or 0))
+        try:
+            self.last_command_id = max(0, int(state.get("last_command_id", 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            self.last_command_id = 0
         self.connected = False
         self.last_error = ""
         self.last_checkin_at = 0.0
@@ -130,6 +135,9 @@ class RemoteControlClient:
         self._wake_event = threading.Event()
         self._thread = None
         self._lock = threading.RLock()
+        self._checkin_lock = threading.Lock()
+        self._generation = 0
+        self._state_dirty = False
 
     @property
     def configured(self):
@@ -140,6 +148,9 @@ class RemoteControlClient:
         )
 
     def _save_state(self):
+        # Keep an unsuccessful write pending, especially before acknowledging
+        # a command to the Hub on the next request.
+        self._state_dirty = True
         _atomic_write_json(
             self.state_path,
             {
@@ -147,11 +158,18 @@ class RemoteControlClient:
                 "last_command_id": int(self.last_command_id),
             },
         )
+        self._state_dirty = False
 
     def start(self):
+        with self._lock:
+            return self._start_locked()
+
+    def _start_locked(self):
         if not self.configured:
             return False
         if self._thread is not None and self._thread.is_alive():
+            if self._stop_event.is_set():
+                return False
             self._wake_event.set()
             return True
         self._stop_event.clear()
@@ -165,12 +183,17 @@ class RemoteControlClient:
         return True
 
     def stop(self, timeout=3.0):
-        self._stop_event.set()
-        self._wake_event.set()
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=max(0.0, float(timeout)))
-        self._thread = None
-        self.connected = False
+        with self._lock:
+            self._generation += 1
+            self._stop_event.set()
+            self._wake_event.set()
+            thread = self._thread
+            self.connected = False
+        if thread is not None and thread is not threading.current_thread():
+            thread.join(timeout=max(0.0, float(timeout)))
+        with self._lock:
+            if thread is self._thread and thread is not None and not thread.is_alive():
+                self._thread = None
 
     def wake(self):
         self._wake_event.set()
@@ -199,6 +222,20 @@ class RemoteControlClient:
         }
 
     def checkin_once(self, timeout=7.0):
+        # Manual connection checks and the heartbeat must not execute one
+        # command twice or acknowledge an older reply after a newer one.
+        with self._checkin_lock:
+            if self._stop_event.is_set():
+                return None
+            return self._checkin_once(timeout)
+
+    def _checkin_once(self, timeout):
+        with self._lock:
+            if self._stop_event.is_set():
+                return None
+            generation = self._generation
+            if self._state_dirty:
+                self._save_state()
         if not self.configured:
             raise RemoteControlError("Удалённое управление не настроено.")
         endpoint = f"{self.settings.hub_url}/api/v1/checkin"
@@ -229,18 +266,42 @@ class RemoteControlClient:
             result = json.loads(response_data.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise RemoteControlError("Hub вернул некорректный ответ.") from exc
-        if not isinstance(result, dict) or not result.get("ok"):
+        if not isinstance(result, dict):
+            raise RemoteControlError("Hub вернул некорректный ответ.")
+        if not result.get("ok"):
             raise RemoteControlError(str(result.get("error") or "Hub отклонил запрос."))
 
-        access_allowed = bool(result.get("access_allowed", True))
+        # stop() can return before a slow HTTP request finishes. Such a reply
+        # belongs to the stopped client and must not enqueue new actions.
+        with self._lock:
+            if self._stop_event.is_set() or generation != self._generation:
+                return None
+            return self._apply_checkin_result(result)
+
+    def _apply_checkin_result(self, result):
+        access_allowed = result.get("access_allowed", True)
+        if not isinstance(access_allowed, bool):
+            raise RemoteControlError("Hub вернул некорректный признак доступа.")
         if access_allowed != self.access_allowed:
+            previous_access = self.access_allowed
             self.access_allowed = access_allowed
+            try:
+                # A full or unavailable disk must not suppress a denial.
+                self.access_handler(access_allowed)
+            except Exception:
+                self.access_allowed = previous_access
+                raise
             self._save_state()
-            self.access_handler(access_allowed)
+
+        if self._stop_event.is_set():
+            return None
 
         command = result.get("command")
         if isinstance(command, dict):
-            command_id = max(0, int(command.get("id", 0) or 0))
+            try:
+                command_id = max(0, int(command.get("id", 0) or 0))
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise RemoteControlError("Hub вернул некорректный номер команды.") from exc
             action = str(command.get("action") or "").strip().lower()
             if command_id > self.last_command_id and action:
                 handled = self.command_handler(action)
@@ -249,7 +310,7 @@ class RemoteControlClient:
                     self._save_state()
 
         with self._lock:
-            self.connected = True
+            self.connected = not self._stop_event.is_set()
             self.last_error = ""
             self.last_checkin_at = time.time()
         return result

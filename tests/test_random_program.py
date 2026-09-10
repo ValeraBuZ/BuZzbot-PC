@@ -194,8 +194,8 @@ class RandomProgramTests(unittest.TestCase):
             )
         )
 
-    def test_matrix_accepts_only_matching_busy_queue_outcomes(self):
-        self.assertTrue(
+    def test_matrix_rejects_navigation_limits_and_accepts_confirmed_unavailability(self):
+        self.assertFalse(
             _routine_outcome_is_success(
                 "train_riders",
                 {
@@ -225,7 +225,7 @@ class RandomProgramTests(unittest.TestCase):
                 },
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             _routine_outcome_is_success(
                 "research",
                 {

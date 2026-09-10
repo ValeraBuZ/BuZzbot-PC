@@ -52,22 +52,32 @@ DEFAULT_TASKS = (
 TASK_TIMEOUTS = {
     "game_login": 600.0,
     "vip_rewards": 60.0,
-    "alliance_donations": 160.0,
+    # A full free-donation cycle also needs its final idle/home confirmation.
+    "alliance_donations": 300.0,
+    # The gift flow verifies each available free reward and has its own
+    # 900-second bound; do not abort it while rewards are still confirmed.
+    "alliance_gifts": 930.0,
     "radar_rewards": 180.0,
     "radar_quick": 360.0,
     "radar_marches": 540.0,
     "mail_rewards": 75.0,
-    "research": 90.0,
+    # Let the bot's unchanged 90-second research watchdog return home and
+    # publish its explicit deferred outcome before the test harness stops it.
+    "research": 150.0,
     "train_infantry": 65.0,
     "train_riders": 65.0,
     "train_shooters": 65.0,
     "train_vehicles": 65.0,
-    "processing_factory": 100.0,
+    # A first scan may traverse all 94 camera positions before finding the
+    # refinery; its live route takes around four minutes at 1280x720.
+    "processing_factory": 360.0,
+    "processing_contest": 360.0,
     "completed_tasks": 100.0,
     "gathering_boost": 60.0,
     # A first-time hospital search may traverse the whole shelter map. Later
     # runs reuse the remembered route and complete much faster.
-    "heal": 210.0,
+    "heal": 420.0,
+    "mysterious_merchant": 420.0,
     "food": 75.0,
     "wood": 75.0,
     "metal": 75.0,
@@ -157,7 +167,7 @@ def _task_reached_live_checkpoint(task_id, completed_steps):
 
 
 def _routine_outcome_is_success(task_id, outcome):
-    """Accept completion or a task-specific, positively identified busy state."""
+    """Accept completion or a task-specific, positively identified unavailable state."""
     if not isinstance(outcome, dict):
         return False
     normalized_task_id = str(task_id or "")
@@ -179,9 +189,9 @@ def _routine_outcome_is_success(task_id, outcome):
         return False
     reason = str(outcome.get("reason") or "")
     return bool(
-        (normalized_task_id.startswith("train_") and reason == "max_queue_checks")
-        or (normalized_task_id == "research" and reason == "max_lab_checks")
-        or (
+        # Exhausting navigation attempts does not prove a busy queue. Missing
+        # barracks/lab detection must remain an unconfirmed live result.
+        (
             normalized_task_id == "radar_marches"
             and reason
             in {
@@ -396,22 +406,36 @@ def run_task(
                     break
                 next_run = float(bot.routine_next_run.get(task_id, 0.0) or 0.0)
                 if bot.current_routine_task_id is None and next_run > time.time() + 1.0:
-                    outcome = dict(getattr(bot, "routine_last_outcome", {}) or {})
-                    observed_steps.update(outcome.get("completed_steps", ()))
-                    if task_id == "game_login":
-                        result["settled"] = bool(bot._is_main_screen_visible())
-                        if not result["settled"]:
-                            result["error"] = "main screen was not detected"
-                    elif _routine_outcome_is_success(task_id, outcome):
-                        result["settled"] = True
-                    else:
-                        outcome_name = str(outcome.get("outcome") or "missing_outcome")
-                        reason = str(outcome.get("reason") or "").strip()
-                        result["error"] = f"routine ended with {outcome_name}"
-                        if reason:
-                            result["error"] += f": {reason}"
                     break
                 time.sleep(1.0)
+
+            # One-shot routines stop their own worker on completion, possibly
+            # between polls (or even before the first poll). Read the outcome
+            # after leaving the loop, before our cleanup stops the bot itself.
+            outcome = getattr(bot, "routine_last_outcome", {}) or {}
+            matching_outcome = (
+                isinstance(outcome, dict)
+                and str(outcome.get("task_id") or "") == str(task_id)
+            )
+            if matching_outcome:
+                observed_steps.update(outcome.get("completed_steps", ()))
+            next_run = float(bot.routine_next_run.get(task_id, 0.0) or 0.0)
+            routine_ended = not bot.is_running or (
+                bot.current_routine_task_id is None and next_run > time.time() + 1.0
+            )
+            if not result["settled"] and routine_ended:
+                if _routine_outcome_is_success(task_id, outcome):
+                    result["settled"] = task_id != "game_login" or bool(bot._is_game_home_visible())
+                    if not result["settled"]:
+                        result["error"] = "playable home screen was not detected"
+                elif matching_outcome:
+                    outcome_name = str(outcome.get("outcome") or "missing_outcome")
+                    reason = str(outcome.get("reason") or "").strip()
+                    result["error"] = f"routine ended with {outcome_name}"
+                    if reason:
+                        result["error"] += f": {reason}"
+                else:
+                    result["error"] = "aborted" if not bot.is_running else "routine ended with missing_outcome"
 
             result["actions"] = sum(
                 max(0, int(bot.stats.get(path, 0)) - initial_stats[path])

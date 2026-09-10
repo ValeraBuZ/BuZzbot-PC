@@ -63,6 +63,8 @@ from buzzbot.multi_emulator import (
 )
 from buzzbot.matching import (
     TemplateCache,
+    alliance_donation_attempts_exhausted,
+    detect_alliance_donation_entry_target,
     detect_alliance_marked_project_target,
     detect_account_details_close_target,
     detect_back_confirmation_cancel_target,
@@ -75,6 +77,7 @@ from buzzbot.matching import (
     detect_equipment_report_close_target,
     detect_equipment_report_free_reward_target,
     detect_game_event_overlay_close_target,
+    detect_game_server_connection_error,
     detect_igg_game_login_ok_target,
     detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
@@ -95,10 +98,12 @@ from buzzbot.matching import (
     detect_radar_world_action_target,
     detect_settings_close_target,
     detect_settlement_event_panel_collapse_target,
+    detect_settlement_event_panel_expand_target,
     detect_merchant_shop_feature_target,
     detect_merchant_shop_building_target,
     detect_shop_selection_marker_target,
     detect_shop_radial_action_target,
+    detect_training_radial_action_target,
     detect_mysterious_merchant_absent_ok_target,
     detect_mysterious_merchant_non_gem_offer_targets,
     detect_shop_merchant_tab_target,
@@ -199,6 +204,7 @@ from buzzbot.report_cloud import (
 )
 from buzzbot.state import BotState, compute_runtime_seconds
 from buzzbot.storage import move_file_to_trash, save_json_with_backup
+from buzzbot.training_profiles import read_training_profile
 from buzzbot.updater import UpdateError, download_and_stage_update, launch_staged_update
 from buzzbot.version import APP_VERSION
 
@@ -257,6 +263,7 @@ GAME_LOGIN_MINIMUM_SECONDS = 50.0
 GAME_LOGIN_STABLE_SECONDS = 12.0
 GAME_LOGIN_RESTART_SECONDS = 150.0
 GAME_LOGIN_MAX_RESTARTS = 2
+GAME_SERVER_RETRY_SECONDS = 300.0
 GAME_LOGIN_WEBVIEW_GRACE_SECONDS = 60.0
 WORLD_SEARCH_TASK_IDS = {"food", "wood", "metal", "oil", "zombie_hunt", "collective_mind"}
 RESOURCE_SQUADS_EXHAUSTED_PASS_KEY = "__resource_squads_exhausted_pass__"
@@ -289,10 +296,14 @@ FENCE_SURVIVOR_SCAN_PATTERN = (
     + ("down",) * 2
     + ("left",) * 4
 )
-PROCESSING_FACTORY_SCAN_PATTERN = (
-    # Force a reproducible corner, then cover the complete shelter in wide
-    # rows.  The previous compact 13-step route only revisited the central
-    # strip and missed account-specific refinery placements entirely.
+PROCESSING_FACTORY_LOCAL_SCAN_PATTERN = (
+    "local_up", "local_down", "local_down", "local_up",
+    "local_left", "local_right", "local_right", "local_left",
+)
+PROCESSING_FACTORY_SCAN_PATTERN = PROCESSING_FACTORY_LOCAL_SCAN_PATTERN + (
+    # Check nearby buildings with slow, paired gestures before the original
+    # wide sweep. The large corner-anchor gestures skipped a real factory just
+    # above the centred view. Keep every original wide-sweep step afterward.
     ("left",) * 12
     + ("up",) * 10
     + ("right",) * 12
@@ -866,6 +877,10 @@ LANGUAGES = {
     }
 }
 
+class _BotActionInterrupted(BaseException):
+    """Unwind an action past recovery handlers when its worker is cancelled."""
+
+
 class AutoClicker:
     """
     Основной класс бота-автокликера.
@@ -925,11 +940,15 @@ class AutoClicker:
         self.routine_action_counts = {}
         self.routine_completed_steps = set()
         self.routine_last_outcome = {}
+        self.routine_donation_entry_attempted = False
         self.routine_action_completes_task = False
         self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
+        self.routine_login_home_recovery_at = 0.0
         self.routine_login_restart_count = 0
+        self.routine_login_server_retry_at = 0.0
+        self.routine_login_server_error_active = False
         self.routine_idle_guard_visible = False
         self.routine_idle_outside_since = 0.0
         self.routine_idle_recovery_attempted = False
@@ -1236,8 +1255,8 @@ class AutoClicker:
         logger.info("Remote command received: %s", action)
         if action == "deny":
             self.remote_access_allowed = False
-            if self.is_running:
-                self.stop()
+            if self.is_running or getattr(self, "multi_emulator_workers", {}):
+                self.stop_all_emulators()
             self.set_status_message("Доступ отключён администратором", force=True)
             return True
         if action == "allow":
@@ -1245,8 +1264,8 @@ class AutoClicker:
             self.set_status_message("Удалённый доступ разрешён", force=True)
             return True
         if action == "stop":
-            if self.is_running:
-                self.stop()
+            if self.is_running or getattr(self, "multi_emulator_workers", {}):
+                self.stop_all_emulators()
             return True
         if action == "update":
             return self.start_update()
@@ -1258,10 +1277,14 @@ class AutoClicker:
                 self.start_routines()
             return True
         if action == "pause":
+            if getattr(self, "multi_emulator_workers", {}):
+                self._write_multi_command("pause")
             if self.is_running and not self.is_paused:
                 self.pause()
             return True
         if action == "resume":
+            if getattr(self, "multi_emulator_workers", {}):
+                self._write_multi_command("resume")
             if self.is_paused:
                 self.resume()
             return True
@@ -1972,7 +1995,7 @@ class AutoClicker:
         if not self._is_main_screen_visible():
             return False
 
-        frame, _origin = self._capture_screen_bgr(force=True)
+        frame, origin = self._capture_screen_bgr(force=True)
         target_x = int(round(frame.shape[1] * 65 / 1280))
         target_y = int(round(frame.shape[0] * 655 / 720))
         self.set_status_message("Переход с карты мира в убежище", force=True)
@@ -1980,7 +2003,7 @@ class AutoClicker:
             if self.uses_adb:
                 self.adb_client.tap(target_x, target_y)
             else:
-                pyautogui.click(target_x, target_y)
+                pyautogui.click(origin[0] + target_x, origin[1] + target_y)
         except Exception:
             logger.exception("Не удалось перейти с карты мира в убежище")
             return False
@@ -2059,6 +2082,9 @@ class AutoClicker:
         region_y = int(round(655 * display.scale_y))
         search_x = int(round(43 * display.scale_x))
         search_y = int(round(447 * display.scale_y))
+        if not self.uses_adb:
+            region_x, region_y = self._screen_normalized_point(65 / 1280, 655 / 720)
+            search_x, search_y = self._screen_normalized_point(43 / 1280, 447 / 720)
 
         for attempt in range(1, 4):
             if self._world_search_panel_visible():
@@ -2166,7 +2192,7 @@ class AutoClicker:
 
     def _try_global_login_connection_recovery(self, task):
         """Recover the one-button in-game login/network error without looping Back."""
-        if not self.uses_adb or not task or task.get("id") == "game_login":
+        if not self.uses_adb or not task:
             return False
         if task.get("id") == "__account_switch__":
             return self._try_account_switch_connection_recovery(task)
@@ -2174,6 +2200,10 @@ class AutoClicker:
             frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("Login connection recovery could not capture the screen")
+            return False
+        if self._try_game_server_connection_recovery(task, frame):
+            return True
+        if task.get("id") == "game_login":
             return False
         # Two-button Android Back confirmation is handled by normal screen
         # recovery.  Only the distinct single wide OK dialog may restart login.
@@ -2228,6 +2258,148 @@ class AutoClicker:
         )
         self.save_config()
         self._interruptible_sleep(8.0)
+        return True
+
+    def _try_game_server_connection_recovery(self, task, frame):
+        """Recover the distinct title-screen error without accepting a login."""
+        server_error = detect_game_server_connection_error(frame)
+        active_episode = task.get("id") == "game_login" and getattr(
+            self, "routine_login_server_error_active", False
+        )
+        if not server_error and not active_episode:
+            return False
+        if not self.uses_adb:
+            return False
+        if active_episode:
+            # A loading frame after restart is not a recovered connection.
+            # Only confirmed home ends this episode and clears its budget.
+            if not server_error and self._is_game_home_visible():
+                self.routine_login_server_retry_at = 0.0
+                self.routine_login_server_error_active = False
+                self.routine_login_restart_count = 0
+                return False
+            retry_at = float(getattr(self, "routine_login_server_retry_at", 0.0) or 0.0)
+            if retry_at:
+                if time.time() < retry_at:
+                    return self._wait_for_game_server_connection()
+                self.routine_login_server_retry_at = 0.0
+                self.routine_login_restart_count = 0
+            elif self.routine_login_restart_count >= GAME_LOGIN_MAX_RESTARTS:
+                # The second restart may expose a loader instead of the error
+                # for a while. Keep the same bounded episode until home is
+                # confirmed, rather than letting its timeout advance the queue.
+                return self._wait_for_game_server_connection()
+        if not server_error:
+            return False
+        try:
+            if self.adb_client.current_foreground_package() != GAME_PACKAGE:
+                return False
+        except AdbError:
+            logger.exception("Server-error recovery could not verify the game package")
+            return False
+
+        if task.get("id") == "__account_switch__":
+            settings = task.setdefault("settings", {})
+            now = time.time()
+            # These observations belong to the rejected handoff. In particular,
+            # a later view of the old settlement must not confirm the target.
+            self.account_switch_selected_at = 0.0
+            self.account_switch_confirmed = False
+            self.account_switch_probe_ready = False
+            self.account_switch_auto_login_attempted = False
+            self.routine_completed_steps = {
+                step for step in self.routine_completed_steps
+                if not str(step).startswith("account_switch_")
+            }
+            self.routine_current_had_action = False
+            self.blocked_coords.clear()
+            expired = now - self.routine_task_started_at >= float(
+                task.get("timeout_seconds", ACCOUNT_SWITCH_TIMEOUT_SECONDS)
+            )
+            manual_igg = (
+                settings.get("login_method") == "igg"
+                and not settings.get("auto_login", False)
+            )
+            if settings.get("_server_error_restarts", 0) >= 1 or expired or manual_igg:
+                self.account_switch_error = (
+                    "Переключение не выполнено: игра не подключилась к серверу (ErrCode:0x2)"
+                )
+                self._finish_current_routine(now)
+                return True
+            settings["_server_error_restarts"] = 1
+            self.account_switch_error = ""
+            self.set_status_message(
+                "Ошибка сервера: один раз перезапускаю игру для переключения аккаунта",
+                force=True,
+            )
+            try:
+                self.adb_client.force_stop_package(GAME_PACKAGE)
+                self._interruptible_sleep(2.0)
+                self.adb_client.launch_package(GAME_PACKAGE)
+                self._invalidate_capture()
+                settings["_game_launch_at"] = time.time()
+                self.routine_last_action_time = time.time()
+                # Preserve routine_task_started_at: this recovery must remain
+                # inside the original bounded account-switch attempt.
+                self._interruptible_sleep(8.0)
+            except AdbError:
+                logger.exception("Account switch server-error restart failed")
+                self.account_switch_error = "Переключение не выполнено: не удалось перезапустить игру"
+                self._finish_current_routine(time.time())
+                return True
+            logger.warning("Title-screen server error confirmed; account switch will retry credentials once")
+            return True
+
+        if task.get("id") == "game_login":
+            self.routine_login_server_error_active = True
+            if self._restart_game_for_login():
+                logger.warning("Title-screen server error confirmed; bounded game login restart requested")
+                return True
+            return self._wait_for_game_server_connection()
+
+        login_index = next(
+            (
+                index for index, candidate in enumerate(self.routine_tasks)
+                if candidate.get("id") == "game_login"
+                and is_task_effectively_enabled(candidate)
+            ),
+            None,
+        )
+        if login_index is None:
+            # Respect a disabled login routine; retain the interrupted slot
+            # without sending ordinary task actions to the title screen.
+            return self._wait_for_game_server_connection()
+        self.routine_forced_task_active_id = "game_login"
+        self.routine_forced_task_return_index = int(self.current_routine_index or 0)
+        self.routine_next_run["game_login"] = 0.0
+        self.current_routine_index = int(login_index)
+        self.current_routine_task_id = None
+        self.routine_current_had_action = False
+        self.routine_completed_steps = set()
+        self.routine_idle_confirmation_count = 0
+        self.blocked_coords.clear()
+        self.set_status_message("Ошибка сервера: восстанавливаю вход перед продолжением задачи", force=True)
+        logger.warning("Title-screen server error confirmed; forcing bounded game_login recovery")
+        self.save_config()
+        return True
+
+    def _wait_for_game_server_connection(self):
+        now = time.time()
+        retry_at = float(getattr(self, "routine_login_server_retry_at", 0.0) or 0.0)
+        if retry_at <= now:
+            retry_at = now + GAME_SERVER_RETRY_SECONDS
+            self.routine_login_server_retry_at = retry_at
+            logger.warning(
+                "Server connection recovery is waiting %.0f seconds before another bounded attempt",
+                GAME_SERVER_RETRY_SECONDS,
+            )
+        self.set_status_message(
+            f"Ошибка сервера: ожидаю восстановления соединения, повтор через {max(1, int(retry_at - now))} с",
+            force=True,
+        )
+        # Keep this inside the active task, with no queue/profile advancement.
+        # The worker's existing interruption check handles Pause and Stop.
+        self._interruptible_sleep(0.5)
         return True
 
     def _find_template_opencv(
@@ -2510,6 +2682,8 @@ class AutoClicker:
             self.blocked_coords.clear()
             self.routine_completed_steps = set()
             self.routine_idle_confirmation_count = 0
+            self.routine_home_recovery_attempted = False
+            self.routine_login_home_recovery_at = 0.0
             self._interruptible_sleep(8.0)
             restarted_at = time.time()
             self.routine_task_started_at = restarted_at
@@ -2753,12 +2927,7 @@ class AutoClicker:
 
     def import_training_profile(self, source_path):
         with zipfile.ZipFile(source_path, "r") as archive:
-            try:
-                manifest = json.loads(archive.read("profile.json").decode("utf-8"))
-            except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ValueError(self.tr('profile_format_error')) from exc
-            if manifest.get("format") != "doomsday-training-profile":
-                raise ValueError(self.tr('profile_format_error'))
+            manifest = read_training_profile(archive)
 
             self.routine_tasks = normalize_routine_tasks(manifest.get("routine_tasks"))
             self.routine_max_marches = min(5, max(1, int(manifest.get("routine_max_marches", 5))))
@@ -2795,6 +2964,8 @@ class AutoClicker:
                 target_folder = self._get_group_path(group)
                 suffix = entry_path.suffix.lower() or ".png"
                 target = target_folder / f"{uid}{suffix}"
+                if not target.resolve().is_relative_to(IMG_DIR.resolve()):
+                    raise ValueError("Путь шаблона выходит за пределы папки img.")
                 target.write_bytes(archive.read(entry_name))
 
                 image = dict(image_data)
@@ -2835,6 +3006,9 @@ class AutoClicker:
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
+                    # Normalization saves this file below. Release our reader
+                    # first: Windows otherwise denies the atomic replacement.
+                    f.close()
                     self.search_images = data.get('images', [])
                     self.groups = data.get('groups', {})
                     self.group_schedules = data.get('group_schedules', {})
@@ -3127,8 +3301,13 @@ class AutoClicker:
                     self.save_config()
 
             except Exception as e:
-                logger.error(f"Ошибка загрузки конфига: {e}")
-                self._load_existing_images()
+                logger.exception("Ошибка загрузки конфига")
+                # Rebuilding and saving a partial/default config here destroys
+                # the very data the user needs to repair the failed load.
+                raise ValueError(
+                    "Не удалось загрузить config.json. Исходный файл сохранён; "
+                    "исправьте его или восстановите резервную копию из backups/config."
+                ) from e
         else:
             self._load_existing_images()
 
@@ -3249,7 +3428,11 @@ class AutoClicker:
             return IMG_DIR
         safe_name = self._transliterate(group_name)
         safe_name = self._sanitize_filename(safe_name)
+        if safe_name in {".", ".."}:
+            raise ValueError("Недопустимое имя группы.")
         group_folder = IMG_DIR / safe_name
+        if not group_folder.resolve().is_relative_to(IMG_DIR.resolve()):
+            raise ValueError("Путь группы выходит за пределы папки img.")
         group_folder.mkdir(parents=True, exist_ok=True)
         return group_folder
 
@@ -4367,6 +4550,7 @@ class AutoClicker:
             return [dict(self.account_switch_task)]
         resource_squads_exhausted = (
             self.routine_only_task_id is None
+            and not bool(getattr(self, "routine_pass_completed", False))
             and self._resource_squads_exhausted_for_current_pass()
         )
         tasks = []
@@ -4574,6 +4758,16 @@ class AutoClicker:
                     self.stop_event.set()
                     return None
 
+            elif not self._resume_single_account_pass(now):
+                return None
+        elif (
+            not self.account_rotation_enabled
+            and self.routine_only_task_id is None
+            and self._account_rotation_cycle_ready()
+            and not self._resume_single_account_pass(now)
+        ):
+            return None
+
         active_marches = self.get_active_marches(now)
         self._release_radar_return_hold(active_marches, now)
         if self._try_return_camped_zombie_march(active_marches, now):
@@ -4670,7 +4864,6 @@ class AutoClicker:
             if (
                 next_task is not None
                 and float(wait_seconds or 0.0) > 0.0
-                and self.account_rotation_enabled
                 and not bool(getattr(self, "routine_pass_completed", False))
                 and self.routine_only_task_id is None
                 and not self.routine_forced_task_queue
@@ -4852,11 +5045,15 @@ class AutoClicker:
         self.routine_action_counts = {}
         self.routine_completed_steps = set()
         self.routine_last_outcome = {}
+        self.routine_donation_entry_attempted = False
         self.routine_action_completes_task = False
         self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
         self.routine_home_recovery_attempted = False
+        self.routine_login_home_recovery_at = 0.0
         self.routine_login_restart_count = 0
+        self.routine_login_server_retry_at = 0.0
+        self.routine_login_server_error_active = False
         self.routine_idle_guard_visible = False
         self.routine_idle_outside_since = 0.0
         self.routine_idle_recovery_attempted = False
@@ -4924,6 +5121,33 @@ class AutoClicker:
             self.routine_current_had_action = True
             self.routine_last_action_time = time.time()
         return task
+
+    def _resume_single_account_pass(self, now):
+        """Wait for any eligible work, then traverse a fresh pass in saved order.
+
+        With no second profile on this emulator, the daily login at index zero
+        must not hold every shorter routine until tomorrow. Deadlines remain
+        intact: the new pass skips cooling tasks and runs due ones in order.
+        """
+        tasks = [task for task in self._scheduler_routine_tasks()
+                 if is_task_effectively_enabled(task)]
+        if not tasks:
+            self.set_status_message("Очередь пройдена: нет доступных задач")
+            return False
+        next_task = min(tasks, key=lambda task: float(self.routine_next_run.get(task["id"], 0.0) or 0.0))
+        deadline = float(self.routine_next_run.get(next_task["id"], 0.0) or 0.0)
+        if deadline > now:
+            self.set_status_message(
+                f"Очередь пройдена: {self.get_routine_task_name(next_task)} через "
+                f"{format_wait_duration(deadline - now, self.lang)}"
+            )
+            return False
+        self.current_routine_index = 0
+        self.routine_pass_completed = False
+        self._reset_account_pass_clock(now)
+        logger.info("Single-account routine pass restarted for due work; saved order and cooldowns preserved")
+        self.save_config()
+        return True
 
     def _account_rotation_cycle_ready(self):
         """Allow a profile switch only after the saved task order wraps."""
@@ -6144,6 +6368,45 @@ class AutoClicker:
         )
         return True
 
+    def _try_wasteland_event_panel_fallback(self, task):
+        """Reveal a hidden event tile once per run, without claiming task progress."""
+        if task.get("id") != "wasteland_exploration" or not self.uses_adb:
+            return False
+        if getattr(self, "routine_completed_steps", set()):
+            return False
+        attempt_key = (
+            getattr(self, "current_account_id", None),
+            getattr(self, "routine_task_started_at", 0.0),
+        )
+        if getattr(self, "_wasteland_event_panel_attempt_key", None) == attempt_key:
+            return False
+        entries = [
+            image for image in self.get_routine_templates(task, active_only=True)
+            if image.get("runtime_step") == "event_entry"
+        ]
+        if not entries or not self._is_settlement_screen_visible():
+            return False
+        for image in entries:
+            location, bbox, _score = self._locate_image(image)
+            if location is not None and bbox is not None:
+                return False
+        frame, _origin = self._capture_screen_bgr(force=True)
+        target = detect_settlement_event_panel_expand_target(frame)
+        if target is None:
+            return False
+        self._check_worker_interrupted()
+        self._wasteland_event_panel_attempt_key = attempt_key
+        if not self._tap_routine_fallback(
+            target,
+            ("wasteland_event_panel_expand", *target),
+            "Исследование пустоши: раскрываю панель событий",
+        ):
+            return False
+        # Keep this preparation out of routine_completed_steps: the missing-
+        # followup check must still distinguish event_entry from real progress.
+        logger.info("Wasteland search expanded the settlement event panel at (%s, %s)", *target)
+        return True
+
     def _try_game_login_visual_fallback(self, task):
         if task.get("id") != "game_login":
             return False
@@ -6212,7 +6475,10 @@ class AutoClicker:
         recovery_now = time.time()
         recovery_due = (
             not self.routine_home_recovery_attempted
-            or recovery_now - self.routine_last_action_time >= 20.0
+            or recovery_now - max(
+                self.routine_last_action_time,
+                float(getattr(self, "routine_login_home_recovery_at", 0.0) or 0.0),
+            ) >= 20.0
         )
         if (
             game_surface_visible
@@ -6220,10 +6486,9 @@ class AutoClicker:
             and recovery_now - self.routine_task_started_at >= 45.0
         ):
             self.routine_home_recovery_attempted = True
-            # A promo can open another Unity screen (for example the event
-            # calendar) immediately after the first return. Throttle retries,
-            # but do not make the first recovery the only possible recovery.
-            self.routine_last_action_time = recovery_now
+            # A failed Back probe is not progress. Keep its throttle separate
+            # so repeated attempts cannot postpone the login restart/timeout.
+            self.routine_login_home_recovery_at = recovery_now
             self.set_status_message(
                 "Вход в игру: закрываю внутренний экран и возвращаюсь домой",
                 force=True,
@@ -6326,6 +6591,9 @@ class AutoClicker:
         except Exception:
             logger.exception("Account switch recovery could not capture the screen")
             return False
+
+        if self._try_game_server_connection_recovery(task, frame):
+            return True
 
         target = detect_login_session_expired_ok_target(frame)
         if target is None:
@@ -7133,6 +7401,23 @@ class AutoClicker:
         if "open_refinery" in self.routine_completed_steps:
             return False
         if "select_refinery" in self.routine_completed_steps:
+            confirmation_image = next(
+                (
+                    image for image in self.search_images
+                    if str(image.get("uid") or "")
+                    == "152e2db2-317c-53cf-91a1-eb1dca8f3f30"
+                ),
+                None,
+            )
+            if confirmation_image is not None:
+                location, bbox, _score = self._locate_image(confirmation_image)
+                if location is not None and bbox is not None:
+                    valid, _reason = self._validate_detected_match(confirmation_image, bbox)
+                    if valid:
+                        self.routine_completed_steps.add("open_refinery")
+                        self.routine_processing_factory_dynamic_selected_at = 0.0
+                        logger.info("Processing factory header confirmed after selection")
+                        return True
             selected_at = float(
                 getattr(
                     self,
@@ -7169,49 +7454,35 @@ class AutoClicker:
                 )
                 and time.time() - selected_at >= 0.8
             ):
-                radial_target = (
-                    int(dynamic_target[0]) - 58,
-                    int(dynamic_target[1]) + 76,
-                )
-                self.routine_processing_factory_radial_attempted = True
-                if not self._tap_routine_fallback(
-                    radial_target,
-                    ("processing_factory_dynamic_radial", *radial_target),
-                    "Завод по обработке: открываю выбранное здание",
-                ):
-                    return False
-
-                confirmation_image = next(
-                    (
-                        image
-                        for image in self.search_images
-                        if str(image.get("uid") or "")
-                        == "152e2db2-317c-53cf-91a1-eb1dca8f3f30"
-                    ),
-                    None,
-                )
-                if confirmation_image is not None:
-                    guard_location, guard_bbox, _score = self._locate_image(
-                        confirmation_image
-                    )
-                    if guard_location is not None and guard_bbox is not None:
-                        is_valid, _reason = self._validate_detected_match(
-                            confirmation_image,
-                            guard_bbox,
-                        )
-                        if is_valid:
-                            self.routine_completed_steps.add("open_refinery")
-                            self.routine_processing_factory_dynamic_selected_at = 0.0
-                            logger.info(
-                                "Processing factory dynamic radial opening confirmed at %s",
-                                radial_target,
-                            )
-                            return True
-                logger.warning(
-                    "Processing factory dynamic radial opening was not confirmed at %s",
-                    radial_target,
-                )
-                return True
+                # A furnace-colour cluster can select the neighbouring escort
+                # building. Never infer its radial button from a fixed offset;
+                # require a recognised refinery action and its header verifier.
+                for radial_image in self.search_images:
+                    if (
+                        not radial_image.get("enabled", True)
+                        or radial_image.get("action") != "open_processing_factory"
+                    ):
+                        continue
+                    radial_location, radial_bbox, _score = self._locate_image(radial_image)
+                    if radial_location is None or radial_bbox is None:
+                        continue
+                    valid, _reason = self._validate_detected_match(radial_image, radial_bbox)
+                    if not valid:
+                        continue
+                    self.routine_processing_factory_radial_attempted = True
+                    opened = self._execute_action(radial_image, radial_location)
+                    self.routine_current_had_action = True
+                    self.routine_last_action_time = time.time()
+                    self.click_count += 1
+                    if opened:
+                        self.routine_completed_steps.add("open_refinery")
+                        self.routine_processing_factory_dynamic_selected_at = 0.0
+                    else:
+                        self.routine_completed_steps.discard("select_refinery")
+                        self.routine_processing_factory_dynamic_selected_at = 0.0
+                        self.routine_processing_factory_dynamic_target = None
+                        self.routine_processing_factory_force_scan = True
+                    return True
             if time.time() - selected_at < 4.0:
                 return False
             try:
@@ -7226,6 +7497,7 @@ class AutoClicker:
             self.routine_processing_factory_dynamic_selected_at = 0.0
             self.routine_processing_factory_dynamic_target = None
             self.routine_processing_factory_radial_attempted = False
+            self.routine_processing_factory_force_scan = True
             self._invalidate_capture()
             self.routine_last_action_time = time.time()
             logger.warning(
@@ -7233,8 +7505,37 @@ class AutoClicker:
             )
             self._interruptible_sleep(0.8)
             return True
+        if "processing_factory_event_panel_checked" not in self.routine_completed_steps:
+            if not self._is_settlement_screen_visible():
+                return False
+            try:
+                frame, _origin = self._capture_screen_bgr(force=True)
+            except Exception:
+                logger.exception("Processing factory could not inspect the settlement event panel")
+                return False
+            panel_target = detect_settlement_event_panel_collapse_target(frame)
+            if panel_target is not None:
+                # The expanded second row hides the real furnaces along the
+                # northern edge of the local route. Use the existing chevron
+                # detector once, before recentering or moving the camera.
+                if not self._tap_routine_fallback(
+                    panel_target,
+                    ("processing_factory_event_panel_collapse", *panel_target),
+                    "Завод по обработке: сворачиваю панель событий перед поиском",
+                ):
+                    return False
+                self.routine_completed_steps.add("processing_factory_event_panel_checked")
+                self._invalidate_capture()
+                self._interruptible_sleep(0.6)
+                logger.info(
+                    "Processing factory search collapsed the settlement event panel at (%s, %s)",
+                    *panel_target,
+                )
+                return True
+            self.routine_completed_steps.add("processing_factory_event_panel_checked")
+
         # A restart resets the scan index but preserves the settlement camera.
-        # Live IGG 5 therefore restarted the 94-step route from the dark map
+        # Live IGG 5 therefore restarted the wide route from the dark map
         # boundary and spent every early step moving farther along that same
         # edge.  Toggle through the world map once to obtain the game's stable
         # settlement centre before any bounded factory scan.
@@ -7266,7 +7567,14 @@ class AutoClicker:
             world_ready = False
             for _attempt in range(5):
                 self._interruptible_sleep(0.55)
-                if self._is_main_screen_visible():
+                # Home markers also appear in the settlement. Require its
+                # Region marker to disappear before accepting the world map;
+                # otherwise the return helper can report success without a
+                # real transition and the camera remains at its old position.
+                if (
+                    not self._is_settlement_screen_visible()
+                    and self._is_main_screen_visible()
+                ):
                     world_ready = True
                     break
             if not world_ready or not self._switch_to_settlement_screen():
@@ -7313,7 +7621,20 @@ class AutoClicker:
             )
             return True
 
-        target = detect_processing_factory_target(frame)
+        if scan_index < len(PROCESSING_FACTORY_LOCAL_SCAN_PATTERN) or scan_index % 12 == 0:
+            # Preserve the candidate frame too: selection returns before the
+            # next camera movement, including when a radial guard rejects it.
+            self._save_routine_calibration_frame(
+                task_id,
+                f"scan_{scan_index:02d}",
+                frame,
+            )
+
+        target = (
+            None
+            if getattr(self, "routine_processing_factory_force_scan", False)
+            else detect_processing_factory_target(frame)
+        )
         if target is not None:
             coord_key = (
                 "processing_factory_dynamic",
@@ -7329,44 +7650,49 @@ class AutoClicker:
                 self.routine_processing_factory_dynamic_selected_at = time.time()
                 self.routine_processing_factory_dynamic_target = target
                 self.routine_processing_factory_radial_attempted = False
-                self.routine_processing_factory_scan_index = scan_index + 1
+                # A local candidate has not executed this camera step. If its
+                # radial menu is rejected, force_scan must still perform the
+                # pending return gesture instead of skipping half of a pair.
+                self.routine_processing_factory_scan_index = (
+                    scan_index
+                    if scan_index < len(PROCESSING_FACTORY_LOCAL_SCAN_PATTERN)
+                    else scan_index + 1
+                )
                 logger.info(
                     "Processing factory selected by furnace cluster at %s",
                     target,
                 )
                 return True
 
-        if scan_index % 12 == 0:
-            self._save_routine_calibration_frame(
-                task_id,
-                f"scan_{scan_index:02d}",
-                frame,
-            )
-
         height, width = frame.shape[:2]
         swipes = {
-            "left": ((980, 420), (360, 420)),
-            "right": ((360, 420), (980, 420)),
-            "up": ((640, 570), (640, 250)),
-            "down": ((640, 250), (640, 570)),
+            "left": ((980, 420), (360, 420), 300),
+            "right": ((360, 420), (980, 420), 300),
+            "up": ((640, 570), (640, 250), 300),
+            "down": ((640, 250), (640, 570), 300),
+            "local_up": ((640, 450), (640, 330), 600),
+            "local_down": ((640, 330), (640, 450), 600),
+            "local_left": ((790, 400), (490, 400), 600),
+            "local_right": ((490, 400), (790, 400), 600),
         }
         direction = PROCESSING_FACTORY_SCAN_PATTERN[scan_index]
-        (from_x, from_y), (to_x, to_y) = swipes[direction]
+        (from_x, from_y), (to_x, to_y), duration_ms = swipes[direction]
         from_x = int(round(from_x * width / 1280.0))
         from_y = int(round(from_y * height / 720.0))
         to_x = int(round(to_x * width / 1280.0))
         to_y = int(round(to_y * height / 720.0))
         try:
             if self.uses_adb:
-                self.adb_client.swipe(from_x, from_y, to_x, to_y, 300)
+                self.adb_client.swipe(from_x, from_y, to_x, to_y, duration_ms)
             else:
                 pyautogui.moveTo(from_x, from_y, duration=0.05)
-                pyautogui.dragTo(to_x, to_y, duration=0.3, button="left")
+                pyautogui.dragTo(to_x, to_y, duration=duration_ms / 1000.0, button="left")
         except Exception:
             logger.exception("Processing factory camera movement failed")
             return False
 
         self.routine_processing_factory_scan_index = scan_index + 1
+        self.routine_processing_factory_force_scan = False
         self._invalidate_capture()
         self.routine_current_had_action = True
         self.routine_last_action_time = time.time()
@@ -7407,6 +7733,38 @@ class AutoClicker:
         except Exception:
             logger.exception("Could not save %s calibration frame for %s", stage, task_id)
             return None
+
+    def _try_alliance_donations_entry_fallback(self, task):
+        if (
+            task.get("id") != "alliance_donations"
+            or self.routine_current_had_action
+            or getattr(self, "routine_donation_entry_attempted", False)
+        ):
+            return False
+        entry_uid = str(uuid.uuid5(PROFILE_NAMESPACE, "alliance_donations:open_alliance"))
+        entry = next(
+            (image for image in self.get_routine_templates(task, active_only=True)
+             if image.get("uid") == entry_uid),
+            None,
+        )
+        if entry is None or not self._is_game_home_visible():
+            return False
+        frame, origin = self._capture_screen_bgr(force=True)
+        target = detect_alliance_donation_entry_target(
+            frame, self.template_cache.get_color(entry["path"]),
+            confidence=entry.get("confidence", 0.88),
+        )
+        if target is None:
+            return False
+        if not self.uses_adb:
+            target = (target[0] + origin[0], target[1] + origin[1])
+        self._check_worker_interrupted()
+        # This is an entry attempt, never a completed donation/runtime step.
+        self.routine_donation_entry_attempted = True
+        return self._tap_routine_fallback(
+            target, ("donations_open_alliance", *target),
+            "Пожертвования: открываю альянс по видимой части кнопки",
+        )
 
     def _try_alliance_gifts_visual_fallback(self, task):
         if task.get("id") != "alliance_gifts":
@@ -8241,6 +8599,21 @@ class AutoClicker:
 
         self._save_routine_calibration_frame("mysterious_merchant", "shop_selected", frame)
 
+        if "merchant_catalogue_result_saved" not in self.routine_completed_steps:
+            # Preserve the first actual result before later scan frames replace
+            # shop_selected. A maxed Shop card only displays the construction
+            # limit notice; it does not focus the existing settlement building.
+            self._save_routine_calibration_frame(
+                "mysterious_merchant", "catalogue_selection_result", frame
+            )
+            self.routine_completed_steps.add("merchant_catalogue_result_saved")
+            if settlement_building_catalogue_is_visible(frame):
+                self.routine_completed_steps.add("merchant_catalogue_focus_unconfirmed")
+                logger.info(
+                    "Merchant catalogue remained open after Shop card; "
+                    "building focus is unconfirmed"
+                )
+
         if "merchant_build_menu_closed" not in self.routine_completed_steps:
             if self._is_settlement_screen_visible():
                 # Selecting an existing catalogue card can close the panel
@@ -8368,6 +8741,49 @@ class AutoClicker:
                     *event_panel_target,
                 )
                 return True
+
+        if (
+            "merchant_shop_building_tapped" not in self.routine_completed_steps
+            and "merchant_catalogue_focus_unconfirmed" in self.routine_completed_steps
+            and "merchant_search_recentered" not in self.routine_completed_steps
+        ):
+            # Retain the positive selection/arrival-marker checks above. If
+            # neither located Shop, do not pan as though the catalogue had
+            # centred it beneath the HUD. The normal world/settlement toggle
+            # provides a confirmed starting view for the existing camera scan.
+            # Shared home markers (tasks, mail, alliance) can also match in the
+            # settlement. Its positive Region marker must win here, otherwise
+            # _switch_to_settlement_screen returns immediately without moving
+            # the camera and the subsequent scan starts from the old position.
+            if self._is_settlement_screen_visible():
+                if "merchant_recenter_world_requested" in self.routine_completed_steps:
+                    return False
+                target = (
+                    int(round(width * 65 / 1280.0)),
+                    int(round(height * 655 / 720.0)),
+                )
+                if not self._tap_routine_fallback(
+                    target,
+                    ("merchant_recenter_world", *target),
+                    "Таинственный торговец: восстанавливаю обзор поселения",
+                ):
+                    return False
+                self.routine_completed_steps.add("merchant_recenter_world_requested")
+                logger.info("Merchant search requested world map before recentering")
+                return True
+            if not self._is_main_screen_visible():
+                return False
+            if not self._switch_to_settlement_screen():
+                return False
+            self.routine_completed_steps.update(
+                {"merchant_search_recentered", "merchant_selected_building_revealed"}
+            )
+            self.routine_merchant_scan_index = 0
+            self.routine_merchant_force_scan_move = False
+            self._invalidate_capture()
+            self.routine_last_action_time = time.time()
+            logger.info("Merchant search settlement recenter confirmed; locating actual Shop")
+            return True
 
         if (
             "merchant_shop_building_tapped" not in self.routine_completed_steps
@@ -8702,6 +9118,39 @@ class AutoClicker:
             return image, location, bbox, float(score or 0.0)
         return None
 
+    def _open_training_from_barracks(self, task, building_match=None):
+        """Open the labelled radial action and verify this troop's real form."""
+        if self._training_step_visible(task, "train") is not None:
+            self.routine_completed_steps.update({"queue", "building"})
+            return True
+        if building_match is None:
+            building_match = self._training_step_visible(task, "building")
+        if building_match is None:
+            return False
+        _image, location, _bbox, _score = building_match
+        frame, _origin = self._capture_screen_bgr(force=True)
+        target = detect_training_radial_action_target(frame, (location.x, location.y))
+        if target is None:
+            logger.warning("Training radial action not confirmed beside the requested barracks")
+            self.routine_completed_steps.discard("building")
+            return False
+        if self.uses_adb:
+            self.adb_client.tap(*target)
+        else:
+            pyautogui.click(*target)
+        self._invalidate_capture()
+        for _attempt in range(8):
+            self._interruptible_sleep(0.4)
+            self._check_worker_interrupted()
+            if self._training_step_visible(task, "train") is not None:
+                self.routine_completed_steps.update({"queue", "building"})
+                logger.info("Training form confirmed after labelled radial action at (%s, %s)", *target)
+                return True
+        self.routine_completed_steps.discard("building")
+        self.set_status_message("Форма нужных войск не появилась после выбора Тренировать", force=True)
+        logger.warning("Training radial click did not open the requested troop form")
+        return False
+
     def _try_training_catalogue_fallback(self, task):
         """Select the requested barracks through the fixed training overview.
 
@@ -8721,10 +9170,25 @@ class AutoClicker:
         if self._training_step_visible(task, "train") is not None:
             # Let the normal template executor perform and confirm Start.
             return False
-        if self._training_step_visible(task, "building") is not None:
-            # The requested barracks is selected.  The next normal iteration
-            # clicks only its calibrated radial training action.
-            return False
+        building_match = self._training_step_visible(task, "building")
+        if building_match is not None:
+            # The repeatable overview has a higher priority than the title.
+            # Once the requested barracks is visible, open its labelled Train
+            # action before another overview click can select a different one.
+            if self._open_training_from_barracks(task, building_match):
+                self.routine_last_action_time = time.time()
+                self.routine_current_had_action = True
+                self.click_count += 1
+            else:
+                checks = self.routine_action_counts.get("training_radial_checks", 0) + 1
+                self.routine_action_counts["training_radial_checks"] = checks
+                if checks >= max(1, int(task.get("settings", {}).get("max_queue_checks", 5) or 5)):
+                    self._defer_current_routine_unavailable(
+                        "не удалось подтвердить форму обучения нужных войск",
+                        time.time(),
+                        retry_delay=60.0,
+                    )
+            return True
 
         if not self._is_settlement_screen_visible():
             return bool(
@@ -8733,6 +9197,26 @@ class AutoClicker:
                     require_settlement=True,
                 )
             )
+
+        # The expanded event ribbon hides the troop-specific barracks title.
+        # Selecting the left overview repeatedly cannot reveal that text:
+        # collapse only the positively identified ribbon, then let the next
+        # iteration validate the requested building before opening training.
+        try:
+            frame, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Training queue fallback could not capture the shelter")
+            return False
+        panel_target = detect_settlement_event_panel_collapse_target(frame)
+        if panel_target is not None:
+            if not self._tap_routine_fallback(
+                panel_target,
+                ("training_event_panel_collapse", *panel_target),
+                "Производство: скрываю панель событий над названием казарм",
+            ):
+                return False
+            logger.info("Training search collapsed the settlement event panel")
+            return True
 
         action_counts = getattr(self, "routine_action_counts", None)
         if not isinstance(action_counts, dict):
@@ -8745,7 +9229,7 @@ class AutoClicker:
         )
         if queue_checks >= max_checks:
             self._defer_current_routine_unavailable(
-                "max_queue_checks",
+                "не удалось подтвердить нужные казармы",
                 time.time(),
                 retry_delay=60.0,
             )
@@ -9807,11 +10291,17 @@ class AutoClicker:
         return frame
 
     def _scan_research_branch(self, branch, display, max_pages=6):
+        if self._research_watchdog_due():
+            logger.warning("Research scan budget expired before opening branch=%s", branch)
+            return False
         frame = self._reset_research_branch(branch, display)
         if frame is None:
             return False
         seen_pages = set()
         for page_index in range(max(1, int(max_pages))):
+            if self._research_watchdog_due():
+                logger.warning("Research scan budget expired before branch=%s page=%s", branch, page_index + 1)
+                return False
             signature = self._research_page_signature(frame)
             if signature and signature in seen_pages:
                 logger.info(
@@ -9825,6 +10315,9 @@ class AutoClicker:
 
             attempted_rows = []
             for _row_attempt in range(6):
+                if self._research_watchdog_due():
+                    logger.warning("Research scan budget expired between rows in branch=%s page=%s", branch, page_index + 1)
+                    return False
                 candidates = self._research_tree_candidates(frame)
                 if not candidates:
                     break
@@ -9853,6 +10346,9 @@ class AutoClicker:
                 if found:
                     return True
 
+            if self._research_watchdog_due():
+                logger.warning("Research scan budget expired before advancing branch=%s page=%s", branch, page_index + 1)
+                return False
             before_reference = self._research_reference_frame(frame)
             self._swipe_research_reference((1000, 500), (300, 500), display)
             self._interruptible_sleep(0.65)
@@ -9884,6 +10380,9 @@ class AutoClicker:
         branches = ("economy", "war") if setting == "any" else (setting,)
         display = self.get_display_profile()
         for branch in branches:
+            if self._research_watchdog_due():
+                logger.warning("Research scan budget expired before configured branch=%s", branch)
+                return None
             self.set_status_message(
                 f"Проверяю ветку исследования: "
                 f"{'экономика' if branch == 'economy' else 'война'}",
@@ -9946,10 +10445,13 @@ class AutoClicker:
                     logger.exception("Dynamic research-tree scan failed")
                     branch = None
                 if branch is None:
-                    logger.warning(
-                        "No enabled research action found after scanning all "
-                        "configured branches and pages"
-                    )
+                    if self._research_watchdog_due():
+                        logger.warning("Research scan interrupted by its confirmation budget; configured search is incomplete")
+                    else:
+                        logger.warning(
+                            "No enabled research action found after scanning all "
+                            "configured branches and pages"
+                        )
                     self._defer_current_routine_no_action(time.time())
                     return True
                 self.routine_completed_steps.add("select")
@@ -10324,9 +10826,15 @@ class AutoClicker:
             return
 
         reason = str(reason)
+        if reason == "max_queue_checks" and task.get("id") in {
+            "train_infantry", "train_riders", "train_shooters", "train_vehicles",
+        }:
+            # Exhausting navigation attempts proves neither active training
+            # nor occupied queues (the live failure still showed 0/4).
+            reason = "не удалось подтвердить нужные казармы или форму обучения"
         display_reason = {
             "boost_item_unavailable": "нет подходящего усиления сбора на выбранное время",
-            "max_queue_checks": "все очереди производства заняты",
+            "max_queue_checks": "не удалось подтвердить нужные казармы или форму обучения",
             "max_lab_checks": "все очереди исследований заняты",
             "merchant_absent": "Таинственный торговец временно отсутствует",
         }.get(reason, reason)
@@ -10621,27 +11129,81 @@ class AutoClicker:
     def _stop_multi_workers(self):
         if not self.multi_emulator_workers:
             self.multi_emulator_total = 1
-            return
-        self._write_multi_command("stop")
-        workers = list(self.multi_emulator_workers.values())
-        self.multi_emulator_workers = {}
-        self.multi_emulator_total = 1
-        for worker in workers:
-            process = worker["process"]
+            return True
+        try:
+            self._write_multi_command("stop")
+        except Exception:
+            logger.exception("Не удалось передать остановку скрытым исполнителям")
+
+        def wait_for_exit(process, timeout):
             try:
-                process.wait(timeout=2.5)
+                process.wait(timeout=timeout)
+                return True
             except subprocess.TimeoutExpired:
-                process.terminate()
-                try:
-                    process.wait(timeout=2.0)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                return False
+            except Exception:
+                logger.exception("Не удалось дождаться завершения скрытого исполнителя")
+                return False
+
+        for index, worker in list(self.multi_emulator_workers.items()):
+            try:
+                process = worker["process"]
+                exited = wait_for_exit(process, 2.5)
+                if not exited:
+                    try:
+                        process.terminate()
+                    except Exception:
+                        logger.exception("Не удалось завершить скрытого исполнителя LDPlayer %s", index)
+                    exited = wait_for_exit(process, 2.0)
+                if not exited:
+                    try:
+                        process.kill()
+                    except Exception:
+                        logger.exception("Не удалось принудительно завершить исполнителя LDPlayer %s", index)
+                    exited = wait_for_exit(process, 2.0)
+                if not exited:
+                    exited = process.poll() is not None
+                # Keep handles to survivors so another launch cannot create
+                # competing workers for the same emulators.
+                if exited and self.multi_emulator_workers.get(index) is worker:
+                    del self.multi_emulator_workers[index]
+            except Exception:
+                logger.exception("Ошибка остановки скрытого исполнителя LDPlayer %s", index)
+        self.multi_emulator_total = 1 + len(self.multi_emulator_workers)
+        if self.multi_emulator_workers:
+            logger.warning("Остались незавершённые скрытые исполнители: %s", list(self.multi_emulator_workers))
+        return not self.multi_emulator_workers
 
     def start_all_emulators(self):
+        try:
+            return self._start_all_emulators()
+        except Exception:
+            logger.exception("Не удалось запустить все эмуляторы")
+            try:
+                self.stop()
+            except Exception:
+                logger.exception("Не удалось остановить основной цикл после ошибки запуска")
+            try:
+                self._stop_multi_workers()
+            except Exception:
+                logger.exception("Не удалось остановить исполнителей после ошибки запуска")
+            self.set_status_message("Ошибка запуска эмуляторов. Проверьте журнал.", force=True)
+            return False
+
+    def _start_all_emulators(self):
         if self.is_multi_worker:
             return self.start_routines()
         if self.is_running:
             return True
+
+        if self.multi_emulator_workers:
+            self._stop_multi_workers()
+            if self.multi_emulator_workers:
+                self.set_status_message(
+                    "Предыдущие исполнители ещё не остановлены. Повторный запуск отменён.",
+                    force=True,
+                )
+                return False
 
         targets = self._running_emulator_targets()
         if not targets:
@@ -10696,7 +11258,6 @@ class AutoClicker:
 
         self.save_config()
         source = json.loads(CONFIG_FILE.read_text(encoding="utf-8-sig"))
-        self._stop_multi_workers()
         for instance, serial in targets:
             if instance.index == primary[0].index:
                 continue
@@ -10877,19 +11438,29 @@ class AutoClicker:
                 return False
             self.device_lease = lease
 
-        self.stop_event.clear()
-        self._set_state(BotState.RUNNING)
-        self.pause_started_at = None
-        self.total_paused_duration = 0.0
-        self.start_time = time.time()
-        self.click_count = 0
-        self.set_status_message(f"{self.tr('state_running')}: {self.tr('ready')}", force=True)
+        try:
+            self.stop_event.clear()
+            self._set_state(BotState.RUNNING)
+            self.pause_started_at = None
+            self.total_paused_duration = 0.0
+            self.start_time = time.time()
+            self.click_count = 0
+            self.set_status_message(f"{self.tr('state_running')}: {self.tr('ready')}", force=True)
 
-        if self.root and self.minimize_on_start:
-            self.root.iconify()
+            if self.root and self.minimize_on_start:
+                self.root.iconify()
 
-        self._thread = threading.Thread(target=self._clicker_loop, daemon=True)
-        self._thread.start()
+            self._thread = threading.Thread(target=self._clicker_loop, daemon=True)
+            self._thread.start()
+        except Exception:
+            self.stop_event.set()
+            self._set_state(BotState.STOPPED)
+            lease = self.device_lease
+            self.device_lease = None
+            if lease is not None:
+                lease.release()
+            logger.exception("Не удалось запустить поток бота")
+            raise
         logger.info("Бот запущен")
         return True
 
@@ -11049,6 +11620,21 @@ class AutoClicker:
         return len(good) >= threshold
 
     def _clicker_loop(self):
+        try:
+            self._run_clicker_loop()
+        finally:
+            self.stop_event.set()
+            self._set_state(BotState.STOPPED)
+            device_lease = getattr(self, "device_lease", None)
+            if device_lease is not None:
+                device_lease.release()
+                self.device_lease = None
+            logger.info("Цикл кликера завершён")
+            self.set_status_message(self.tr('state_stopped'), force=True)
+            if self.root:
+                self.gui_queue.put((self.root.deiconify, (), {}))
+
+    def _run_clicker_loop(self):
         pyautogui.PAUSE = 0
         logger.info("Цикл кликера запущен")
         while not self.stop_event.is_set() and not self.stop_hotkey_pressed:
@@ -11617,7 +12203,15 @@ class AutoClicker:
                                         )
                                         refresh_after_action = True
                                     limit_key = str(img_config.get("limit_key") or "")
-                                    if limit_key:
+                                    if limit_key and not (
+                                        limit_key == "max_queue_checks"
+                                        and current_routine_task.get("id") in {
+                                            "train_infantry", "train_riders", "train_shooters", "train_vehicles",
+                                        }
+                                        and "building" in self.routine_completed_steps
+                                    ):
+                                        # A positively verified troop form is progress,
+                                        # even on the final allowed overview check.
                                         self.routine_current_action_count += 1
                                         self.routine_action_counts[limit_key] = (
                                             self.routine_action_counts.get(limit_key, 0) + 1
@@ -11771,9 +12365,25 @@ class AutoClicker:
 
                 if (
                     self.routine_mode
+                    and current_routine_task.get("id") == "alliance_donations"
+                    and not action_occurred
+                    and self._try_alliance_donations_entry_fallback(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
                     and current_routine_task.get("id") == "mail_rewards"
                     and not action_occurred
                     and self._try_mail_visual_fallback(current_routine_task)
+                ):
+                    continue
+
+                if (
+                    self.routine_mode
+                    and current_routine_task.get("id") == "wasteland_exploration"
+                    and not action_occurred
+                    and self._try_wasteland_event_panel_fallback(current_routine_task)
                 ):
                     continue
 
@@ -12087,19 +12697,14 @@ class AutoClicker:
 
                 time.sleep(self.sleep_not_found)
 
-            except Exception as e:
-                logger.error(f"Критическая ошибка в цикле: {e}")
+            except _BotActionInterrupted:
+                continue
+            except pyautogui.FailSafeException:
+                logger.warning("Аварийная остановка PyAutoGUI")
+                self.stop_event.set()
+            except Exception:
+                logger.exception("Ошибка в цикле кликера")
                 time.sleep(self.sleep_error)
-
-        self._set_state(BotState.STOPPED)
-        device_lease = getattr(self, "device_lease", None)
-        if device_lease is not None:
-            device_lease.release()
-            self.device_lease = None
-        logger.info("Цикл кликера завершён")
-        self.set_status_message(self.tr('state_stopped'), force=True)
-        if self.root:
-            self.gui_queue.put((self.root.deiconify, (), {}))
 
     def _switch_to_next_group(self):
         if not self.cycle_groups:
@@ -12403,6 +13008,7 @@ class AutoClicker:
         return True
 
     def _execute_action(self, img_config, location):
+        self._check_worker_interrupted()
         self.routine_action_failure_reason = ""
         x, y = location.x, location.y
         offset = img_config.get("click_offset", (0, 0))
@@ -12416,6 +13022,15 @@ class AutoClicker:
 
         if self._resource_result_level_rejected(img_config):
             return False
+
+        if action == "click" and img_config.get("runtime_step") == "building":
+            training_task = self.get_routine_task(self.current_routine_task_id)
+            if training_task is not None and training_task.get("id") in {
+                "train_infantry", "train_riders", "train_shooters", "train_vehicles",
+            }:
+                # This template is the title, not the radial Train button.
+                # In particular, max-level barracks have a different layout.
+                return self._open_training_from_barracks(training_task)
 
         if action == "open_processing_factory":
             if self.uses_adb:
@@ -12471,6 +13086,7 @@ class AutoClicker:
                 logger.exception("Could not close the unexpected refinery screen")
             self._invalidate_capture()
             self.routine_completed_steps.discard("select_refinery")
+            self.routine_processing_factory_force_scan = True
             self.set_status_message(
                 "Завод не открылся: возвращаюсь и повторяю поиск",
                 force=True,
@@ -12593,6 +13209,7 @@ class AutoClicker:
 
         if action == "alliance_marked_project":
             frame, _origin = self._capture_screen_bgr(force=True)
+            self._save_routine_calibration_frame("alliance_donations", "tree", frame)
             target = detect_alliance_marked_project_target(frame)
             if target is None:
                 logger.info("Alliance donation marker was not found; using project templates")
@@ -12618,6 +13235,8 @@ class AutoClicker:
                 force=True,
             )
             self._interruptible_sleep(img_config.get("delay", self.sleep_found))
+            project_frame, _origin = self._capture_screen_bgr(force=True)
+            self._save_routine_calibration_frame("alliance_donations", "project", project_frame)
             return True
 
         if action == "radar_defer_in_progress":
@@ -12713,13 +13332,21 @@ class AutoClicker:
             return True
 
         if action == "select_training_queue":
+            training_task = self.get_routine_task(self.current_routine_task_id)
+            if training_task is None:
+                return False
+            if self._training_step_visible(training_task, "train") is not None:
+                # The overview belongs to the settlement, never the troop form.
+                return False
+            building_match = self._training_step_visible(training_task, "building")
+            if building_match is not None:
+                return self._open_training_from_barracks(training_task, building_match)
             if self.uses_adb:
                 self.adb_client.tap(int(round(target_x)), int(round(target_y)))
             else:
                 pyautogui.click(target_x, target_y)
             self._invalidate_capture()
             self._interruptible_sleep(0.8)
-            training_task = self.get_routine_task(self.current_routine_task_id)
             building_match = (
                 self._training_step_visible(training_task, "building")
                 if training_task is not None
@@ -12738,6 +13365,7 @@ class AutoClicker:
                     int(location.y),
                     score,
                 )
+                return self._open_training_from_barracks(training_task, building_match)
             else:
                 self.set_status_message(
                     "Выбрано следующее свободное учебное здание",
@@ -14217,17 +14845,33 @@ class AutoClicker:
                 self._interruptible_sleep(0.35)
             action = "click"
 
+        if (
+            action == "click"
+            and getattr(self, "current_routine_task_id", None) == "alliance_donations"
+            and img_config.get("runtime_step") == "project_closed"
+        ):
+            # The closer's missing-button guard alone is not proof of zero
+            # attempts. Read the explicit counter before leaving the project.
+            try:
+                donation_frame, _donation_origin = self._capture_screen_bgr(force=True)
+                if alliance_donation_attempts_exhausted(donation_frame):
+                    self.routine_completed_steps.add("donations_exhausted")
+                    logger.info("Alliance donation exhaustion confirmed by the 0/30 counter")
+            except Exception:
+                logger.exception("Could not confirm the alliance donation counter")
+
+        self._check_worker_interrupted()
         if self.uses_adb:
             current_x = int(round(target_x))
             current_y = int(round(target_y))
             if click_seq:
                 self.adb_client.tap(current_x, current_y)
-                time.sleep(0.2)
+                self._interruptible_sleep(0.2)
                 for dx, dy in click_seq:
                     current_x += int(round(dx * display.scale_x))
                     current_y += int(round(dy * display.scale_y))
                     self.adb_client.tap(current_x, current_y)
-                    time.sleep(0.2)
+                    self._interruptible_sleep(0.2)
             elif numbers and action == "click":
                 self.adb_client.tap(current_x, current_y)
                 self._interruptible_sleep(0.5)
@@ -14238,19 +14882,21 @@ class AutoClicker:
             elif action == "click":
                 self.adb_client.tap(current_x, current_y)
             elif action == "double_click":
-                self.adb_client.double_tap(current_x, current_y)
+                self.adb_client.tap(current_x, current_y)
+                self._interruptible_sleep(0.12)
+                self.adb_client.tap(current_x, current_y)
             elif action == "right_click":
                 self.adb_client.long_press(current_x, current_y)
         else:
             pyautogui.moveTo(target_x, target_y, duration=0.1)
-            time.sleep(0.05)
+            self._interruptible_sleep(0.05)
             if click_seq:
                 pyautogui.click()
-                time.sleep(0.2)
+                self._interruptible_sleep(0.2)
                 for dx, dy in click_seq:
                     pyautogui.moveRel(dx, dy, duration=0.1)
                     pyautogui.click()
-                    time.sleep(0.2)
+                    self._interruptible_sleep(0.2)
             elif numbers and action == "click":
                 pyautogui.click()
                 self._interruptible_sleep(0.5)
@@ -14510,16 +15156,27 @@ class AutoClicker:
         return True
 
     def _interruptible_sleep(self, seconds):
-        end_time = time.time() + seconds
-        while time.time() < end_time:
+        self._check_worker_interrupted()
+        end_time = time.monotonic() + max(0.0, float(seconds))
+        while time.monotonic() < end_time:
+            self._check_worker_interrupted()
             if self.stop_event.is_set() or self.stop_hotkey_pressed:
                 logger.info("Сон прерван по stop_event")
                 break
             if self.is_paused:
                 logger.info("Сон прерван из-за паузы")
                 break
-            remaining = end_time - time.time()
-            time.sleep(min(0.5, remaining))
+            remaining = max(0.0, end_time - time.monotonic())
+            self.stop_event.wait(min(0.5, remaining))
+        self._check_worker_interrupted()
+
+    def _check_worker_interrupted(self):
+        # Headless diagnostics may call action helpers directly while stopped.
+        # Cancellation only unwinds the actual running clicker worker.
+        if threading.current_thread() is getattr(self, "_thread", None) and (
+            self.stop_event.is_set() or self.stop_hotkey_pressed or self.is_paused
+        ):
+            raise _BotActionInterrupted()
 
     def start_schedule_thread(self):
         if self.schedule_thread is not None and self.schedule_thread.is_alive():
@@ -14537,7 +15194,10 @@ class AutoClicker:
 
     def _schedule_loop(self):
         while not self.schedule_stop_event.is_set():
-            self.check_group_schedules()
+            try:
+                self.check_group_schedules()
+            except Exception:
+                logger.exception("Ошибка проверки расписания групп")
             self.schedule_stop_event.wait(60)
 
     def check_group_schedules(self):
@@ -14545,7 +15205,9 @@ class AutoClicker:
         now = time.localtime()
         current_minutes = now.tm_hour * 60 + now.tm_min
 
-        for group, schedule in self.group_schedules.items():
+        for group, schedule in list(self.group_schedules.items()):
+            if not isinstance(schedule, dict):
+                continue
             if not schedule.get('auto', False):
                 continue
             schedule_type = schedule.get('type', 'time')
@@ -14566,7 +15228,11 @@ class AutoClicker:
             else:
                 if on_min is None:
                     continue
-                should_be_on = (on_min <= current_minutes < on_min + duration)
+                try:
+                    duration = float(duration)
+                except (TypeError, ValueError):
+                    continue
+                should_be_on = 0 <= (current_minutes - on_min) % 1440 < duration
 
             if should_be_on != current_state:
                 self.groups[group] = should_be_on
@@ -14576,7 +15242,7 @@ class AutoClicker:
         if changed:
             self.save_config()
             if self.root:
-                self.root.event_generate("<<GroupsChanged>>")
+                self.gui_queue.put((self.root.event_generate, ("<<GroupsChanged>>",), {}))
 
     def select_area(self, master=None, for_work_area=False, default_group=None, default_description=None):
         if not self.stop_event.is_set():
@@ -17401,6 +18067,11 @@ def should_autostart_alliance_gifts_only(argv=None):
     return any(str(arg).strip().lower() == "--alliance-gifts-only" for arg in args)
 
 
+def should_autostart_donations_only(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    return any(str(arg).strip().lower() == "--donations-only" for arg in args)
+
+
 def should_autostart_all_emulators(argv=None):
     args = sys.argv[1:] if argv is None else argv
     return any(str(arg).strip().lower() == "--autostart-all" for arg in args)
@@ -17443,17 +18114,33 @@ def validate_smoke_test_layout(app_dir=APP_DIR):
     return len(images)
 
 
+def run_startup_smoke_test(app_dir=APP_DIR):
+    app_dir = Path(app_dir)
+    marker = app_dir / "smoke-test.ok"
+    marker.unlink(missing_ok=True)
+    template_count = validate_smoke_test_layout(app_dir)
+    # Importing tkinter alone does not initialize the Tcl/Tk runtime.
+    # Exercise the same GUI initialization as normal startup, without a bot.
+    root = tk.Tk()
+    try:
+        root.withdraw()
+        root.update_idletasks()
+    finally:
+        root.destroy()
+    marker.write_text(
+        f"BuZzbot {APP_VERSION}: {template_count} templates; Tcl/Tk initialized\n",
+        encoding="utf-8",
+    )
+    return template_count
+
+
 def main():
     if should_run_smoke_test():
-        template_count = validate_smoke_test_layout()
+        template_count = run_startup_smoke_test()
         logger.info(
             "Smoke test passed for BuZzbot %s: %s configured templates",
             APP_VERSION,
             template_count,
-        )
-        (APP_DIR / "smoke-test.ok").write_text(
-            f"BuZzbot {APP_VERSION}: {template_count} templates\n",
-            encoding="utf-8",
         )
         return
     enable_windows_high_dpi()
@@ -17482,7 +18169,14 @@ def main():
 
     IMG_DIR.mkdir(parents=True, exist_ok=True)
 
-    bot = AutoClicker(root)
+    try:
+        bot = AutoClicker(root)
+    except ValueError as exc:
+        logger.exception("Не удалось инициализировать бота")
+        if not is_multi_worker:
+            messagebox.showerror("Ошибка загрузки BuZzbot", str(exc), parent=root)
+        root.destroy()
+        return
 
     def hotkey_stop(event=None):
         if bot.is_running:
@@ -17535,6 +18229,9 @@ def main():
 
     build_compact_ui(root, bot)
 
+    if bot.remote_settings.enabled and not is_multi_worker:
+        root.after(0, bot.start_remote_control)
+
     if is_multi_worker:
         root.withdraw()
         control_path = RUNTIME_DIR / "control.json"
@@ -17585,6 +18282,9 @@ def main():
     elif should_autostart_alliance_gifts_only():
         logger.info("Alliance gifts diagnostic requested: all other tasks are suspended")
         root.after(1500, lambda: bot.start_task_only("alliance_gifts"))
+    elif should_autostart_donations_only():
+        logger.info("Alliance donations diagnostic requested: all other tasks are suspended")
+        root.after(1500, lambda: bot.start_task_only("alliance_donations"))
     elif should_autostart_routines():
         if should_start_fresh_pass():
             logger.info(

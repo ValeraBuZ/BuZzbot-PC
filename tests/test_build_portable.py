@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -8,6 +9,22 @@ import build_portable
 
 
 class PortableBuildTests(unittest.TestCase):
+    def test_missing_tk_aborts_before_deleting_existing_build(self):
+        with (
+            patch("PyInstaller.utils.hooks.tcl_tk.tcltk_info", SimpleNamespace(available=False)),
+            patch("sys.argv", ["build_portable.py"]),
+            patch.object(build_portable, "ensure_clean_target") as clean,
+            patch.object(build_portable, "run_pyinstaller") as build,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "without tkinter"):
+                build_portable.main()
+            clean.assert_not_called()
+            build.assert_not_called()
+
+    def test_working_tcl_tk_passes_build_preflight(self):
+        with patch("PyInstaller.utils.hooks.tcl_tk.tcltk_info", SimpleNamespace(available=True)):
+            build_portable.validate_build_environment()
+
     def test_portable_brand_and_windowed_executable_are_stable(self):
         spec = build_portable.build_spec_text()
         self.assertEqual(build_portable.APP_NAME, "BuZzbot")
