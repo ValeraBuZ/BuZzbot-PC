@@ -1,0 +1,5513 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Старенький ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 3.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 99000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №146 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-146.png",
+      "id": "bid-20260927-146",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "squad.defense",
+          "value": 5.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 5.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 3.2,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 97000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №147 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-147.png",
+      "id": "bid-20260927-147",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 10,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 95000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №148 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-148.png",
+      "id": "bid-20260927-148",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 5.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 88888,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №149 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-149.png",
+      "id": "bid-20260927-149",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 10.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 65000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №150 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-150.png",
+      "id": "bid-20260927-150",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Светошумовая граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 8.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 50000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №151 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-151.png",
+      "id": "bid-20260927-151",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 18,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 5.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 3.9,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.9,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 50000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №152 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-152.png",
+      "id": "bid-20260927-152",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 10,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.6,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 50000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №153 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-153.png",
+      "id": "bid-20260927-153",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 6.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.8,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 48000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №154 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-154.png",
+      "id": "bid-20260927-154",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 3.0,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 46650,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №155 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-155.png",
+      "id": "bid-20260927-155",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 44444,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №156 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-156.png",
+      "id": "bid-20260927-156",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 3.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 3.3,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 42150,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №157 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-157.png",
+      "id": "bid-20260927-157",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 8.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 40500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №158 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-158.png",
+      "id": "bid-20260927-158",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 8.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 33333,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №159 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-159.png",
+      "id": "bid-20260927-159",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 5.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 32000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №160 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-160.png",
+      "id": "bid-20260927-160",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 3.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 3.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 4.1,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 31000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №161 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-161.png",
+      "id": "bid-20260927-161",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 30400,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №162 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-162.png",
+      "id": "bid-20260927-162",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 15,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 2.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 30200,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №163 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-163.png",
+      "id": "bid-20260927-163",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 30000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №164 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-164.png",
+      "id": "bid-20260927-164",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 14,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 6.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.8,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 30000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №165 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-165.png",
+      "id": "bid-20260927-165",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Осколочная граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 30000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №166 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-166.png",
+      "id": "bid-20260927-166",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 28500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №167 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-167.png",
+      "id": "bid-20260927-167",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 7,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.9,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 27200,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №168 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-168.png",
+      "id": "bid-20260927-168",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Противотанковая мина",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 26000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №169 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-169.png",
+      "id": "bid-20260927-169",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Бронежилет с мониторингом",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.4,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 25000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №170 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-170.png",
+      "id": "bid-20260927-170",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 23456,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №171 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-171.png",
+      "id": "bid-20260927-171",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 0.6,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 22000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №172 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-172.png",
+      "id": "bid-20260927-172",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 4,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 20000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №173 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-173.png",
+      "id": "bid-20260927-173",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 20000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №174 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-174.png",
+      "id": "bid-20260927-174",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон «Колибри»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 20000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №175 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-175.png",
+      "id": "bid-20260927-175",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 2.6,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 20000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №176 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-176.png",
+      "id": "bid-20260927-176",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огненный ёж»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 8.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 5.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 19999,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №177 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-177.png",
+      "id": "bid-20260927-177",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 10,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 17000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №178 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-178.png",
+      "id": "bid-20260927-178",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 15.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 17000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №179 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-179.png",
+      "id": "bid-20260927-179",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "Простота",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 16888,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №180 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-180.png",
+      "id": "bid-20260927-180",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон «Колибри»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 1,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.9,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 16500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №181 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-181.png",
+      "id": "bid-20260927-181",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Маскировочная маска",
+      "market": "Текущий аукцион",
+      "trait": "Удача",
+      "level": 17,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 3.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 16000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №182 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-182.png",
+      "id": "bid-20260927-182",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 5.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.8,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 15800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №183 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-183.png",
+      "id": "bid-20260927-183",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 4.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 15200,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №184 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-184.png",
+      "id": "bid-20260927-184",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 10.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 15000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №185 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-185.png",
+      "id": "bid-20260927-185",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 5,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 4.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 14800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №186 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-186.png",
+      "id": "bid-20260927-186",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 1.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 5.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 1.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 12945,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №187 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-187.png",
+      "id": "bid-20260927-187",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 3.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 12000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №188 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-188.png",
+      "id": "bid-20260927-188",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 5.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 12000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №189 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-189.png",
+      "id": "bid-20260927-189",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 11,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 12000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №190 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-190.png",
+      "id": "bid-20260927-190",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 3.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 12000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №191 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-191.png",
+      "id": "bid-20260927-191",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "Изысканное",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 2.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.1,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 11500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №192 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-192.png",
+      "id": "bid-20260927-192",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкий бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 0.6,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 11177,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №193 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-193.png",
+      "id": "bid-20260927-193",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Старенький ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 10400,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №194 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-194.png",
+      "id": "bid-20260927-194",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ППШ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 7.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 6.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора еды"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора дерева"
+        }
+      ],
+      "status": "bid",
+      "price": 10400,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №195 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-195.png",
+      "id": "bid-20260927-195",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 10000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №196 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-196.png",
+      "id": "bid-20260927-196",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 10000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №197 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-197.png",
+      "id": "bid-20260927-197",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 10000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №198 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-198.png",
+      "id": "bid-20260927-198",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 9990,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №199 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-199.png",
+      "id": "bid-20260927-199",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 5.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 9600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №200 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-200.png",
+      "id": "bid-20260927-200",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Бронежилет с мониторингом",
+      "market": "Текущий аукцион",
+      "trait": "Изысканное",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 9500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №201 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-201.png",
+      "id": "bid-20260927-201",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Лазерный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 6.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 9300,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №202 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-202.png",
+      "id": "bid-20260927-202",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 2,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 5.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 4.1,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 9200,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №203 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-203.png",
+      "id": "bid-20260927-203",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Маскировочная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 3.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 3.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 8000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №204 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-204.png",
+      "id": "bid-20260927-204",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 5.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 8000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №205 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-205.png",
+      "id": "bid-20260927-205",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 4.8,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 8000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №206 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-206.png",
+      "id": "bid-20260927-206",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 7000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №207 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-207.png",
+      "id": "bid-20260927-207",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 7000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №208 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-208.png",
+      "id": "bid-20260927-208",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 7000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №209 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-209.png",
+      "id": "bid-20260927-209",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 0.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 7000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №210 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-210.png",
+      "id": "bid-20260927-210",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 10.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 6300,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №211 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-211.png",
+      "id": "bid-20260927-211",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Автономная турель",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 5.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 6100,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №212 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-212.png",
+      "id": "bid-20260927-212",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 6000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №213 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-213.png",
+      "id": "bid-20260927-213",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 6000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №214 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-214.png",
+      "id": "bid-20260927-214",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 5800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №215 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-215.png",
+      "id": "bid-20260927-215",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 3.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 5500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №216 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-216.png",
+      "id": "bid-20260927-216",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 6.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 6.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 5300,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №217 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-217.png",
+      "id": "bid-20260927-217",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон «Колибри»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 4.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 5000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №218 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-218.png",
+      "id": "bid-20260927-218",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4991,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №219 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-219.png",
+      "id": "bid-20260927-219",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4799,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №220 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-220.png",
+      "id": "bid-20260927-220",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 9.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №221 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-221.png",
+      "id": "bid-20260927-221",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 3.6,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 0.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №222 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-222.png",
+      "id": "bid-20260927-222",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 2.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4200,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №223 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-223.png",
+      "id": "bid-20260927-223",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 14,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 1.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №224 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-224.png",
+      "id": "bid-20260927-224",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 4000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №225 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-225.png",
+      "id": "bid-20260927-225",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 8.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.4,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №226 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-226.png",
+      "id": "bid-20260927-226",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "Изысканное",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.3,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №227 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-227.png",
+      "id": "bid-20260927-227",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.0,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №228 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-228.png",
+      "id": "bid-20260927-228",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 4.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №229 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-229.png",
+      "id": "bid-20260927-229",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №230 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-230.png",
+      "id": "bid-20260927-230",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный радар",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 6.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора еды"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора дерева"
+        }
+      ],
+      "status": "bid",
+      "price": 3600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №231 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-231.png",
+      "id": "bid-20260927-231",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3599,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №232 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-232.png",
+      "id": "bid-20260927-232",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 3500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №233 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-233.png",
+      "id": "bid-20260927-233",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2900,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №234 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-234.png",
+      "id": "bid-20260927-234",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 2.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2900,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №235 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-235.png",
+      "id": "bid-20260927-235",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 1.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 6.2,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2850,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №236 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-236.png",
+      "id": "bid-20260927-236",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "Простота",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 6.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №237 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-237.png",
+      "id": "bid-20260927-237",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон «Колибри»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №238 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-238.png",
+      "id": "bid-20260927-238",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Противотанковая мина",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 19,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 10.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_damage",
+          "value": 1.9,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №239 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-239.png",
+      "id": "bid-20260927-239",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 5.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2600,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №240 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-240.png",
+      "id": "bid-20260927-240",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 12.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №241 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-241.png",
+      "id": "bid-20260927-241",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 1,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 6.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.5,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.9,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2444,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №242 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-242.png",
+      "id": "bid-20260927-242",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 0.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 5.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2444,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №243 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-243.png",
+      "id": "bid-20260927-243",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 11.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2400,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №244 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-244.png",
+      "id": "bid-20260927-244",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 1.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 0.6,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2201,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №245 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-245.png",
+      "id": "bid-20260927-245",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Осколочная граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 8.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2188,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №246 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-246.png",
+      "id": "bid-20260927-246",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2001,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №247 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-247.png",
+      "id": "bid-20260927-247",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Осколочная граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 2.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.2,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2001,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №248 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-248.png",
+      "id": "bid-20260927-248",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 2001,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №249 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-249.png",
+      "id": "bid-20260927-249",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Старомодная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 6.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 8.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "bid",
+      "price": 2000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №250 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-250.png",
+      "id": "bid-20260927-250",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "Изысканное",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 5.0,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 1800,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №251 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-251.png",
+      "id": "bid-20260927-251",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 1.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "bid",
+      "price": 1500,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №252 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-252.png",
+      "id": "bid-20260927-252",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 5.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "bid",
+      "price": 1000,
+      "observed": "2026-09-27",
+      "source": "Снимок пользователя №253 · Зал торгов · 27.09.2026",
+      "notes": "Показанное поле «Лучшая ставка». Торги не завершены. Число участников, факт ставки покупателя и итоговая продажа не подтверждены; сумма может быть начальной ценой. Характеристики проверены по снимку.",
+      "evidence": "bid-253.png",
+      "id": "bid-20260927-253",
+      "sale_confirmed": false
+    }
+  ]
+}

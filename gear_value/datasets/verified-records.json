@@ -1,0 +1,7007 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 15.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №2 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-002.png",
+      "id": "shot-20260926-002",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 288,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №3 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-003.png",
+      "id": "shot-20260926-003",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Противотанковая мина",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №4 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-004.png",
+      "id": "shot-20260926-004",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 4.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №5 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-005.png",
+      "id": "shot-20260926-005",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №6 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-006.png",
+      "id": "shot-20260926-006",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 6.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 880,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №7 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-007.png",
+      "id": "shot-20260926-007",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Старомодная маска",
+      "market": "Текущий аукцион",
+      "trait": "Удача",
+      "level": 6,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 6.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №8 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-008.png",
+      "id": "shot-20260926-008",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 7.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №9 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-009.png",
+      "id": "shot-20260926-009",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 11,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 7.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 2.6,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 400,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №10 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-010.png",
+      "id": "shot-20260926-010",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Бронежилет с мониторингом",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №11 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-011.png",
+      "id": "shot-20260926-011",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 6.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 0.6,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №12 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-012.png",
+      "id": "shot-20260926-012",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 6.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 16.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 350,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №13 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-013.png",
+      "id": "shot-20260926-013",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "elite",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 5,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 100,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №14 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-014.png",
+      "id": "shot-20260926-014",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №15 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-015.png",
+      "id": "shot-20260926-015",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №16 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-016.png",
+      "id": "shot-20260926-016",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 12.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 5.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 333,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №17 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-017.png",
+      "id": "shot-20260926-017",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №18 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-018.png",
+      "id": "shot-20260926-018",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 400,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №19 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-019.png",
+      "id": "shot-20260926-019",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "Простота",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 1.3,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.1,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №20 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-020.png",
+      "id": "shot-20260926-020",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 3.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 6.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №21 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-021.png",
+      "id": "shot-20260926-021",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон «Колибри»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 400,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №22 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-022.png",
+      "id": "shot-20260926-022",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 2.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1333,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №23 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-023.png",
+      "id": "shot-20260926-023",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №24 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-024.png",
+      "id": "shot-20260926-024",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 14.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 211,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №25 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-025.png",
+      "id": "shot-20260926-025",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №26 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-026.png",
+      "id": "shot-20260926-026",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "АА-12 с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 5.2,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 250,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №27 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-027.png",
+      "id": "shot-20260926-027",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №28 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-028.png",
+      "id": "shot-20260926-028",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №29 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-029.png",
+      "id": "shot-20260926-029",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 3.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 3.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.2,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 299,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №30 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-030.png",
+      "id": "shot-20260926-030",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №31 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-031.png",
+      "id": "shot-20260926-031",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Светошумовая граната",
+      "market": "Текущий аукцион",
+      "trait": "Простота",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 5.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №32 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-032.png",
+      "id": "shot-20260926-032",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "АА-12 с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 7,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 5.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.3,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 400,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №33 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-033.png",
+      "id": "shot-20260926-033",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 8,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.4,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.9,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №34 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-034.png",
+      "id": "shot-20260926-034",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Автономная турель",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 5.3,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 999,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №35 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-035.png",
+      "id": "shot-20260926-035",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №36 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-036.png",
+      "id": "shot-20260926-036",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 9.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №37 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-037.png",
+      "id": "shot-20260926-037",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 0.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 18.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №38 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-038.png",
+      "id": "shot-20260926-038",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 4.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 6.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 9.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №39 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-039.png",
+      "id": "shot-20260926-039",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 4.3,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 300,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №40 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-040.png",
+      "id": "shot-20260926-040",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 5,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 4.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 2.9,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №41 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-041.png",
+      "id": "shot-20260926-041",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "elite",
+      "name": "ППШ «Огневая мощь»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.3,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 1.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 100,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №42 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-042.png",
+      "id": "shot-20260926-042",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 800,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №43 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-043.png",
+      "id": "shot-20260926-043",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Бронежилет с мониторингом",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 300,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №44 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-044.png",
+      "id": "shot-20260926-044",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 5,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 4.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №45 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-045.png",
+      "id": "shot-20260926-045",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 4.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 3.6,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №46 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-046.png",
+      "id": "shot-20260926-046",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №47 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-047.png",
+      "id": "shot-20260926-047",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 4.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №48 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-048.png",
+      "id": "shot-20260926-048",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 8.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №49 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-049.png",
+      "id": "shot-20260926-049",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 496,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №50 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-050.png",
+      "id": "shot-20260926-050",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "Изысканное",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 9.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 6.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 4.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 300,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №51 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-051.png",
+      "id": "shot-20260926-051",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 3.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 5.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 5000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №52 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-052.png",
+      "id": "shot-20260926-052",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Противотанковая мина",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 6.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 8.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 350,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №53 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-053.png",
+      "id": "shot-20260926-053",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Лазерный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 3,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 1.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 10.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.6,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №54 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-054.png",
+      "id": "shot-20260926-054",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 8.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1900,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №55 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-055.png",
+      "id": "shot-20260926-055",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 2.1,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 600,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №56 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-056.png",
+      "id": "shot-20260926-056",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 0.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 250,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №57 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-057.png",
+      "id": "shot-20260926-057",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 4.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 11.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 320,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №58 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-058.png",
+      "id": "shot-20260926-058",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "elite",
+      "name": "Короткоствольный ППШ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.5,
+          "color": "unknown",
+          "custom": "Скорость сбора еды"
+        },
+        {
+          "key": "custom",
+          "value": 1.5,
+          "color": "unknown",
+          "custom": "Скорость сбора дерева"
+        }
+      ],
+      "status": "ask",
+      "price": 100,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №59 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-059.png",
+      "id": "shot-20260926-059",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ППШ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 2.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 2.2,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора еды"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора дерева"
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №60 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-060.png",
+      "id": "shot-20260926-060",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ППШ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 3.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора еды"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора дерева"
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №61 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-061.png",
+      "id": "shot-20260926-061",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 450,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №62 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-062.png",
+      "id": "shot-20260926-062",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 13.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 350,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №63 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-063.png",
+      "id": "shot-20260926-063",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Лазерный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 10.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1700,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №64 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-064.png",
+      "id": "shot-20260926-064",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Автономная турель",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 6.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 10.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 400,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №65 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-065.png",
+      "id": "shot-20260926-065",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 10.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №66 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-066.png",
+      "id": "shot-20260926-066",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 1.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 5.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №67 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-067.png",
+      "id": "shot-20260926-067",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 9.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 300,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №68 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-068.png",
+      "id": "shot-20260926-068",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Старомодная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 7.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.6,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №69 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-069.png",
+      "id": "shot-20260926-069",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 8.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 5.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 300,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №70 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-070.png",
+      "id": "shot-20260926-070",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 2.9,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №71 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-071.png",
+      "id": "shot-20260926-071",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огненный ёж»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 3.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №72 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-072.png",
+      "id": "shot-20260926-072",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Осколочная граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 999,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №73 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-073.png",
+      "id": "shot-20260926-073",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "Идеал",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 21.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 10.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 50000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №74 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-074.png",
+      "id": "shot-20260926-074",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Осколочная граната",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 10.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 50000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №75 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-075.png",
+      "id": "shot-20260926-075",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 15,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 2.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 25000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №76 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-076.png",
+      "id": "shot-20260926-076",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "Стрелки",
+      "level": 10,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 3.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.6,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 25000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №77 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-077.png",
+      "id": "shot-20260926-077",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Vector с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 6.4,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 2.1,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 22222,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №78 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-078.png",
+      "id": "shot-20260926-078",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 11.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 5.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 22000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №79 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-079.png",
+      "id": "shot-20260926-079",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 6,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.reduction",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.2,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20080,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №80 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-080.png",
+      "id": "shot-20260926-080",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 10.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 7.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.3,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №81 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-081.png",
+      "id": "shot-20260926-081",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Лазерный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 16,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.9,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 2.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 1.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №83 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-083.png",
+      "id": "shot-20260926-083",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Мина «Клеймор»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 2,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 5.3,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 4.9,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 0.6,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 4.1,
+          "color": "unknown",
+          "custom": "УРН базовой атаки на зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №84 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-084.png",
+      "id": "shot-20260926-084",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 15.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №86 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-086.png",
+      "id": "shot-20260926-086",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 8.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 5.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №87 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-087.png",
+      "id": "shot-20260926-087",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 3.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 4.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 8.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №88 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-088.png",
+      "id": "shot-20260926-088",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 5,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 3.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 5.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №89 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-089.png",
+      "id": "shot-20260926-089",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 6,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 7.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №90 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-090.png",
+      "id": "shot-20260926-090",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "Пехота",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "infantry.defense",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №91 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-091.png",
+      "id": "shot-20260926-091",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "Всадники",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №92 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-092.png",
+      "id": "shot-20260926-092",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Шипастая маска",
+      "market": "Текущий аукцион",
+      "trait": "Удача",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 3.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 14.3,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 1.7,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №93 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-093.png",
+      "id": "shot-20260926-093",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 3,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 8.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 1.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.6,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №94 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-094.png",
+      "id": "shot-20260926-094",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №95 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-095.png",
+      "id": "shot-20260926-095",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Тепловизор",
+      "market": "Текущий аукцион",
+      "trait": "Стрелки",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №96 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-096.png",
+      "id": "shot-20260926-096",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Личный РПГ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 5.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №97 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-097.png",
+      "id": "shot-20260926-097",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "Яркость",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 19900,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №99 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-099.png",
+      "id": "shot-20260926-099",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 4.1,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 19800,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №100 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-100.png",
+      "id": "shot-20260926-100",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 5.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 3.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 19000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №101 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-101.png",
+      "id": "shot-20260926-101",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Углеродный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "Ношеное",
+      "level": 12,
+      "attempts": 7,
+      "stats": [
+        {
+          "key": "infantry.damage",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 9.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 2.7,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 2.7,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 18500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №102 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-102.png",
+      "id": "shot-20260926-102",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Углеродная маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 11.3,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 18000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №103 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-103.png",
+      "id": "shot-20260926-103",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Экзоскелет",
+      "market": "Текущий аукцион",
+      "trait": "Стрелки",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 6.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 6.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 6.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 17200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №104 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-104.png",
+      "id": "shot-20260926-104",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 17.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 17000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №105 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-105.png",
+      "id": "shot-20260926-105",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "Яркость",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.defense",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 17000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №107 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-107.png",
+      "id": "shot-20260926-107",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 10.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 0.8,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 17000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №108 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-108.png",
+      "id": "shot-20260926-108",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Легкая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 5.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 3.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 16000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №109 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-109.png",
+      "id": "shot-20260926-109",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 9.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 10.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 6.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 16000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №110 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-110.png",
+      "id": "shot-20260926-110",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 5.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 5.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15999,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №111 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-111.png",
+      "id": "shot-20260926-111",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "АА-12 с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 1.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №112 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-112.png",
+      "id": "shot-20260926-112",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 10,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.8,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 4.8,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 4.8,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №113 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-113.png",
+      "id": "shot-20260926-113",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.reduction",
+          "value": 2.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 9.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №114 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-114.png",
+      "id": "shot-20260926-114",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "Всадники",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №115 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-115.png",
+      "id": "shot-20260926-115",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Зенитный снаряд",
+      "market": "Текущий аукцион",
+      "trait": "Удача",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 2.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №116 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-116.png",
+      "id": "shot-20260926-116",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "P90",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 2.6,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №117 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-117.png",
+      "id": "shot-20260926-117",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №118 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-118.png",
+      "id": "shot-20260926-118",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 1,
+      "stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 4.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 5.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.6,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №119 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-119.png",
+      "id": "shot-20260926-119",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Инфракрасный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "Всадники",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 2.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 5.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №120 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-120.png",
+      "id": "shot-20260926-120",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 4.6,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 14.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.9,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №121 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-121.png",
+      "id": "shot-20260926-121",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Шипастая маска",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 5.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 9.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 6.3,
+          "color": "unknown",
+          "custom": "УРН от умений Зомби"
+        },
+        {
+          "key": "squad.zombie_exp",
+          "value": 9.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №122 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-122.png",
+      "id": "shot-20260926-122",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "АА-12 с модулями",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 15,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 3.4,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 6.1,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №123 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-123.png",
+      "id": "shot-20260926-123",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 1.6,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 6.5,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора стали"
+        },
+        {
+          "key": "custom",
+          "value": 2.4,
+          "color": "unknown",
+          "custom": "Скорость сбора нефти"
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №124 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-124.png",
+      "id": "shot-20260926-124",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "ППШ «Огненный ёж»",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.defense",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 4.6,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 15000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №125 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-125.png",
+      "id": "shot-20260926-125",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Камуфляжный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 3.2,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 5.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.8,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 5000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №126 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-126.png",
+      "id": "shot-20260926-126",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Дрон-камикадзе",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.resource_bonus",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.attack",
+          "value": 1.4,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2800,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №127 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-127.png",
+      "id": "shot-20260926-127",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.gathering",
+          "value": 8.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 3.3,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.attack",
+          "value": 3.7,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №128 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-128.png",
+      "id": "shot-20260926-128",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Короткоствольный ПП",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.0,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 1.7,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 7.2,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.health",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №129 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-129.png",
+      "id": "shot-20260926-129",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Светошумовая граната",
+      "market": "Текущий аукцион",
+      "trait": "Простота",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "infantry.attack",
+          "value": 5.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.defense",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 2.4,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №130 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-130.png",
+      "id": "shot-20260926-130",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Легкая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "squad.zombie_damage",
+          "value": 10.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_damage",
+          "value": 3.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 2000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №131 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-131.png",
+      "id": "shot-20260926-131",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Бунтарский шлем",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 4.2,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.gathering",
+          "value": 8.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.7,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1900,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №132 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-132.png",
+      "id": "shot-20260926-132",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "mask",
+      "rarity": "legendary",
+      "name": "Лазерный ПНВ",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 10.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 2.2,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 3.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1700,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №133 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-133.png",
+      "id": "shot-20260926-133",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Тяжелая броня",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 6.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "infantry.damage",
+          "value": 1.2,
+          "color": "blue",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 2.3,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1500,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №134 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-134.png",
+      "id": "shot-20260926-134",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.damage",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 2.7,
+          "color": "green",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.0,
+          "color": "green",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1333,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №135 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-135.png",
+      "id": "shot-20260926-135",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Барретт",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 2.7,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "squad.load",
+          "value": 15.7,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "rider.reduction",
+          "value": 1.9,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1200,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №136 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-136.png",
+      "id": "shot-20260926-136",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "tactical",
+      "rarity": "legendary",
+      "name": "Противотанковая мина",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.attack",
+          "value": 2.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 3.1,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.defense",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.counter_reduction",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 1000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №137 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-137.png",
+      "id": "shot-20260926-137",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "vest",
+      "rarity": "legendary",
+      "name": "Утяжеленный бронежилет",
+      "market": "Текущий аукцион",
+      "trait": "Ношеное",
+      "level": 0,
+      "attempts": 8,
+      "stats": [
+        {
+          "key": "rider.defense",
+          "value": 2.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.5,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.attack",
+          "value": 1.5,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 0.8,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_reduction",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 999,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №138 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-138.png",
+      "id": "shot-20260926-138",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "Идеал",
+      "level": 0,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "squad.zombie_exp",
+          "value": 21.0,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "squad.basic_damage",
+          "value": 10.5,
+          "color": "red",
+          "custom": ""
+        },
+        {
+          "key": "ranged.defense",
+          "value": 7.0,
+          "color": "red",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.5,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 50000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №139 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-139.png",
+      "id": "shot-20260926-139",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "XM-8",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 4,
+      "stats": [
+        {
+          "key": "rider.attack",
+          "value": 5.3,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.resource_bonus",
+          "value": 3.9,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.damage",
+          "value": 1.4,
+          "color": "blue",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.counter_damage",
+          "value": 4.5,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 2.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №82 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-082.png",
+      "id": "shot-20260926-082",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 8,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "ranged.attack",
+          "value": 4.5,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.8,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "rider.damage",
+          "value": 4.4,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 2.1,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 0.9,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 20000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №85 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-085.png",
+      "id": "shot-20260926-085",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Спрингфилд",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 12,
+      "attempts": 2,
+      "stats": [
+        {
+          "key": "ranged.reduction",
+          "value": 2.8,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.zombie_damage",
+          "value": 6.9,
+          "color": "purple",
+          "custom": ""
+        },
+        {
+          "key": "infantry.reduction",
+          "value": 2.0,
+          "color": "purple",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.basic_damage",
+          "value": 2.7,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.skill_damage",
+          "value": 1.2,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 19999,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №98 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-098.png",
+      "id": "shot-20260926-098",
+      "sale_confirmed": false
+    },
+    {
+      "slot": "firearm",
+      "rarity": "legendary",
+      "name": "Бронежилет с мониторингом",
+      "market": "Текущий аукцион",
+      "trait": "",
+      "level": 20,
+      "attempts": 3,
+      "stats": [
+        {
+          "key": "squad.load",
+          "value": 16.1,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "ranged.reduction",
+          "value": 4.0,
+          "color": "gold",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 6.6,
+          "color": "gold",
+          "custom": ""
+        }
+      ],
+      "base_stats": [
+        {
+          "key": "squad.defense",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        },
+        {
+          "key": "squad.attack",
+          "value": 3.0,
+          "color": "unknown",
+          "custom": ""
+        }
+      ],
+      "status": "ask",
+      "price": 17000,
+      "observed": "2026-09-26",
+      "source": "Снимок пользователя №106 · 26.09.2026",
+      "notes": "Цена объявления. Сделка не подтверждена. Карточка, числа и цвета проверены по скриншоту.",
+      "evidence": "shot-106.png",
+      "id": "shot-20260926-106",
+      "sale_confirmed": false
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+name: Doomsday Gear Value Windows build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gear_value/**'
+      - '.github/workflows/gear-value.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gear-value-main
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Получить исходники
+        uses: actions/checkout@v6
+
+      - name: Установить Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: gear_value/requirements.txt
+
+      - name: Установить зависимости оценщика
+        run: python -m pip install -r gear_value/requirements.txt pyinstaller==6.22.2
+
+      - name: Запустить тесты оценщика
+        run: python -m unittest discover -s gear_value/tests -v
+
+      - name: Собрать оценщик
+        run: python gear_value/build.py
+
+      - name: Проверить готовое приложение и создать ZIP
+        shell: pwsh
+        run: |
+          $exe = Get-Item gear_value/dist/DoomsdayGearValue/DoomsdayGearValue.exe
+          if ($exe.Length -lt 1MB) { throw 'EXE оценщика повреждён.' }
+          $reportPath = Join-Path $env:RUNNER_TEMP 'gear-installation.json'
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList @('--check-installation', ('"' + $reportPath + '"')) -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw 'Самопроверка оценщика завершилась с ошибкой.' }
+          $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+          if (-not $report.ok -or $report.bundled_records -lt 238) { throw 'Не пройдена проверка интерфейса или встроенной базы.' }
+          Compress-Archive -Path gear_value/dist/DoomsdayGearValue -DestinationPath gear_value/dist/DoomsdayGearValue.zip -CompressionLevel Optimal
+          $sha256 = (Get-FileHash gear_value/dist/DoomsdayGearValue.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha256  DoomsdayGearValue.zip" | Set-Content gear_value/dist/SHA256SUMS.txt -Encoding utf8NoBOM
+
+      - name: Сохранить ZIP оценщика
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoomsdayGearValue
+          path: |
+            gear_value/dist/DoomsdayGearValue.zip
+            gear_value/dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Обновить отдельный релиз оценщика
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f gear-latest
+          git push origin gear-latest --force
+          if ($LASTEXITCODE -ne 0) { throw 'Не удалось обновить тег оценщика.' }
+          gh release view gear-latest *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload gear-latest gear_value/dist/DoomsdayGearValue.zip gear_value/dist/SHA256SUMS.txt --clobber
+            if ($LASTEXITCODE -ne 0) { throw 'Не удалось загрузить сборку оценщика.' }
+            gh release edit gear-latest --title "Оценщик снаряжения Doomsday — последняя сборка" --notes "Самостоятельное Windows-приложение. Распакуйте DoomsdayGearValue.zip и запустите DoomsdayGearValue.exe. Бот и LDPlayer не нужны." --latest=false
+          } else {
+            gh release create gear-latest gear_value/dist/DoomsdayGearValue.zip gear_value/dist/SHA256SUMS.txt --title "Оценщик снаряжения Doomsday — последняя сборка" --notes "Самостоятельное Windows-приложение. Распакуйте DoomsdayGearValue.zip и запустите DoomsdayGearValue.exe. Бот и LDPlayer не нужны." --latest=false
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать релиз оценщика.' }

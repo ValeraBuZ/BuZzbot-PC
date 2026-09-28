@@ -1,0 +1,10 @@
+/data/
+/build/
+/dist/
+__pycache__/
+*.py[cod]
+/.venv/
+/.ruff_cache/
+/.pytest_cache/
+/Новые скриншоты/
+*.spec
