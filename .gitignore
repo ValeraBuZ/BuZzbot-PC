@@ -5,6 +5,10 @@ bot.log*
 .venv/
 .idea/
 .vscode/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
 
 config.json
 img/

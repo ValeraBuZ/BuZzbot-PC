@@ -24,10 +24,126 @@ def _reference_frame(frame_bgr):
     return resized, width / REFERENCE_WIDTH, height / REFERENCE_HEIGHT
 
 
+def settlement_region_button_is_visible(frame_bgr):
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    marker = cv2.imread(str(Path(__file__).parent / "assets/navigation/region_label.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    region = cv2.cvtColor(frame[685:720, 10:125], cv2.COLOR_BGR2GRAY)
+    return float(cv2.matchTemplate(region, marker, cv2.TM_CCOEFF_NORMED).max()) >= 0.88
+
+
+def detect_offline_resources_confirm_target(frame_bgr):
+    """Recognise the resource report shown after login, including its button."""
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    directory = Path(__file__).parent / "assets/accounts"
+    for filename, region in (
+        ("offline_resources_label.png", gray[148:193, 510:920]),
+        ("offline_resources_confirm.png", gray[616:674, 670:980]),
+    ):
+        marker = cv2.imread(str(directory / filename), cv2.IMREAD_GRAYSCALE)
+        if marker is None or float(cv2.matchTemplate(region, marker, cv2.TM_CCOEFF_NORMED).max()) < 0.88:
+            return None
+    return round(824 * sx), round(644 * sy)
+
+
+def detect_vehicle_barracks_target(frame_bgr):
+    """Find the garage facade; its title and training form still need checking."""
+    directory = Path(__file__).parent / "assets/training"
+    for path in sorted(directory.glob("vehicle_barracks_*.png")):
+        marker = cv2.imread(str(path))
+        target, _inliers = detect_merchant_shop_feature_target(
+            frame_bgr, marker, min_inliers=12, search_bounds=(95, 130, 1160, 585),
+        )
+        if target is not None:
+            return target
+    return None
+
+
+def detect_fence_survivor_target(frame_bgr):
+    """Find the green question marker despite camera zoom and moving scenery."""
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    marker = cv2.imread(str(Path(__file__).parent / "assets/survivors/question.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return None
+    region = frame[150:610, 95:1245]
+    gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+    best = (0.80, None)
+    for scale in (0.65, 0.8, 0.9, 1.0, 1.1, 1.25, 1.4):
+        template = cv2.resize(marker, None, fx=scale, fy=scale)
+        _low, score, _low_at, location = cv2.minMaxLoc(cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED))
+        if score <= best[0]:
+            continue
+        x, y = location
+        h, w = template.shape
+        hsv = cv2.cvtColor(region[y:y+h, x:x+w], cv2.COLOR_BGR2HSV)
+        green = (hsv[:, :, 0] >= 28) & (hsv[:, :, 0] <= 90) & (hsv[:, :, 1] >= 60) & (hsv[:, :, 2] >= 65)
+        if float(np.mean(green)) >= 0.10:
+            best = score, (round((95+x+w/2)*sx), round((150+y+h/2)*sy))
+    return best[1]
+
+
+def detect_radar_complete_all_target(frame_bgr):
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None or not radar_overview_is_visible(frame):
+        return None
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    directory = Path(__file__).parent / "assets/radar"
+    label = cv2.imread(str(directory / "complete_all_label.png"), 0)
+    lock = cv2.imread(str(directory / "complete_all_lock.png"), 0)
+    if label is None or lock is None:
+        return None
+    if cv2.matchTemplate(gray[645:710, 5:220], label, cv2.TM_CCOEFF_NORMED).max() < 0.86:
+        return None
+    if cv2.matchTemplate(gray[520:600, 105:185], lock, cv2.TM_CCOEFF_NORMED).max() >= 0.80:
+        return None
+    return round(100 * sx), round(600 * sy)
+
+
+def detect_radar_task_pin_targets(frame_bgr):
+    """Existing missions can remain actionable after their red dots disappear."""
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None or not radar_overview_is_visible(frame):
+        return []
+    gray = cv2.cvtColor(frame[130:590, 250:1080], cv2.COLOR_BGR2GRAY)
+    candidates = []
+    for path in (Path(__file__).parent / "assets/radar/pins").glob("*.png"):
+        template = cv2.imread(str(path), 0)
+        if template is None:
+            continue
+        for scale in (0.9, 1.0, 1.1):
+            marker = cv2.resize(template, None, fx=scale, fy=scale)
+            result = cv2.matchTemplate(gray, marker, cv2.TM_CCOEFF_NORMED)
+            for y, x in zip(*np.where(result >= 0.86)):
+                candidates.append((float(result[y, x]), x + marker.shape[1] / 2 + 250,
+                                   y + marker.shape[0] / 2 + 130))
+    targets = []
+    for _score, x, y in sorted(candidates, reverse=True):
+        if all((x - px) ** 2 + (y - py) ** 2 > 32 ** 2 for px, py in targets):
+            targets.append((x, y))
+    return [(round(x * sx), round(y * sy)) for x, y in sorted(targets, key=lambda p: (p[1], p[0]))]
+
+
 def stamina_dialog_is_visible(frame_bgr):
     """Return whether the insufficient-stamina item dialog is visible."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
+        return False
+
+    # Map decorations and event banners share the old color pattern. Require
+    # the actual dialog title before any stamina-item or close-button tap.
+    marker = cv2.imread(str(Path(__file__).parent / "assets/stamina/dialog_title.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    heading = cv2.cvtColor(frame[73:122, 485:790], cv2.COLOR_BGR2GRAY)
+    if float(cv2.matchTemplate(heading, marker, cv2.TM_CCOEFF_NORMED).max()) < 0.88:
         return False
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -210,20 +326,30 @@ def detect_truck_personal_slot_target(frame_bgr):
     if frame is None:
         return None
 
+    # Personal slots may include the third/fourth lower card on upgraded accounts.
+    candidates = ((207, 410), (768, 410), (497, 551), (1060, 551))
     # A prepared-but-not-started truck is resumed before opening another slot.
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    unsent = hsv[430:472, 70:345]
-    red = (
-        ((unsent[:, :, 0] < 12) | (unsent[:, :, 0] > 170))
-        & (unsent[:, :, 1] > 90)
-        & (unsent[:, :, 2] > 85)
-    )
-    if float(np.mean(red)) >= 0.008:
-        return int(round(207 * scale_x)), int(round(410 * scale_y))
-
-    candidates = ((207, 410), (752, 410))
+    for center_x, center_y in candidates:
+        # Keep the label search inside this card. The orange body of the
+        # lower truck overlaps the old wide region beside an upper timer.
+        unsent = hsv[center_y + 20:center_y + 62, center_x - 100:center_x + 101]
+        red = (
+            ((unsent[:, :, 0] < 12) | (unsent[:, :, 0] > 170))
+            & (unsent[:, :, 1] > 90)
+            & (unsent[:, :, 2] > 85)
+        )
+        if float(np.mean(red)) >= 0.008:
+            return int(round(center_x * scale_x)), int(round(center_y * scale_y))
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    pale = (gray >= 160) & (hsv[:, :, 1] <= 90)
     for center in candidates:
-        if _bright_cross_ratio(frame, center) >= 0.10:
+        x, y = center
+        # Require all four arms. A lock and its explanatory text can satisfy
+        # the old average-brightness test without containing a plus.
+        plus_visible = min(float(pale[y+dy-6:y+dy+7, x+dx-7:x+dx+8].mean())
+                           for dx, dy in ((-22, 0), (22, 0), (0, -17), (0, 17))) >= 0.42
+        if _bright_cross_ratio(frame, center) >= 0.10 and plus_visible:
             return (
                 int(round(center[0] * scale_x)),
                 int(round(center[1] * scale_y)),
@@ -238,9 +364,9 @@ def detect_truck_occupied_slot_targets(frame_bgr):
         return []
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     targets = []
-    for center_x in (207, 752):
-        region = hsv[310:485, max(0, center_x - 145):min(1280, center_x + 145)]
-        unsent_region = hsv[430:472, max(0, center_x - 137):min(1280, center_x + 138)]
+    for center_x, center_y in ((207, 410), (768, 410), (497, 551), (1060, 551)):
+        region = hsv[center_y - 100:center_y + 75, center_x - 145:center_x + 145]
+        unsent_region = hsv[center_y + 20:center_y + 62, center_x - 100:center_x + 101]
         unsent_red = (
             ((unsent_region[:, :, 0] < 12) | (unsent_region[:, :, 0] > 170))
             & (unsent_region[:, :, 1] > 90)
@@ -260,7 +386,7 @@ def detect_truck_occupied_slot_targets(frame_bgr):
         )
         if float(np.mean(blue)) >= 0.010:
             targets.append(
-                (int(round(center_x * scale_x)), int(round(410 * scale_y)))
+                (int(round(center_x * scale_x)), int(round(center_y * scale_y)))
             )
     return targets
 
@@ -270,6 +396,8 @@ def truck_alliance_escort_is_visible(frame_bgr):
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return False
+    if _truck_text_matches(frame, "alliance_title.png", (80, 10, 570, 75)):
+        return True
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # Alliance Escort has a persistent red 0/1 or 1/1 ticket counter here and
     # no personal-shipment tab bar in the upper-right corner.
@@ -292,7 +420,7 @@ def truck_alliance_escort_is_visible(frame_bgr):
 def truck_express_overview_is_visible(frame_bgr):
     """Recognise the personal/other shipment overview."""
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
-    if frame is None:
+    if frame is None or detect_truck_transporting_close_target(frame) is not None:
         return False
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     tabs = hsv[14:66, 850:1268]
@@ -304,8 +432,19 @@ def truck_express_overview_is_visible(frame_bgr):
     )
     return bool(
         float(np.mean(orange_tabs)) >= 0.20
-        and _bright_cross_ratio(frame, (640, 190)) >= 0.18
+        and (
+            _bright_cross_ratio(frame, (640, 190)) >= 0.18
+            or _truck_overview_title_visible(frame)
+        )
     )
+
+
+def _truck_overview_title_visible(frame):
+    marker = cv2.imread(str(Path(__file__).parent / "assets/trucks/overview_title.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    region = cv2.cvtColor(frame[5:70, 70:520], cv2.COLOR_BGR2GRAY)
+    return float(cv2.matchTemplate(region, marker, cv2.TM_CCOEFF_NORMED).max()) >= 0.82
 
 
 def truck_arrival_reward_is_visible(frame_bgr):
@@ -337,10 +476,43 @@ def truck_arrival_reward_is_visible(frame_bgr):
     )
 
 
+def truck_daily_dispatch_limit_is_visible(frame_bgr):
+    """An empty physical slot remains clickable after daily dispatches reach 0."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None or not truck_express_overview_is_visible(frame):
+        return False
+    if _truck_text_matches(frame, "daily_limit_message.png", (300, 115, 980, 163)):
+        return True
+    # This is a remaining-dispatch counter: 4/4 is available, 0/4 exhausted.
+    # Keep the zero search before the slash; a zero elsewhere cannot block it.
+    return (
+        _truck_text_matches(frame, "daily_dispatches_label.png", (5, 661, 271, 704))
+        and _truck_text_matches(frame, "zero_remaining.png", (268, 665, 289, 700))
+    )
+
+
+def truck_personal_dispatch_card_is_visible(frame_bgr):
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    return bool(frame is not None
+                and _truck_text_matches(frame, "personal_card_title.png", (510, 55, 770, 105))
+                and detect_truck_start_dispatch_target(frame) is not None)
+
+
+def detect_truck_transporting_close_target(frame_bgr):
+    """Recognise the personal in-transit modal by its title and status text."""
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    if (_truck_text_matches(frame, "personal_card_title.png", (510, 55, 770, 105))
+            and _truck_text_matches(frame, "transporting_label.png", (495, 510, 785, 553))):
+        return round(1057 * scale_x), round(80 * scale_y)
+    return None
+
+
 def detect_truck_start_dispatch_target(frame_bgr):
     """Return the enabled gold Start Escort button on a personal shipment."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
-    if frame is None:
+    if frame is None or detect_truck_transporting_close_target(frame) is not None:
         return None
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     region = hsv[552:618, 420:855]
@@ -376,7 +548,8 @@ def detect_truck_escort_confirmation_target(frame_bgr):
 def detect_truck_active_detail_back_target(frame_bgr):
     """Return the back arrow for an in-progress truck's world-map panel."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
-    if frame is None:
+    if (frame is None or truck_express_overview_is_visible(frame)
+            or truck_alliance_escort_is_visible(frame)):
         return None
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     region = hsv[150:220, 1100:1190]
@@ -422,6 +595,45 @@ def truck_auto_dispatch_is_enabled(frame_bgr):
     left_handle = (left[:, :, 1] <= 105) & (left[:, :, 2] >= 135)
     right_handle = (right[:, :, 1] <= 105) & (right[:, :, 2] >= 135)
     return bool(float(np.mean(right_handle)) > float(np.mean(left_handle)) + 0.08)
+
+
+def _truck_text_matches(frame, name, region):
+    marker = cv2.imread(str(Path(__file__).parent / "assets/trucks" / name), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    left, top, right, bottom = region
+    gray = cv2.cvtColor(frame[top:bottom, left:right], cv2.COLOR_BGR2GRAY)
+    return float(cv2.matchTemplate(gray, marker, cv2.TM_CCOEFF_NORMED).max()) >= 0.84
+
+
+def truck_formation_is_visible(frame_bgr):
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    return frame is not None and _truck_text_matches(
+        frame, "formation_title.png", (810, 580, 1195, 650)
+    )
+
+
+def detect_truck_formation_add_target(frame_bgr):
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None or not truck_formation_is_visible(frame):
+        return None
+    for y in (140, 230, 320):
+        if _truck_text_matches(frame, "slot_plus.png", (33, y - 25, 81, y + 25)):
+            return round(57 * sx), round(y * sy)
+    return None
+
+
+def detect_truck_squad_done_target(frame_bgr):
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None or not _truck_text_matches(frame, "squad_done.png", (860, 616, 1065, 670)):
+        return None
+    # An enabled Done button alone also appears with zero troops. Require an
+    # actual selected troop bar before accepting the game's proposed squad.
+    hsv = cv2.cvtColor(frame[120:525, 748:1040], cv2.COLOR_BGR2HSV)
+    green = (hsv[:, :, 0] >= 35) & (hsv[:, :, 0] <= 90) & (hsv[:, :, 1] >= 90) & (hsv[:, :, 2] >= 90)
+    if float(np.mean(green)) < 0.001:
+        return None
+    return round(963 * sx), round(643 * sy)
 
 
 def detect_shop_selection_marker_target(
@@ -501,23 +713,19 @@ def detect_training_radial_action_target(frame_bgr, barracks_title_target):
     right = min(1280, int(title_x + 300))
     top = max(0, int(title_y + 100))
     bottom = min(650, int(title_y + 410))
-    template = imread_unicode(
-        Path(__file__).parent / "assets/training/training_action_label.png",
-        cv2.IMREAD_GRAYSCALE,
-    )
-    if template is None or right <= left or bottom <= top:
+    if right <= left or bottom <= top:
         return None
     gray = cv2.cvtColor(frame[top:bottom, left:right], cv2.COLOR_BGR2GRAY)
-    if gray.shape[0] < template.shape[0] or gray.shape[1] < template.shape[1]:
-        return None
-    _, score, _, location = cv2.minMaxLoc(
-        cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
-    )
-    if score < 0.82:
-        return None
-    label_x = left + location[0] + template.shape[1] / 2
-    label_y = top + location[1] + template.shape[0] / 2
-    return round(label_x * scale_x), round((label_y - 44) * scale_y)
+    for filename in ("training_action_label.png", "training_action_label_bright.png"):
+        template = imread_unicode(Path(__file__).parent / "assets/training" / filename, cv2.IMREAD_GRAYSCALE)
+        if template is None or gray.shape[0] < template.shape[0] or gray.shape[1] < template.shape[1]:
+            continue
+        _, score, _, location = cv2.minMaxLoc(cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED))
+        if score >= 0.82:
+            label_x = left + location[0] + template.shape[1] / 2
+            label_y = top + location[1] + template.shape[0] / 2
+            return round(label_x * scale_x), round((label_y - 44) * scale_y)
+    return None
 
 
 def detect_shop_radial_action_target(frame_bgr, building_target=None):
@@ -840,15 +1048,30 @@ def detect_merchant_shop_feature_target(
 
 
 def mysterious_merchant_screen_is_visible(frame_bgr):
-    """Recognise the Mysterious Merchant offer grid."""
+    """Require the merchant grid, its title and its selected left-hand tab."""
     if not _shop_offer_grid_is_visible(frame_bgr):
         return False
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
-    marker = cv2.imread(str(Path(__file__).parent / "assets/merchant/merchant_title.png"), cv2.IMREAD_GRAYSCALE)
-    if marker is None:
+    directory = Path(__file__).parent / "assets/merchant"
+    marker = imread_unicode(directory / "merchant_title.png", cv2.IMREAD_GRAYSCALE)
+    tab_marker = imread_unicode(directory / "merchant_tab.png", cv2.IMREAD_GRAYSCALE)
+    if marker is None or tab_marker is None:
         return False
     header = cv2.cvtColor(frame[55:98, 140:480], cv2.COLOR_BGR2GRAY)
-    return float(np.max(cv2.matchTemplate(header, marker, cv2.TM_CCOEFF_NORMED))) >= 0.82
+    if float(np.max(cv2.matchTemplate(header, marker, cv2.TM_CCOEFF_NORMED))) < 0.82:
+        return False
+    tab = frame[365:478, 15:125]
+    tab_gray = cv2.cvtColor(tab, cv2.COLOR_BGR2GRAY)
+    if float(cv2.matchTemplate(tab_gray, tab_marker, cv2.TM_CCOEFF_NORMED).max()) < 0.82:
+        return False
+    tab_hsv = cv2.cvtColor(tab, cv2.COLOR_BGR2HSV)
+    selected_red = (
+        ((tab_hsv[:, :, 0] <= 12) | (tab_hsv[:, :, 0] >= 170))
+        & (tab_hsv[:, :, 1] >= 55) & (tab_hsv[:, :, 2] >= 100)
+    )
+    # Inactive tabs retain the same lettering but are darkened. A matching
+    # title during the shop transition cannot make an inactive tab current.
+    return float(np.mean(selected_red)) >= 0.30
 
 
 def detect_shop_merchant_tab_target(frame_bgr):
@@ -945,12 +1168,39 @@ def detect_mysterious_merchant_absent_ok_target(frame_bgr):
     return int(round(640 * scale_x)), int(round(509 * scale_y))
 
 
+def detect_merchant_free_refresh_target(frame_bgr):
+    """Require the explicit Free Refresh label on the verified merchant page."""
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None or not mysterious_merchant_screen_is_visible(frame):
+        return None
+    marker = cv2.imread(str(Path(__file__).parent / "assets/merchant/free_refresh.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return None
+    region = frame[605:678, 855:1040]
+    score = float(cv2.matchTemplate(cv2.cvtColor(region, cv2.COLOR_BGR2GRAY), marker, cv2.TM_CCOEFF_NORMED).max())
+    hsv = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
+    gold = (hsv[:, :, 0] >= 8) & (hsv[:, :, 0] <= 42) & (hsv[:, :, 1] >= 70) & (hsv[:, :, 2] >= 130)
+    if score < 0.86 or float(np.mean(gold)) < 0.30:
+        return None
+    return round(948 * sx), round(638 * sy)
+
+
 def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
-    """Return only resource-priced merchant offers, never purple gem prices."""
+    """Return offers with a positively identified resource icon and amount."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None or not mysterious_merchant_screen_is_visible(frame):
         return []
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # These are crops of real price-bar icons, not the larger item artwork or
+    # HUD counters. Unknown currencies remain unclickable until supported by
+    # an observed price icon; a gold fill alone says nothing about the cost.
+    directory = Path(__file__).parent / "assets/merchant"
+    resource_icons = [
+        icon for name in ("currency_food.png", "currency_wood.png")
+        if (icon := imread_unicode(directory / name)) is not None
+    ]
+    if not resource_icons:
+        return []
     candidates = []
     # Price bars move vertically when the offer list scrolls. Locate their
     # gold background inside the three price columns, excluding item artwork
@@ -974,13 +1224,43 @@ def detect_mysterious_merchant_non_gem_offer_targets(frame_bgr):
                 & (region[:, :, 1] >= 35)
                 & (region[:, :, 2] >= 65)
             )
-            # Any meaningful purple price area vetoes the offer. Ambiguous
-            # buttons are skipped; this intentionally favours safety over
-            # exhausting every offer.
-            if float(np.mean(purple)) <= 0.05:
-                candidates.append(
-                    (int(round((x1 + x2) / 2 * scale_x)),
-                     int(round((y1 + y2) / 2 * scale_y)))
+            if float(np.mean(purple)) > 0.05:
+                continue
+            icon_region = frame[y1:y2, x1 + 3:x1 + 60]
+            icon_seen = False
+            for icon in resource_icons:
+                for icon_scale in (0.85, 0.9, 1.0, 1.1, 1.2):
+                    template = cv2.resize(icon, None, fx=icon_scale, fy=icon_scale)
+                    if (
+                        template.shape[0] > icon_region.shape[0]
+                        or template.shape[1] > icon_region.shape[1]
+                    ):
+                        continue
+                    if float(cv2.matchTemplate(
+                        icon_region, template, cv2.TM_CCOEFF_NORMED,
+                    ).max()) >= 0.86:
+                        icon_seen = True
+                        break
+                if icon_seen:
+                    break
+            if not icon_seen:
+                continue
+            # A transition can expose the currency before the button's cost.
+            # Require visible amount glyphs to its right as well; the caller
+            # separately confirms this same offer in a fresh stable frame.
+            amount = region[:, 52:-5]
+            amount_mask = (
+                (amount[:, :, 1] < 70) & (amount[:, :, 2] >= 190)
+            ).astype(np.uint8) * 255
+            _count, _labels, stats, _centers = cv2.connectedComponentsWithStats(amount_mask)
+            if not any(
+                3 <= width <= 20 and 10 <= height <= 28 and area >= 25
+                for _x, _y, width, height, area in stats[1:]
+            ):
+                continue
+            candidates.append(
+                (int(round((x1 + x2) / 2 * scale_x)),
+                 int(round((y1 + y2) / 2 * scale_y)))
                 )
     return sorted(candidates, key=lambda point: (point[1], point[0]))
 
@@ -1073,6 +1353,39 @@ def detect_login_session_expired_ok_target(frame_bgr):
 
     _area, center_x, center_y = max(candidates)
     return int(round(center_x * scale_x)), int(round(center_y * scale_y))
+
+
+def detect_gem_confirmation_cancel_target(frame_bgr):
+    """Recognize the gem-spending warning and return only its No button.
+
+    Require the warning title, currency icon, explicit cancellation label and
+    purple paid button together. A generic login OK dialog is not this modal.
+    The variable price is deliberately excluded from the templates.
+    """
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    directory = Path(__file__).parent / "assets/research"
+    for name, bounds in (
+        ("gem_warning_title", (555, 170, 720, 220)),
+        ("gem_warning_cancel", (450, 480, 540, 537)),
+        ("gem_warning_currency", (730, 440, 790, 488)),
+    ):
+        template = cv2.imread(str(directory / (name + ".png")), 0)
+        if template is None:
+            return None
+        x1, y1, x2, y2 = bounds
+        score = float(cv2.matchTemplate(
+            gray[y1:y2, x1:x2], template, cv2.TM_CCOEFF_NORMED,
+        ).max())
+        if not np.isfinite(score) or score < 0.88:
+            return None
+    hsv = cv2.cvtColor(frame[488:529, 655:908], cv2.COLOR_BGR2HSV)
+    if np.mean((hsv[:, :, 0] >= 115) & (hsv[:, :, 0] <= 160)
+               & (hsv[:, :, 1] >= 60)) < 0.45:
+        return None
+    return round(495 * sx), round(509 * sy)
 
 
 def detect_research_action_target(frame_bgr):
@@ -1326,6 +1639,32 @@ def detect_login_saved_account_continue_target(frame_bgr):
     return int(round(640 * scale_x)), int(round(326 * scale_y))
 
 
+def world_map_hud_is_visible(frame_bgr):
+    """Recognize both world-map controls independently of the terrain color."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    for name, (x,y,w,h) in (
+        ('world_search_icon', (0,390,130,130)),
+        ('world_shelter_label', (0,681,160,39)),
+    ):
+        marker = cv2.imread(str(Path(__file__).parent/'assets/navigation'/f'{name}.png'), 0)
+        if marker is None:
+            return False
+        roi=gray[y:y+h,x:x+w]
+        if roi.shape[0]<marker.shape[0] or roi.shape[1]<marker.shape[1]:
+            return False
+        _,score,_,at=cv2.minMaxLoc(cv2.matchTemplate(roi,marker,cv2.TM_CCOEFF_NORMED))
+        if score<.85:
+            return False
+        crop=roi[at[1]:at[1]+marker.shape[0],at[0]:at[0]+marker.shape[1]]
+        bright=marker>=200
+        if not np.any(bright) or np.mean(crop[bright]>=150)<.8:
+            return False
+    return True
+
+
 def detect_igg_id_selection_target(frame_bgr):
     """Detect the first saved-ID row in IGG's non-accessible WebView."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
@@ -1526,7 +1865,6 @@ def detect_igg_game_login_ok_target(frame_bgr):
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    outside = gray[0:150, :]
     dialog = gray[160:575, 315:965]
     cancel_button = hsv[478:540, 355:635]
     ok_button = hsv[478:540, 645:925]
@@ -1543,26 +1881,28 @@ def detect_igg_game_login_ok_target(frame_bgr):
         & (ok_button[:, :, 2] >= 145)
     )
     if (
-        float(np.mean(outside <= 70)) < 0.75
-        # Android can expose Unity's previous confirmation frame against a
-        # black background while closing the SDK WebView. It is not yet an
-        # interactive game dialog; accepting it can leave the old account.
-        or float(np.mean(outside)) < 20.0
-        or float(np.mean(dialog >= 145)) < 0.55
+        float(np.mean(dialog >= 145)) < 0.55
         or float(np.mean(neutral_cancel)) < 0.45
         or float(np.mean(gold_ok)) < 0.55
     ):
         return None
-    # Purchase confirmations use the same panel and buttons. Only the IGG
-    # prompt contains this text; geometry alone must never authorize login.
+    # The map behind this modal may be bright (for example, desert terrain).
+    # Check the panel itself, its two buttons and the IGG wording instead of
+    # requiring a dark background. Purchase confirmations share this layout;
+    # geometry alone must never authorize login.
     marker = cv2.imread(
         str(Path(__file__).parent / "assets/accounts/igg_id_confirmation_marker.png"),
         cv2.IMREAD_GRAYSCALE,
     )
     if marker is None:
         return None
-    match = cv2.matchTemplate(gray[260:430, 370:930], marker, cv2.TM_CCOEFF_NORMED)
-    if float(np.max(match)) < 0.82:
+    # Unity scales the modal briefly while the SDK closes. Its dark
+    # background is valid; recognize the actual IGG wording at that scale.
+    score = max(float(cv2.matchTemplate(
+        gray[260:430, 370:930], cv2.resize(marker, None, fx=scale, fy=scale),
+        cv2.TM_CCOEFF_NORMED,
+    ).max()) for scale in (0.94, 0.96, 0.98, 1.0))
+    if score < 0.82:
         return None
     return int(round(784 * scale_x)), int(round(508 * scale_y))
 
@@ -1644,11 +1984,28 @@ def detect_settings_close_target(frame_bgr):
     return int(round(1133 * scale_x)), int(round(43 * scale_y))
 
 
+def detect_commander_settings_target(frame_bgr):
+    frame, sx, sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return None
+    directory = Path(__file__).parent / "assets/accounts"
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    for name, region in (("commander_title.png", gray[15:90, 80:540]),
+                         ("commander_settings.png", gray[645:710, 100:260])):
+        marker = cv2.imread(str(directory / name), cv2.IMREAD_GRAYSCALE)
+        if marker is None or cv2.matchTemplate(region, marker, cv2.TM_CCOEFF_NORMED).max() < 0.85:
+            return None
+    return round(180 * sx), round(637 * sy)
+
+
 def detect_commander_profile_back_target(frame_bgr):
     """Detect the commander profile screen that remains under Settings."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
+
+    if detect_commander_settings_target(frame) is not None:
+        return int(round(47 * scale_x)), int(round(45 * scale_y))
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -1663,6 +2020,81 @@ def detect_commander_profile_back_target(frame_bgr):
     if float(np.mean(gold_back)) < 0.06 or float(np.mean(right_panel < 95)) < 0.75:
         return None
     return int(round(47 * scale_x)), int(round(45 * scale_y))
+
+
+def collective_search_not_found_is_visible(frame_bgr):
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    marker = cv2.imread(str(Path(__file__).parent / "assets/collective/not_found.png"), 0)
+    if marker is None:
+        return False
+    gray = cv2.cvtColor(frame[80:200, 100:1180], cv2.COLOR_BGR2GRAY)
+    return float(cv2.matchTemplate(gray, marker, cv2.TM_CCOEFF_NORMED).max()) >= .82
+
+
+def zombie_search_not_found_is_visible(frame_bgr):
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    gray = cv2.cvtColor(frame[80:200, 100:1180], cv2.COLOR_BGR2GRAY)
+    for name in ('not_found_zombie', 'not_found_message'):
+        marker = cv2.imread(str(Path(__file__).parent / f'assets/zombie/{name}.png'), 0)
+        if marker is None or float(cv2.matchTemplate(gray, marker, cv2.TM_CCOEFF_NORMED).max()) < .82:
+            return False
+    return True
+
+
+def zombie_target_card_is_visible(frame_bgr):
+    """Require the zombie heading and Attack action on the same target card."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    directory = Path(__file__).parent / 'assets/zombie'
+    title = cv2.imread(str(directory / 'card_title.png'), 0)
+    attack = cv2.imread(str(directory / 'card_attack.png'), 0)
+    if title is None or attack is None:
+        return False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _low, score, _at, (x,y) = cv2.minMaxLoc(cv2.matchTemplate(gray[120:280], title, cv2.TM_CCOEFF_NORMED))
+    if score < .84:
+        return False
+    y += 120
+    region = gray[y+320:min(650,y+410), max(0,x-55):min(1280,x+245)]
+    return (region.shape[0] >= attack.shape[0] and region.shape[1] >= attack.shape[1]
+            and float(cv2.matchTemplate(region, attack, cv2.TM_CCOEFF_NORMED).max()) >= .84)
+
+
+def collective_target_card_is_visible(frame_bgr):
+    """Require the collective-mind name and its own Rally action on one card."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    directory = Path(__file__).parent / "assets/collective"
+    title = cv2.imread(str(directory / "card_title.png"), 0)
+    rally = cv2.imread(str(directory / "card_rally.png"), 0)
+    if title is None or rally is None:
+        return False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    _low, score, _at, (x, y) = cv2.minMaxLoc(cv2.matchTemplate(gray[120:280], title, cv2.TM_CCOEFF_NORMED))
+    if score < .84:
+        return False
+    y += 120
+    region = gray[y+280:min(650, y+410), x+150:min(1280, x+350)]
+    return (region.shape[0] >= rally.shape[0] and region.shape[1] >= rally.shape[1]
+            and float(cv2.matchTemplate(region, rally, cv2.TM_CCOEFF_NORMED).max()) >= .84)
+
+
+def collective_target_busy_is_visible(frame_bgr):
+    """The game permits only one alliance rally against a particular target."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    marker = cv2.imread(str(Path(__file__).parent / "assets/collective/target_busy.png"), cv2.IMREAD_GRAYSCALE)
+    if marker is None:
+        return False
+    region = cv2.cvtColor(frame[70:220, 150:1130], cv2.COLOR_BGR2GRAY)
+    return float(cv2.matchTemplate(region, marker, cv2.TM_CCOEFF_NORMED).max()) >= 0.85
 
 
 def detect_collective_tutorial_continue_target(frame_bgr):
@@ -1786,88 +2218,60 @@ def alliance_donation_attempts_exhausted(frame_bgr):
     return bool(score >= 0.94)
 
 
+def _alliance_marked_label_location(frame, region):
+    """Recognize the actual Marked label even while its red ribbon pulses."""
+    marker = imread_unicode(
+        Path(__file__).parent / "assets/alliance_donations/marked_label.png",
+        cv2.IMREAD_GRAYSCALE,
+    )
+    if marker is None:
+        return None
+    left, top, right, bottom = region
+    gray = cv2.cvtColor(frame[top:bottom, left:right], cv2.COLOR_BGR2GRAY)
+    best = (0.82, None)
+    for scale in (0.9, 1.0, 1.1):
+        template = cv2.resize(marker, None, fx=scale, fy=scale)
+        _low, score, _low_at, location = cv2.minMaxLoc(
+            cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
+        )
+        if score > best[0]:
+            x, y = location
+            best = score, (left + x + template.shape[1] / 2,
+                           top + y + template.shape[0] / 2)
+    return best[1]
+
+
+def alliance_marked_project_is_visible(frame_bgr):
+    """Confirm the marked project panel, not just a red tree notification."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None or _alliance_marked_label_location(frame, (390, 100, 565, 155)) is None:
+        return False
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # Both resource and premium buttons belong to the donation panel. The
+    # premium button is only a visual guard; it is never clicked.
+    ordinary = hsv[562:602, 865:1115]
+    premium = hsv[562:602, 570:820]
+    return bool(
+        (np.mean((ordinary[:, :, 0] >= 8) & (ordinary[:, :, 0] <= 42)
+                 & (ordinary[:, :, 1] >= 70) & (ordinary[:, :, 2] >= 100)) >= 0.35
+         or alliance_donation_attempts_exhausted(frame))
+        and np.mean((premium[:, :, 0] >= 115) & (premium[:, :, 0] <= 160)
+                    & (premium[:, :, 1] >= 40)) >= 0.35
+    )
+
+
 def detect_alliance_marked_project_target(frame_bgr):
     """Find the alliance technology card carrying the compact red marker."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(
-        hsv,
-        np.array([0, 120, 140], dtype=np.uint8),
-        np.array([12, 255, 255], dtype=np.uint8),
-    )
-    mask |= cv2.inRange(
-        hsv,
-        np.array([170, 120, 140], dtype=np.uint8),
-        np.array([179, 255, 255], dtype=np.uint8),
-    )
+    label = _alliance_marked_label_location(frame, (170, 155, 1100, 660))
+    if label is not None:
+        label_x, label_y = label
+        return round((label_x - 110) * scale_x), round((label_y + 16) * scale_y)
 
-    # Technology cards occupy the center of the tree. Excluding the title bar,
-    # navigation and right-side controls prevents unrelated red HUD badges.
-    mask[:90, :] = 0
-    mask[660:, :] = 0
-    mask[:, :170] = 0
-    mask[:, 1100:] = 0
-
-    compact_candidates = []
-    ribbon_candidates = []
-    component_count, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
-    for index in range(1, component_count):
-        x, y, width, height, area = stats[index]
-        aspect = width / float(height) if height else 0.0
-        extent = area / float(width * height) if width and height else 0.0
-        if (
-            1200 <= area <= 6000
-            and 90 <= width <= 230
-            and 20 <= height <= 70
-            and 2.0 <= aspect <= 8.0
-            and extent >= 0.35
-        ):
-            center_x, center_y = centroids[index]
-            ribbon_candidates.append((int(area), float(center_x), float(center_y)))
-            continue
-        if (
-            # On the live technology tree the pale letters in "Marked!"
-            # split the red ribbon into two shorter components.  The largest
-            # surviving half is still much wider than the compact project dot
-            # and is authoritative inside the bounded technology-tree area.
-            400 <= area <= 1600
-            and 60 <= width <= 180
-            and 12 <= height <= 32
-            and 2.5 <= aspect <= 9.0
-            and extent >= 0.30
-        ):
-            center_x, center_y = centroids[index]
-            ribbon_candidates.append((int(area), float(center_x), float(center_y)))
-            continue
-        if not (
-            70 <= area <= 220
-            and 9 <= width <= 18
-            and 9 <= height <= 18
-            and 0.7 <= aspect <= 1.4
-            and extent >= 0.45
-        ):
-            continue
-        center_x, center_y = centroids[index]
-        compact_candidates.append((int(area), float(center_x), float(center_y)))
-
-    if ribbon_candidates:
-        _area, marker_x, marker_y = max(ribbon_candidates)
-        # The wide "Marked" ribbon starts above the right half of the card.
-        target_x = (marker_x - 95.0) * scale_x
-        target_y = marker_y * scale_y
-        return int(round(target_x)), int(round(target_y))
-
-    if not compact_candidates:
-        return None
-
-    _area, marker_x, marker_y = max(compact_candidates)
-    # The marker is attached to the right edge of the project card.
-    target_x = (marker_x - 55.0) * scale_x
-    target_y = marker_y * scale_y
-    return int(round(target_x)), int(round(target_y))
+    return None
 
 
 def detect_radar_notification_targets(frame_bgr):
@@ -1925,6 +2329,18 @@ def detect_radar_notification_targets(frame_bgr):
         targets.append((int(round(target_x)), int(round(target_y))))
 
     return sorted(set(targets), key=lambda point: (point[1], point[0]))
+
+
+def radar_task_card_is_visible(frame_bgr):
+    """Recognize the clipboard itself, including cards with disabled actions."""
+    frame, _sx, _sy = _reference_frame(frame_bgr)
+    if frame is None:
+        return False
+    clip = imread_unicode(Path(__file__).parent / "assets/radar/card_clip.png", cv2.IMREAD_GRAYSCALE)
+    if clip is None:
+        return False
+    gray = cv2.cvtColor(frame[70:190, 70:435], cv2.COLOR_BGR2GRAY)
+    return bool(cv2.matchTemplate(gray, clip, cv2.TM_CCOEFF_NORMED).max() >= 0.82)
 
 
 def radar_overview_is_visible(frame_bgr):
@@ -2028,17 +2444,35 @@ def detect_radar_card_action_target(frame_bgr):
 
 
 def radar_card_has_active_countdown(frame_bgr):
-    """Recognize the HH:MM:SS timer on an already-running radar card.
+    """Recognize a timer only on a radar card explicitly marked in progress.
 
-    Radar task artwork and text vary between accounts, but the six dark timer
-    digits always occupy the same narrow strip in the left card. Detecting
-    aligned digit components is more stable than matching one duration.
+    Available cards also show six digits in this strip: their event expiry
+    ("Завершится через") is not evidence of a dispatched squad. Require the
+    game's "В процессе" status inside the card before inspecting its timer.
     """
     frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return False
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    in_progress_label = imread_unicode(
+        Path(__file__).parent / "assets/radar/in_progress_label.png",
+        cv2.IMREAD_GRAYSCALE,
+    )
+    if in_progress_label is None:
+        return False
+    card_status = gray[300:650, 65:430]
+    status_visible = False
+    for scale in (0.9, 1.0, 1.1):
+        label = cv2.resize(in_progress_label, None, fx=scale, fy=scale)
+        if float(
+            cv2.matchTemplate(card_status, label, cv2.TM_CCOEFF_NORMED).max()
+        ) >= 0.82:
+            status_visible = True
+            break
+    if not status_visible:
+        return False
+
     timer_strip = gray[338:378, 292:430]
     if timer_strip.size == 0:
         return False
@@ -2208,12 +2642,18 @@ def detect_radar_squad_march_target(frame_bgr):
     return int(round(970 * scale_x)), int(round(240 * scale_y))
 
 
-def zombie_camp_checkbox_is_checked(frame_bgr):
+def zombie_camp_checkbox_is_checked(frame_bgr, attack_target=None):
     """Detect the optional 'set up camp after attack' checkmark."""
-    frame, _scale_x, _scale_y = _reference_frame(frame_bgr)
+    frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return False
-    checkbox_inner = frame[506:530, 809:831]
+    attack_x, attack_y = (966, 561) if attack_target is None else (
+        attack_target[0] / scale_x, attack_target[1] / scale_y,
+    )
+    center_x, center_y = round(attack_x - 146), round(attack_y - 43)
+    if not (11 <= center_x < frame.shape[1] - 11 and 12 <= center_y < frame.shape[0] - 12):
+        return False
+    checkbox_inner = frame[center_y - 12:center_y + 12, center_x - 11:center_x + 11]
     hsv = cv2.cvtColor(checkbox_inner, cv2.COLOR_BGR2HSV)
     colored_bright = (
         (hsv[:, :, 1] >= 80)
@@ -2265,7 +2705,16 @@ def detect_camped_march_card_targets(frame_bgr):
                 card_frame_present = True
                 break
         if not card_frame_present:
-            continue
+            # An unselected portrait can have an open/low-contrast border,
+            # so Canny does not always yield one rectangular contour. In
+            # that case require the actual tent icon, not just cyan pixels.
+            tent = imread_unicode(
+                Path(__file__).parent / "assets/marches/camp_status.png",
+                cv2.IMREAD_GRAYSCALE,
+            )
+            status_gray = cv2.cvtColor(frame[top+38:top+66, 1237:1263], cv2.COLOR_BGR2GRAY)
+            if tent is None or float(cv2.matchTemplate(status_gray, tent, cv2.TM_CCOEFF_NORMED).max()) < 0.88:
+                continue
 
         status_roi = hsv[top + 38:top + 66, 1237:1263]
         if status_roi.size == 0:
@@ -2287,96 +2736,52 @@ def detect_camped_march_card_targets(frame_bgr):
 
 
 def detect_march_retreat_target(frame_bgr):
-    """Return the right-hand retreat action for a selected world-map squad."""
+    """Recognise retreat and its neighbouring emoji action on a selected squad."""
     frame, scale_x, scale_y = _reference_frame(frame_bgr)
     if frame is None:
         return None
 
-    # Selecting a march card centers its camp at a camera-dependent position.
-    # The two action circles (emoji, retreat) therefore move together instead
-    # of staying at one fixed coordinate. Detect the pair and use the right one.
-    roi_left, roi_top, roi_right, roi_bottom = 280, 360, 920, 590
-    action_roi = frame[roi_top:roi_bottom, roi_left:roi_right]
-    if action_roi.size == 0:
+    # Circle fitting drifts on the moving map background and sometimes puts
+    # the two button centres at different heights. Match their actual icons;
+    # require both actions in the same layout to reject unrelated gold UI.
+    directory = Path(__file__).parent / "assets/marches"
+    retreat = imread_unicode(directory / "retreat_icon.png", cv2.IMREAD_GRAYSCALE)
+    emoji = imread_unicode(directory / "emoji_icon.png", cv2.IMREAD_GRAYSCALE)
+    if retreat is None or emoji is None:
         return None
-    gray = cv2.cvtColor(action_roi, cv2.COLOR_BGR2GRAY)
-    circles = cv2.HoughCircles(
-        gray,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=45,
-        param1=90,
-        param2=26,
-        minRadius=22,
-        maxRadius=45,
-    )
-    if circles is None:
-        return None
-
-    hsv = cv2.cvtColor(action_roi, cv2.COLOR_BGR2HSV)
-    gold = (
-        (hsv[:, :, 0] >= 5)
-        & (hsv[:, :, 0] <= 45)
-        & (hsv[:, :, 1] >= 70)
-        & (hsv[:, :, 2] >= 70)
-    )
-    candidates = np.round(circles[0]).astype(int).tolist()
-    best_pair = None
-    best_score = -1.0
-    yy, xx = np.ogrid[:action_roi.shape[0], :action_roi.shape[1]]
-    for index, first in enumerate(candidates):
-        for second in candidates[index + 1:]:
-            left_circle, right_circle = sorted((first, second), key=lambda item: item[0])
-            delta_x = right_circle[0] - left_circle[0]
-            average_radius = (left_circle[2] + right_circle[2]) / 2.0
-            if average_radius <= 0 or not 2.85 <= delta_x / average_radius <= 3.20:
+    roi_left, roi_top = 280, 360
+    gray = cv2.cvtColor(frame[roi_top:590, roi_left:920], cv2.COLOR_BGR2GRAY)
+    best_score, best_target = 0.0, None
+    # World-map zoom also scales these two actions, independently of the
+    # emulator resolution. At minimum zoom they are about 62.5% of normal.
+    for scale in (0.50, 0.55, 0.60, 0.625, 0.65, 0.675, 0.70, 0.75, 0.80,
+                  0.85, 0.90, 0.95, 1.0, 1.05, 1.10, 1.15, 1.20):
+        arrow = cv2.resize(retreat, None, fx=scale, fy=scale)
+        face = cv2.resize(emoji, None, fx=scale, fy=scale)
+        ah, aw = arrow.shape
+        fh, fw = face.shape
+        scores = cv2.matchTemplate(gray, arrow, cv2.TM_CCOEFF_NORMED)
+        for _candidate in range(3):
+            _low, arrow_score, _low_at, (x, y) = cv2.minMaxLoc(scores)
+            if arrow_score < 0.84:
+                break
+            # Suppress this peak before considering another matching arrow.
+            scores[max(0, y-ah//2):y+ah//2+1, max(0, x-aw//2):x+aw//2+1] = -1
+            cx, cy = x + aw / 2, y + ah / 2
+            face_x, face_y = round(cx - 113 * scale - fw / 2), round(cy - fh / 2)
+            left, top = max(0, face_x - 6), max(0, face_y - 6)
+            region = gray[top:face_y+fh+7, left:face_x+fw+7]
+            if region.shape[0] < fh or region.shape[1] < fw:
                 continue
-            if abs(right_circle[1] - left_circle[1]) > 3:
-                continue
-            if abs(right_circle[2] - left_circle[2]) > 3:
-                continue
-
-            gold_scores = []
-            bright_scores = []
-            green_scores = []
-            for center_x, center_y, radius in (left_circle, right_circle):
-                mask = (xx - center_x) ** 2 + (yy - center_y) ** 2 <= radius ** 2
-                inner_mask = (
-                    (xx - center_x) ** 2 + (yy - center_y) ** 2
-                    <= (radius * 0.68) ** 2
-                )
-                gold_scores.append(float(np.mean(gold[mask])))
-                bright_scores.append(
-                    float(np.mean(hsv[:, :, 2][inner_mask] >= 170))
-                )
-                green_scores.append(
-                    float(
-                        np.mean(
-                            (
-                                (hsv[:, :, 0][inner_mask] >= 45)
-                                & (hsv[:, :, 0][inner_mask] <= 110)
-                                & (hsv[:, :, 1][inner_mask] >= 90)
-                                & (hsv[:, :, 2][inner_mask] >= 80)
-                            )
-                        )
-                    )
-                )
-            score = sum(gold_scores)
-            if (
-                min(gold_scores) >= 0.25
-                and min(bright_scores) >= 0.20
-                and max(green_scores) <= 0.08
-                and score > best_score
-            ):
+            face_score = float(cv2.matchTemplate(region, face, cv2.TM_CCOEFF_NORMED).max())
+            score = min(arrow_score, face_score)
+            if face_score >= 0.84 and score > best_score:
                 best_score = score
-                best_pair = right_circle
-
-    if best_pair is None:
-        return None
-    return (
-        int(round((roi_left + best_pair[0]) * scale_x)),
-        int(round((roi_top + best_pair[1]) * scale_y)),
-    )
+                best_target = (
+                    round((roi_left + cx) * scale_x),
+                    round((roi_top + cy) * scale_y),
+                )
+    return best_target
 
 
 def detect_back_confirmation_cancel_target(frame_bgr):

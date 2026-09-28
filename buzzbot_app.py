@@ -1,4 +1,6 @@
 import os
+from copy import deepcopy
+import re
 import threading
 import time
 import tkinter as tk
@@ -64,24 +66,38 @@ from buzzbot.multi_emulator import (
 from buzzbot.matching import (
     TemplateCache,
     alliance_donation_attempts_exhausted,
+    alliance_marked_project_is_visible,
     detect_alliance_donation_entry_target,
     detect_alliance_marked_project_target,
     detect_account_details_close_target,
     detect_back_confirmation_cancel_target,
     detect_blank_webview_close_target,
     detect_collective_tutorial_continue_target,
+    collective_target_busy_is_visible,
+    collective_search_not_found_is_visible,
+    collective_target_card_is_visible,
+    zombie_search_not_found_is_visible,
+    zombie_target_card_is_visible,
     detect_commander_profile_back_target,
+    detect_commander_settings_target,
     detect_camped_march_card_targets,
     detect_account_settings_back_target,
     detect_finished_healing_target,
+    detect_fence_survivor_target,
+    detect_radar_complete_all_target,
+    detect_radar_task_pin_targets,
+    settlement_region_button_is_visible,
     detect_equipment_report_close_target,
     detect_equipment_report_free_reward_target,
     detect_game_event_overlay_close_target,
+    detect_gem_confirmation_cancel_target,
     detect_game_server_connection_error,
     detect_igg_game_login_ok_target,
     detect_igg_id_selection_target,
     detect_login_saved_account_continue_target,
     detect_login_session_expired_ok_target,
+    detect_offline_resources_confirm_target,
+    detect_vehicle_barracks_target,
     detect_prize_hunt_squad_confirmation_target,
     detect_processing_factory_target,
     detect_research_action_target,
@@ -106,15 +122,22 @@ from buzzbot.matching import (
     detect_training_radial_action_target,
     detect_mysterious_merchant_absent_ok_target,
     detect_mysterious_merchant_non_gem_offer_targets,
+    detect_merchant_free_refresh_target,
     detect_shop_merchant_tab_target,
     mysterious_merchant_screen_is_visible,
     settlement_building_catalogue_is_visible,
     detect_truck_occupied_slot_targets,
     detect_truck_active_detail_back_target,
     detect_truck_escort_confirmation_target,
+    detect_truck_formation_add_target,
+    detect_truck_squad_done_target,
+    truck_formation_is_visible,
     detect_truck_personal_slot_target,
+    truck_daily_dispatch_limit_is_visible,
+    truck_personal_dispatch_card_is_visible,
     detect_truck_ready_collection_target,
     detect_truck_start_dispatch_target,
+    detect_truck_transporting_close_target,
     detect_lowest_stamina_refill_target,
     detect_march_retreat_target,
     detect_stamina_refill_target,
@@ -123,6 +146,7 @@ from buzzbot.matching import (
     healing_selection_is_empty,
     healing_troop_form_is_visible,
     radar_overview_is_visible,
+    radar_task_card_is_visible,
     radar_marker_has_notification,
     radar_card_has_active_countdown,
     stamina_dialog_is_visible,
@@ -203,10 +227,16 @@ from buzzbot.report_cloud import (
     upload_report_to_sync_folder,
 )
 from buzzbot.state import BotState, compute_runtime_seconds
+from buzzbot.own_rally import OwnRallyController, participant_candidates
 from buzzbot.storage import move_file_to_trash, save_json_with_backup
 from buzzbot.training_profiles import read_training_profile
 from buzzbot.updater import UpdateError, download_and_stage_update, launch_staged_update
 from buzzbot.version import APP_VERSION
+from buzzbot.memory_guard import (
+    GIB, system_commit_memory, instance_private_memory, instance_memory_limit, restart_needed,
+)
+from buzzbot.igg_identity import read_game_igg_id, read_sdk_igg_id
+from buzzbot.matching import world_map_hud_is_visible
 
 HEALING_CAMERA_ROUTE_VERSION = 3
 HEALING_HOSPITAL_REOPEN_OFFSETS = (
@@ -279,6 +309,9 @@ MARCH_DECREASE_CONFIRMATION_SECONDS = 2.0
 ACCOUNT_PASS_SOFT_SECONDS = 15.0 * 60.0
 ACCOUNT_PASS_TASK_HARD_SECONDS = 25.0 * 60.0
 ACCOUNT_SWITCH_TIMEOUT_SECONDS = 5.0 * 60.0
+ACCOUNT_SWITCH_IDENTITY_RETRY_SECONDS = 120.0
+ACCOUNT_SWITCH_IGG_CONFIRMATION_GRACE_SECONDS = 30.0
+ACCOUNT_SWITCH_GAME_LOAD_GRACE_SECONDS = 60.0
 ACCOUNT_SWITCH_RETRY_SECONDS = 60.0
 # A radar dispatch may legitimately keep the ordered pointer blocked for its
 # five-minute safety interval.  Do not start one when it could consume the
@@ -296,6 +329,7 @@ FENCE_SURVIVOR_SCAN_PATTERN = (
     + ("down",) * 2
     + ("left",) * 4
 )
+PROCESSING_FACTORY_BUDGET_SECONDS = 180.0
 PROCESSING_FACTORY_LOCAL_SCAN_PATTERN = (
     "local_up", "local_down", "local_down", "local_up",
     "local_left", "local_right", "local_right", "local_left",
@@ -955,6 +989,11 @@ class AutoClicker:
         self.routine_resource_retry_count = 0
         self.zombie_level_restore = {}
         self.zombie_level_restore_pending = {}
+        self.hunt_search_levels = {}
+        self.hunt_found_levels = {}
+        self.own_rally_settings = {"leader_id": "", "participant_id": "any", "repeat": True}
+        self.own_rally_controller = None
+        self._own_rally_task = None
         self.routine_radar_pending_marker_key = None
         self.routine_radar_confirmed_marker_keys = set()
         self.routine_radar_marker_failure_counts = {}
@@ -973,6 +1012,8 @@ class AutoClicker:
         self.routine_processing_factory_dynamic_target = None
         self.routine_processing_factory_radial_attempted = False
         self.routine_processing_factory_recenter_attempted = False
+        self.routine_processing_factory_recovery_required = False
+        self.routine_processing_factory_force_scan = False
         self.routine_merchant_build_menu_requested_at = 0.0
         self.routine_merchant_pending_target = None
         self.routine_merchant_scan_index = 0
@@ -1000,6 +1041,7 @@ class AutoClicker:
         self.account_switch_retry_at = 0.0
         self.account_switch_task = None
         self.account_switch_error = ""
+        self.account_switch_stop_message = ""
         self.account_switch_selected_at = 0.0
         self.account_switch_confirmed = False
         self.account_switch_probe_ready = False
@@ -1033,6 +1075,10 @@ class AutoClicker:
         self._adb_capture_lock = threading.RLock()
         self._adb_recovery_lock = threading.Lock()
         self._adb_last_recovery_attempt = 0.0
+        self._memory_guard_enabled = os.name == "nt"
+        self._memory_guard_checked_at = 0.0
+        self._memory_guard_waiting = False
+        self._memory_guard_restarted_at = None
         self.player_width = 1280
         self.player_height = 720
         self.player_name = ""
@@ -1410,6 +1456,11 @@ class AutoClicker:
         return uploaded_path, True
 
     def _set_state(self, new_state):
+        own = getattr(self, 'own_rally_controller', None)
+        if (new_state == BotState.STOPPED and own is not None and not own.cancel.is_set()
+                and threading.current_thread() is getattr(self, '_thread', None)):
+            # Finishing an internal one-shot phase does not stop the outer mode.
+            new_state = BotState.RUNNING
         self.state = new_state
         self.is_running = new_state != BotState.STOPPED
         self.is_paused = new_state == BotState.PAUSED
@@ -1425,6 +1476,7 @@ class AutoClicker:
         self._invalidate_capture()
 
     def _invalidate_capture(self):
+        self._account_switch_ui_cache = None
         with self._adb_capture_lock:
             self._adb_frame_cache = None
             self._adb_frame_timestamp = 0.0
@@ -1656,7 +1708,7 @@ class AutoClicker:
             return True
         # A configured profile must never jump to another running emulator just
         # because it is currently the only ADB device that answered.
-        if target or preferred_index >= 0:
+        if target or preferred_index >= 0 or index_from_serial(self.adb_serial) is not None:
             return False
         if len(devices) == 1:
             serial = devices[0]
@@ -1669,9 +1721,13 @@ class AutoClicker:
         running = [item for item in instances if item.running]
         current = self.get_current_account()
         preferred_index = int(current.get("ldplayer_index", -1)) if current else -1
-        preferred = next((item for item in running if item.index == preferred_index), None)
-        if preferred:
-            return preferred
+        if preferred_index < 0:
+            serial_index = index_from_serial(self.adb_serial)
+            preferred_index = serial_index if serial_index is not None else -1
+        if preferred_index >= 0:
+            # A stopped or missing configured VM is never permission to rebind
+            # the account to the only other running instance.
+            return next((item for item in instances if item.index == preferred_index), None)
         if len(running) == 1:
             return running[0]
         return None
@@ -1710,14 +1766,19 @@ class AutoClicker:
             self._show_notification('success' if connected else 'error', key, **kwargs)
         return connected
 
-    def repair_adb_connection(self, instance_index=None):
-        if self._auto_detect_adb_connection() and self.adb_client.is_responsive():
+    def repair_adb_connection(self, instance_index=None, *, force_restart=False):
+        target = self.get_adb_repair_target()
+        may_detect = instance_index is None or (target and target.index == instance_index)
+        if not force_restart and may_detect and self._auto_detect_adb_connection() and self.adb_client.is_responsive():
             self.set_status_message(self.tr('adb_repaired', serial=self.adb_serial), force=True)
             return True
 
         ldconsole, instances = self._ldplayer_instances()
         running = [item for item in instances if item.running]
         target = next((item for item in instances if item.index == instance_index), None)
+        if instance_index is not None and target is None:
+            self.set_status_message(f"LDPlayer {instance_index} не найден. Привязка аккаунта сохранена", force=True)
+            return False
         if target is None:
             target = self.get_adb_repair_target()
         if target is None:
@@ -1747,13 +1808,23 @@ class AutoClicker:
         client = AdbClient(self.adb_path or None, target.adb_serial)
         deadline = time.monotonic() + 90.0
         while time.monotonic() < deadline:
+            if self.is_running and (self.stop_event.is_set() or self.stop_hotkey_pressed):
+                return False
+            if target.running and target.box_pid > 0:
+                # reboot is asynchronous: the old VM can still answer ADB for
+                # a short time. Recovery must wait for a fresh host process.
+                _console, refreshed = self._ldplayer_instances()
+                restarted = next((item for item in refreshed if item.index == target.index), None)
+                if not restarted or not restarted.running or restarted.box_pid in (-1, 0, target.box_pid):
+                    time.sleep(2.0)
+                    continue
             if client.is_responsive():
                 self._adopt_adb_serial(target.adb_serial, target.index)
                 message = self.tr('adb_repaired', serial=target.adb_serial)
                 logger.info(message)
                 self.set_status_message(message, force=True)
                 return True
-            if self._auto_detect_adb_connection() and self.adb_client.is_responsive():
+            if may_detect and self._auto_detect_adb_connection() and self.adb_client.is_responsive():
                 message = self.tr('adb_repaired', serial=self.adb_serial)
                 logger.info(message)
                 self.set_status_message(message, force=True)
@@ -1764,7 +1835,7 @@ class AutoClicker:
         self.set_status_message(message, force=True)
         return False
 
-    def _recover_runtime_adb_connection(self):
+    def _recover_runtime_adb_connection(self, *, force_restart=False):
         now = time.monotonic()
         if now - self._adb_last_recovery_attempt < 20.0:
             return False
@@ -1781,11 +1852,34 @@ class AutoClicker:
                 instance_index,
             )
             self.set_status_message("Связь с LDPlayer потеряна. Восстанавливаю...", force=True)
-            if not self.repair_adb_connection(instance_index=instance_index):
+            options = {"force_restart": True} if force_restart else {}
+            if not self.repair_adb_connection(instance_index=instance_index, **options):
+                return False
+            if self.stop_event.is_set() or self.stop_hotkey_pressed:
                 return False
             self._refresh_adb_client()
+            self._invalidate_capture()
             self.adb_client.launch_package(GAME_PACKAGE)
             self._interruptible_sleep(8.0)
+            switch_task = getattr(self, "account_switch_task", None)
+            if (getattr(self, "routine_only_task_id", None) == "__account_switch__"
+                    and switch_task and self._schedule_account_transition_retry(
+                        switch_task, "Соединение с эмулятором восстановлено", time.time(),
+                        restart_game=False,
+                    )):
+                logger.info("Runtime ADB recovery retained the target account and scheduled a fresh transition")
+                return True
+            if (force_restart and getattr(self, "routine_mode", False)
+                    and getattr(self, "account_rotation_enabled", False)):
+                only_task = self.routine_only_task_id
+                if not self._prepare_current_account_verification(
+                    self.current_routine_index, pass_completed=self.routine_pass_completed,
+                    after_login=True,
+                ):
+                    return False
+                if only_task:
+                    self.account_switch_task["settings"]["_return_only_task_id"] = only_task
+                return True
             self.blocked_coords.clear()
             self.routine_completed_steps = set()
             self.routine_current_had_action = False
@@ -1798,6 +1892,57 @@ class AutoClicker:
             return False
         finally:
             self._adb_recovery_lock.release()
+
+    def _check_runtime_memory(self):
+        """Run in the clicker thread, between actions, so recovery cannot race taps."""
+        if not getattr(self, "_memory_guard_enabled", False) or not self.uses_adb:
+            return False
+        now = time.monotonic()
+        if now - self._memory_guard_checked_at < 10.0:
+            if self._memory_guard_waiting:
+                self._interruptible_sleep(1.0)
+            return self._memory_guard_waiting
+        self._memory_guard_checked_at = now
+        commit = system_commit_memory()
+        # Cache VM discovery to avoid spawning ldconsole when commit is exhausted.
+        cached = getattr(self, "_memory_guard_instance", None)
+        profile = self.get_current_account() or {}
+        index = int(profile.get("ldplayer_index", -1))
+        if index < 0:
+            index = index_from_serial(self.adb_serial)
+        different_vm = cached is not None and cached[2] is not None and cached[2].index != index
+        if cached is None or different_vm or (not (commit and commit.low) and now - cached[0] >= 30):
+            ldconsole, instances = self._ldplayer_instances()
+            instance = next((item for item in instances if item.index == index and item.running), None)
+            cached = (now, ldconsole, instance)
+            self._memory_guard_instance = cached
+        _, ldconsole, instance = cached
+        private = instance_private_memory(instance) if instance else None
+        limit = instance_memory_limit(ldconsole, instance.index) if instance else 8 * GIB
+        if instance and restart_needed(private, limit, commit):
+            logger.warning("Memory guard: LDPlayer %s private=%.2f GiB, limit=%.2f GiB, commit available=%s",
+                           instance.index, private / GIB, limit / GIB,
+                           round(commit.available / GIB, 2) if commit else "unknown")
+            previous = self._memory_guard_restarted_at
+            if previous is not None and now - previous < 300:
+                self.account_switch_stop_message = "LDPlayer снова расходует слишком много памяти. Работа остановлена"
+                self.stop_event.set()
+                return True
+            self.set_status_message("LDPlayer расходует слишком много памяти. Перезапускаю и проверяю аккаунт", force=True)
+            self._memory_guard_restarted_at = now
+            self._memory_guard_instance = None
+            self._memory_guard_waiting = False
+            if not self._recover_runtime_adb_connection(force_restart=True):
+                self.account_switch_stop_message = "Не удалось восстановить LDPlayer после превышения памяти"
+                self.stop_event.set()
+            return True
+        self._memory_guard_waiting = bool(commit and commit.low)
+        if self._memory_guard_waiting:
+            logger.warning("Memory guard: Windows commit reserve %.2f GiB; suspending ADB actions", commit.available / GIB)
+            self.set_status_message("Windows не хватает памяти. Ожидаю освобождения памяти", force=True)
+            self._interruptible_sleep(1.0)
+            return True
+        return False
 
     def create_diagnostic_report(self):
         for handler in logger.handlers:
@@ -1973,7 +2118,11 @@ class AutoClicker:
                 continue
             if location and bbox:
                 return True
-        return False
+        try:
+            frame, _origin = self._capture_screen_bgr()
+            return settlement_region_button_is_visible(frame)
+        except Exception:
+            return False
 
     def _is_game_home_visible(self):
         """Return true for either normal playable home surface.
@@ -2190,6 +2339,72 @@ class AutoClicker:
         logger.warning("Главный экран не подтверждён после завершения задачи")
         return False
 
+    def _recover_interrupted_routine_foreground(self, task):
+        """Recover a lost game before recording an outcome for its current slot."""
+        if (
+            not task
+            or task.get("id") in {"game_login", "__account_switch__"}
+            or not getattr(self, "uses_adb", False)
+        ):
+            return False
+        try:
+            package = self.adb_client.current_foreground_package()
+        except Exception:
+            logger.exception("Could not inspect foreground during an active routine")
+            return False
+        if not package or package == GAME_PACKAGE:
+            return False
+        login_index = next((
+            index for index, candidate in enumerate(self.routine_tasks)
+            if candidate.get("id") == "game_login"
+        ), None)
+        if login_index is None:
+            self.routine_mode = False
+            self.stop_event.set()
+            self.set_status_message(
+                "Игра закрылась: задача сохранена, восстановление входа не настроено",
+                force=True,
+            )
+            return True
+        # Resolve the actual task slot before the scheduler can advance it.
+        interrupted_index = next((
+            index for index, candidate in enumerate(self.routine_tasks)
+            if candidate.get("id") == task.get("id")
+        ), int(self.current_routine_index or 0))
+        if getattr(self, "routine_only_task_id", None):
+            self.routine_tasks[login_index].setdefault("settings", {})[
+                "_foreground_resume_only_task_id"
+            ] = self.routine_only_task_id
+            self.routine_only_task_id = None
+        self.routine_tasks[login_index].setdefault("settings", {})[
+            "_foreground_return_forced_context"
+        ] = {
+            "queue": list(getattr(self, "routine_forced_task_queue", [])),
+            "active_id": getattr(self, "routine_forced_task_active_id", None),
+            "return_index": getattr(self, "routine_forced_task_return_index", None),
+        }
+        self._enable_login_recovery()
+        self.routine_forced_task_active_id = "game_login"
+        self.routine_forced_task_return_index = interrupted_index
+        self.routine_next_run["game_login"] = 0.0
+        self.current_routine_index = login_index
+        self.current_routine_task_id = None
+        self.routine_current_had_action = False
+        self.routine_completed_steps = set()
+        self.routine_idle_confirmation_count = 0
+        self.blocked_coords.clear()
+        self.routine_last_action_time = time.time()
+        self.set_status_message(
+            "Игра закрылась: восстановлю вход, проверю ID и повторю текущую задачу",
+            force=True,
+        )
+        logger.warning(
+            "Game left foreground (%s) during %s; login must return to slot %s without deferring it",
+            package, task.get("id"), interrupted_index,
+        )
+        self.save_config()
+        return True
+
     def _try_global_login_connection_recovery(self, task):
         """Recover the one-button in-game login/network error without looping Back."""
         if not self.uses_adb or not task:
@@ -2219,7 +2434,7 @@ class AutoClicker:
                 index
                 for index, candidate in enumerate(self.routine_tasks)
                 if candidate.get("id") == "game_login"
-                and is_task_effectively_enabled(candidate)
+                and (is_task_effectively_enabled(candidate) or candidate.get("settings", {}).get("_completed_login", False))
             ),
             None,
         )
@@ -2236,6 +2451,8 @@ class AutoClicker:
             logger.exception("Login connection error recovery failed")
             return False
 
+        self._remember_interrupted_login_context()
+        self._enable_login_recovery()
         self.routine_forced_task_active_id = "game_login"
         self.routine_forced_task_return_index = interrupted_index
         self.routine_next_run["game_login"] = 0.0
@@ -2361,7 +2578,7 @@ class AutoClicker:
             (
                 index for index, candidate in enumerate(self.routine_tasks)
                 if candidate.get("id") == "game_login"
-                and is_task_effectively_enabled(candidate)
+                and (is_task_effectively_enabled(candidate) or candidate.get("settings", {}).get("_completed_login", False))
             ),
             None,
         )
@@ -2369,6 +2586,8 @@ class AutoClicker:
             # Respect a disabled login routine; retain the interrupted slot
             # without sending ordinary task actions to the title screen.
             return self._wait_for_game_server_connection()
+        self._remember_interrupted_login_context()
+        self._enable_login_recovery()
         self.routine_forced_task_active_id = "game_login"
         self.routine_forced_task_return_index = int(self.current_routine_index or 0)
         self.routine_next_run["game_login"] = 0.0
@@ -3064,10 +3283,19 @@ class AutoClicker:
                     raw_zombie_restore = data.get('zombie_level_restore', {})
                     self.zombie_level_restore = {}
                     self.zombie_level_restore_pending = {
-                        str(context): min(3, max(0, int(levels)))
+                        str(context): min(10, max(0, int(levels)))
                         for context, levels in raw_zombie_restore.items()
                         if isinstance(context, str) and isinstance(levels, (int, float))
                     } if isinstance(raw_zombie_restore, dict) else {}
+                    raw_hunt_levels = data.get('hunt_search_levels', {})
+                    self.hunt_search_levels = {
+                        key: min(10 if key.endswith('|zombie_hunt') else 7,
+                                 max(0 if key.endswith('|zombie_hunt') else 1, int(level)))
+                        for key, level in raw_hunt_levels.items()
+                        if isinstance(key, str) and isinstance(level, (int, float))
+                        and key.endswith(('|zombie_hunt', '|collective_mind'))
+                    } if isinstance(raw_hunt_levels, dict) else {}
+                    self.hunt_found_levels = {}
                     for task in self.routine_tasks:
                         self.groups.setdefault(effective_task_group(task), task.get("enabled", True))
                     self.groups.setdefault(SYSTEM_TEMPLATE_GROUP, True)
@@ -3116,13 +3344,22 @@ class AutoClicker:
                         data.get('account_profiles'),
                         self.adb_serial,
                     )
+                    raw_own_rally = data.get('own_rally_settings', {})
+                    self.own_rally_settings = dict(raw_own_rally) if isinstance(raw_own_rally, dict) else {}
                     ensure_account_task_defaults(
                         self.account_profiles,
                         self.routine_tasks,
                         enabled_task_ids=("mysterious_merchant", "trucks", "alliance_gifts"),
                     )
                     self._migrate_account_logins_to_credential_store()
-                    if not self.is_multi_worker:
+                    # A saved account list is authoritative. Old credential
+                    # keys must not resurrect removed profiles or rewrite
+                    # their chosen login method, row or enabled state.
+                    saved_profiles = data.get('account_profiles')
+                    if not self.is_multi_worker and not (
+                        isinstance(saved_profiles, list)
+                        and any(isinstance(profile, dict) for profile in saved_profiles)
+                    ):
                         try:
                             self.account_profiles = recover_account_profiles(
                                 self.account_profiles,
@@ -3329,6 +3566,7 @@ class AutoClicker:
                     **getattr(self, 'zombie_level_restore_pending', {}),
                     **self.zombie_level_restore,
                 },
+                'hunt_search_levels': getattr(self, 'hunt_search_levels', {}),
                 'routine_next_run': self.routine_next_run,
                 'current_routine_index': self.current_routine_index,
                 'routine_pass_completed': self.routine_pass_completed,
@@ -3342,6 +3580,7 @@ class AutoClicker:
                     self.routine_radar_return_observed_peak or 0
                 ),
                 'account_profiles': self.account_profiles,
+                'own_rally_settings': getattr(self, 'own_rally_settings', {}),
                 'current_account_id': self.current_account_id,
                 'account_rotation_enabled': self.account_rotation_enabled,
                 'account_pass_started_at': float(
@@ -3535,7 +3774,15 @@ class AutoClicker:
     def get_routine_task(self, task_id):
         if task_id == "__account_switch__":
             return self.account_switch_task
+        own_task = getattr(self, "_own_rally_task", None)
+        if own_task and task_id == own_task.get("id"):
+            return own_task
         return next((task for task in self.routine_tasks if task.get("id") == task_id), None)
+
+    def _routine_group_enabled(self, group):
+        own_task = getattr(self, "_own_rally_task", None)
+        return bool((own_task and effective_task_group(own_task) == group)
+                    or self.groups.get(group, True))
 
     def get_routine_templates(self, task, active_only=False):
         group = effective_task_group(task)
@@ -3555,7 +3802,7 @@ class AutoClicker:
 
             images = [image for image in images if merchant_offer_is_allowed(image)]
         if active_only:
-            if not self.groups.get(group, True):
+            if not self._routine_group_enabled(group):
                 return []
             images = [img for img in images if img.get("enabled", True)]
         return images
@@ -3796,8 +4043,7 @@ class AutoClicker:
         if self.adb_client.current_foreground_package() != GAME_PACKAGE:
             raise CredentialError("Форма входа IGG не открыта в игре.")
 
-        ui_xml = self.adb_client.ui_xml()
-        targets = form or extract_igg_login_form(ui_xml)
+        targets = form or extract_igg_login_form(self.adb_client.ui_xml())
         if not targets:
             raise CredentialError("Форма входа IGG не подтверждена.")
         login = self.get_account_login(account_id, "igg")
@@ -3855,6 +4101,14 @@ class AutoClicker:
     def select_account_profile(self, account_id, save=True, start_fresh_pass=False):
         profile = find_account(self.account_profiles, account_id)
         if not profile:
+            return False
+        if getattr(self, "is_running", False) and getattr(self, "account_switch_task", None):
+            if account_id == self.current_account_id:
+                return True
+            self.set_status_message(
+                "Выполняется вход в аккаунт. Дождитесь завершения или остановите бота перед выбором профиля.",
+                force=True,
+            )
             return False
         current = self.get_current_account()
         if current:
@@ -3955,13 +4209,13 @@ class AutoClicker:
         self.save_config()
         return True
 
-    def _prepare_account_switch(self, profile):
+    def _prepare_account_switch(self, profile, *, verify_only=False):
         group = ACCOUNT_SWITCH_TEMPLATE_GROUP
         templates = [
             image for image in self.search_images
             if image.get("group") == group and image.get("enabled", True)
         ]
-        if not templates:
+        if not templates and not verify_only:
             self.set_status_message(f"Не обучено переключение аккаунта: {profile.get('name')}", force=True)
             return False
         # These controls are small, flat UI elements. ORB cannot reach the
@@ -3978,7 +4232,7 @@ class AutoClicker:
                 image["required_setting_key"] = "login_method"
                 image["required_setting_value"] = "igg"
         login_method = str(profile.get("login_method") or "igg").strip().lower()
-        if login_method == "igg":
+        if login_method == "igg" and not verify_only:
             if not profile.get("auto_login", False):
                 self.set_status_message("Для переключения включите автоматический вход IGG", force=True)
                 return False
@@ -4005,22 +4259,155 @@ class AutoClicker:
                 "login_method": login_method,
                 "chooser_index": int(profile.get("chooser_index", 1)),
                 "auto_login": bool(profile.get("auto_login", False)),
+                "_return_routine_index": int(getattr(self, "current_routine_index", 0) or 0),
+                "_return_pass_completed": bool(getattr(self, "routine_pass_completed", False)),
             },
         }
+        bound_igg_id = str(profile.get("verified_igg_id") or "").strip()
+        if re.fullmatch(r"[0-9]{6,20}", bound_igg_id):
+            self.account_switch_task["settings"]["_expected_igg_id"] = bound_igg_id
         self.routine_only_task_id = "__account_switch__"
         self.current_routine_task_id = None
         self.account_switch_error = ""
+        self.account_switch_stop_message = ""
         self.account_switch_selected_at = 0.0
         self.account_switch_confirmed = False
         self.account_switch_probe_ready = False
         self.account_switch_auto_login_attempted = False
         return True
 
+    def _prepare_current_account_verification(
+        self, return_index, *, pass_completed=False, after_login=False, stop_after=False,
+    ):
+        """Hold the current pass until its profile is proved inside the game."""
+        forced_context = {
+            "queue": list(getattr(self, "routine_forced_task_queue", [])),
+            "active_id": getattr(self, "routine_forced_task_active_id", None),
+            "return_index": getattr(self, "routine_forced_task_return_index", None),
+        }
+        return_only_task_id = None
+        if forced_context["active_id"] == "game_login":
+            login_task = self.get_routine_task("game_login") or {}
+            return_only_task_id = login_task.get("settings", {}).get("_foreground_resume_only_task_id")
+            forced_context = login_task.get("settings", {}).get(
+                "_foreground_return_forced_context",
+                {"queue": forced_context["queue"], "active_id": None, "return_index": None},
+            )
+        if not getattr(self, "account_rotation_enabled", False):
+            self._resume_without_account_verification({
+                "_return_routine_index": return_index,
+                "_return_pass_completed": pass_completed,
+                "_return_forced_context": forced_context,
+                "_return_only_task_id": return_only_task_id,
+                "_after_game_login": after_login,
+                "_stop_after_verification": stop_after,
+            })
+            return True
+        profile = self.get_current_account()
+        bound_id = str((profile or {}).get("verified_igg_id") or "").strip()
+        verify_only = bool(re.fullmatch(r"[0-9]{6,20}", bound_id))
+        if not profile or not self._prepare_account_switch(profile, verify_only=verify_only):
+            self.account_switch_error = (
+                "Переключение не подтверждено: для проверки текущего профиля "
+                "нужны настроенный вход и сохранённые учётные данные"
+            )
+            self.account_switch_last_result = self.account_switch_error
+            self.account_switch_stop_message = self.account_switch_error
+            self.account_switch_failure_count = 1
+            self.account_switch_retry_at = 0.0
+            self.current_routine_index = int(return_index)
+            self.routine_pass_completed = bool(pass_completed)
+            self.routine_forced_task_queue = list(forced_context.get("queue", []))
+            self.routine_forced_task_active_id = forced_context.get("active_id")
+            self.routine_forced_task_return_index = forced_context.get("return_index")
+            self.current_routine_task_id = None
+            self.account_switch_task = None
+            self.routine_only_task_id = None
+            self.routine_mode = False
+            self.stop_event.set()
+            self.set_status_message(self.account_switch_error, force=True)
+            self.save_config()
+            return False
+        settings = self.account_switch_task["settings"]
+        settings.update({
+            "_resume_current_pass": True,
+            "_verify_only": verify_only,
+            "_return_routine_index": int(return_index),
+            "_return_pass_completed": bool(pass_completed),
+            "_after_game_login": bool(after_login),
+            "_stop_after_verification": bool(stop_after),
+            "_return_forced_context": forced_context,
+            "_return_only_task_id": return_only_task_id,
+        })
+        self.account_switch_task["name"] = f"Проверка аккаунта: {profile.get('name')}"
+        self.current_routine_index = int(return_index)
+        self.routine_pass_completed = bool(pass_completed)
+        self.routine_completed_steps = set()
+        self.routine_current_had_action = False
+        self.account_switch_failure_count = 1
+        self.account_switch_retry_at = 0.0
+        self.routine_next_run["__account_switch__"] = 0.0
+        if verify_only:
+            self.account_switch_selected_at = time.time()
+        self.set_status_message("Перед очередью проверяю игровой ID текущего профиля", force=True)
+        self.save_config()
+        return True
+
+    def _resume_without_account_verification(self, settings):
+        """Resume the open game's work without claiming its identity was proved."""
+        self.current_routine_index = int(settings.get("_return_routine_index", 0))
+        self.routine_pass_completed = bool(settings.get("_return_pass_completed", False))
+        context = settings.get("_return_forced_context", {})
+        self.routine_forced_task_queue = list(context.get("queue", []))
+        self.routine_forced_task_active_id = context.get("active_id")
+        self.routine_forced_task_return_index = context.get("return_index")
+        self.routine_only_task_id = settings.get("_return_only_task_id") or None
+        self.current_routine_task_id = None
+        self.routine_completed_steps = set()
+        self.routine_current_had_action = False
+        self.routine_current_action_count = 0
+        self.routine_action_counts = {}
+        self.account_switch_task = None
+        self.account_switch_confirmed = False
+        self.account_switch_selected_at = 0.0
+        self.account_switch_probe_ready = False
+        self.account_switch_auto_login_attempted = False
+        self.account_switch_error = ""
+        self.account_switch_stop_message = ""
+        self.account_switch_retry_at = 0.0
+        # Turning rotation back on must still require real identity proof.
+        self.account_switch_failure_count = max(1, getattr(self, "account_switch_failure_count", 0))
+        self.routine_next_run.pop("__account_switch__", None)
+        if settings.get("_after_game_login"):
+            self._disable_completed_game_login()
+        login_task = self.get_routine_task("game_login")
+        if login_task:
+            login_task.setdefault("settings", {}).pop("_foreground_resume_only_task_id", None)
+            login_task["settings"].pop("_foreground_return_forced_context", None)
+        message = "Автосмена выключена: продолжаю без проверки аккаунта"
+        if settings.get("_stop_after_verification"):
+            self.routine_mode = False
+            self.stop_event.set()
+            message = "Вход в игру завершён"
+            self.account_switch_stop_message = message
+        self.account_switch_last_result = message
+        logger.info("Account identity check skipped because automatic account rotation is disabled")
+        self.set_status_message(message, force=True)
+        self.save_config()
+
+    def _cancel_disabled_current_account_verification(self):
+        task = getattr(self, "account_switch_task", None)
+        if (getattr(self, "account_rotation_enabled", False) or not task
+                or not task.get("settings", {}).get("_resume_current_pass")):
+            return False
+        self._resume_without_account_verification(task["settings"])
+        self._return_to_main_screen(max_back_steps=4)
+        return True
+
     def start_account_switch(self, account_id):
         profile = find_account(self.account_profiles, account_id)
         # An explicit request is allowed to retry a previously blocked switch;
         # unattended rotation itself remains one bounded attempt per pass.
-        self.account_switch_failure_count = 0
         if not profile or not self._prepare_account_switch(profile):
             return False
         # Latch the attempt before entering the external IGG flow.  If the
@@ -4030,7 +4417,12 @@ class AutoClicker:
         self.save_config()
         self.routine_mode = True
         self.routine_next_run["__account_switch__"] = 0.0
-        return self.start()
+        if self.start():
+            return True
+        self.current_routine_task_id = "__account_switch__"
+        self.account_switch_error = "Переключение не подтверждено: не удалось запустить проверку аккаунта"
+        self._finish_current_routine()
+        return False
 
     def start_account_probe(self, account_id=None):
         if self.uses_adb and self.adb_client is not None:
@@ -4445,6 +4837,8 @@ class AutoClicker:
         return capacity
 
     def _world_map_visible_in_frame(self, frame):
+        if world_map_hud_is_visible(frame):
+            return True
         height, width = frame.shape[:2]
         roi = frame[
             int(height * 380 / 720):int(height * 510 / 720),
@@ -4548,6 +4942,8 @@ class AutoClicker:
     def _scheduler_routine_tasks(self):
         if self.routine_only_task_id == "__account_switch__" and self.account_switch_task:
             return [dict(self.account_switch_task)]
+        if getattr(self, "_own_rally_task", None):
+            return [dict(self._own_rally_task)]
         resource_squads_exhausted = (
             self.routine_only_task_id is None
             and not bool(getattr(self, "routine_pass_completed", False))
@@ -4620,7 +5016,8 @@ class AutoClicker:
                 continue
             if str(task.get("id") or "") != "gathering_boost":
                 return False
-            self.current_routine_index = (index + 1) % len(self.routine_tasks)
+            self.current_routine_index = index
+            self._advance_routine_after_outcome(task, now)
             self.set_status_message(
                 "Усиление сбора уже активно: продолжаю очередь ресурсов",
                 force=True,
@@ -4638,7 +5035,7 @@ class AutoClicker:
         now,
         active_marches,
     ):
-        """Advance past due ordinary marches when every squad is occupied.
+        """Advance past ordinary marches when every squad is occupied.
 
         Radar marches are deliberately excluded: an active or returning radar
         squad must keep the queue on the radar block. Ordinary gathering and
@@ -4675,16 +5072,19 @@ class AutoClicker:
             if (
                 task_id == "radar_marches"
                 or not task.get("uses_march", False)
-                or deadline > float(now)
             ):
                 break
 
             self.current_routine_index = index
-            self.routine_next_run[task_id] = float(now) + 60.0
+            # A cooling march still occupies its saved queue slot.  Leaving it
+            # here would let the cyclic selector skip the entire march tail
+            # and restart earlier tasks before this pass is complete.
+            self.routine_next_run[task_id] = max(deadline, float(now) + 60.0)
             self.routine_last_outcome = {
                 "task_id": task_id,
                 "outcome": "deferred_no_squad",
                 "reason": "all_ordinary_marches_busy",
+                "prior_deadline": deadline,
                 "completed_steps": [],
                 "actions": 0,
             }
@@ -4713,9 +5113,32 @@ class AutoClicker:
         return True
 
     def _begin_due_routine(self, now):
+        if self._cancel_disabled_current_account_verification():
+            return None
+        if self._wait_or_restart_account_transition(now):
+            return None
+        if (
+            self.routine_only_task_id is None
+            and self.account_rotation_enabled
+            and int(getattr(self, "account_switch_failure_count", 0) or 0) > 0
+        ):
+            self.routine_mode = False
+            self.stop_event.set()
+            self.account_switch_stop_message = (
+                getattr(self, "account_switch_error", "")
+                or "Переключение не подтверждено: повторите смену аккаунта перед продолжением очереди"
+            )
+            self.set_status_message(
+                self.account_switch_stop_message,
+                force=True,
+            )
+            return None
         if self.current_routine_task_id:
             task = self.get_routine_task(self.current_routine_task_id)
-            if task and task.get("enabled") and self.groups.get(effective_task_group(task), True):
+            if task and task.get("enabled") and (
+                task.get("id") == "__account_switch__"
+                or self._routine_group_enabled(effective_task_group(task))
+            ):
                 return task
             self.current_routine_task_id = None
 
@@ -4768,10 +5191,15 @@ class AutoClicker:
         ):
             return None
 
-        active_marches = self.get_active_marches(now)
-        self._release_radar_return_hold(active_marches, now)
-        if self._try_return_camped_zombie_march(active_marches, now):
-            return None
+        if self.routine_only_task_id == "__account_switch__":
+            # Do not reconcile this profile's march state or release another
+            # queue slot using observations from an as-yet unverified account.
+            active_marches = 0
+        else:
+            active_marches = self.get_active_marches(now)
+            self._release_radar_return_hold(active_marches, now)
+            if self._try_return_camped_zombie_march(active_marches, now):
+                return None
         deployment_wait = max(0.0, self.routine_deployment_blocked_until - now)
         if deployment_wait > 0:
             active_marches = self.routine_max_marches
@@ -4782,7 +5210,13 @@ class AutoClicker:
                 boost_deadline,
                 float(self.routine_next_run.get("gathering_boost", 0.0) or 0.0),
             )
-            self._skip_satisfied_gathering_boost(boost_deadline, now)
+            if (
+                self.routine_only_task_id != "__account_switch__"
+                and self._skip_satisfied_gathering_boost(boost_deadline, now)
+            ):
+                if bool(getattr(self, "routine_pass_completed", False)):
+                    self.save_config()
+                    return None
         runtime_tasks = self._scheduler_routine_tasks()
         # A task can also become unavailable only at runtime (for example,
         # its group or templates are missing).  The saved-task advancement
@@ -4809,7 +5243,7 @@ class AutoClicker:
             self.save_config()
             return None
         forced_index = None
-        while self.routine_forced_task_queue:
+        while self.routine_forced_task_queue and self.routine_only_task_id != "__account_switch__":
             forced_task_id = str(self.routine_forced_task_queue[0] or "")
             forced_index = next(
                 (
@@ -4937,7 +5371,7 @@ class AutoClicker:
                 max(1.0, float(settings.get("arrival_retry_minutes", 60) or 60)),
             )
             self.routine_next_run[task["id"]] = float(now) + retry_minutes * 60.0
-            self.current_routine_index = (index + 1) % len(runtime_tasks)
+            self.current_routine_index = index
             self.routine_last_outcome = {
                 "task_id": task["id"],
                 "outcome": "deferred_unavailable",
@@ -4945,6 +5379,7 @@ class AutoClicker:
                 "completed_steps": [],
                 "actions": 0,
             }
+            self._advance_routine_after_outcome(task, now)
             self.set_status_message(
                 "Таинственный торговец ещё не прибыл: продолжаю строгую очередь",
                 force=True,
@@ -4959,7 +5394,7 @@ class AutoClicker:
                 (
                     task_index
                     for task_index, candidate in enumerate(runtime_tasks)
-                    if candidate.get("id") == "game_login" and candidate.get("enabled")
+                    if candidate.get("id") == "game_login" and (candidate.get("enabled") or candidate.get("settings", {}).get("_completed_login", False))
                 ),
                 None,
             )
@@ -4982,6 +5417,9 @@ class AutoClicker:
                     # game_login to vip_rewards and abandoning the rest of the
                     # pass until the next daily deadline.
                     if task.get("id") != "game_login":
+                        self._remember_interrupted_login_context()
+                        self._enable_login_recovery()
+                        runtime_tasks[login_index]["enabled"] = True
                         self.routine_forced_task_active_id = "game_login"
                         self.routine_forced_task_return_index = int(index)
                         logger.info(
@@ -5027,7 +5465,8 @@ class AutoClicker:
                 "Starting forced post-radar follow-up %s",
                 self.routine_forced_task_active_id,
             )
-        self.current_routine_index = index
+        if task.get("id") != "__account_switch__":
+            self.current_routine_index = index
         self.current_routine_task_id = task["id"]
         self.routine_task_started_at = now
         if task.get("id") == "research":
@@ -5046,6 +5485,21 @@ class AutoClicker:
         self.routine_completed_steps = set()
         self.routine_last_outcome = {}
         self.routine_donation_entry_attempted = False
+        if task.get("id") == "trucks":
+            # Checked slots and escort state belong to one invocation, not to
+            # the process lifetime. Carrying them into another account (or a
+            # later pass) hides newly arrived rewards in those same slot IDs.
+            self.routine_truck_checked_slots = set()
+            self.routine_truck_current_slot = -1
+            self.routine_truck_detail_opened_at = 0.0
+            self.routine_truck_pending_kind = ""
+            self.routine_truck_pending_started_at = 0.0
+            self.routine_truck_overview_confirmations = 0
+            self.routine_truck_arrival_dismiss_attempts = 0
+            self.routine_truck_formation_index = 1
+            self.routine_truck_daily_limit_exhausted = False
+            self.routine_truck_slot_requested_at = 0.0
+            logger.info("Fresh personal truck slot check started for this task invocation")
         self.routine_action_completes_task = False
         self.routine_action_failure_reason = ""
         self.routine_idle_confirmation_count = 0
@@ -5069,6 +5523,8 @@ class AutoClicker:
         self.routine_processing_factory_dynamic_target = None
         self.routine_processing_factory_radial_attempted = False
         self.routine_processing_factory_recenter_attempted = False
+        self.routine_processing_factory_recovery_required = False
+        self.routine_processing_factory_force_scan = False
         self.routine_merchant_build_menu_requested_at = 0.0
         self.routine_merchant_pending_target = None
         self.routine_merchant_scan_index = 0
@@ -5116,6 +5572,15 @@ class AutoClicker:
         if task.get("id") == "game_login" and not self._launch_game_for_login():
             self._defer_current_routine_no_action(now)
             return None
+        if (
+            task.get("id") == "__account_switch__"
+            and task.get("settings", {}).get("_resume_current_pass")
+            and not task.get("settings", {}).get("_after_game_login")
+            and not self._launch_game_for_login()
+        ):
+            self.account_switch_error = "Переключение не подтверждено: не удалось открыть игру для проверки ID"
+            self._finish_current_routine(now)
+            return None
         if task.get("id") in WORLD_SEARCH_TASK_IDS and self._prepare_world_search_screen():
             self.routine_completed_steps.add("world_search")
             self.routine_current_had_action = True
@@ -5136,6 +5601,25 @@ class AutoClicker:
             return False
         next_task = min(tasks, key=lambda task: float(self.routine_next_run.get(task["id"], 0.0) or 0.0))
         deadline = float(self.routine_next_run.get(next_task["id"], 0.0) or 0.0)
+        if next_task.get("uses_march") and deadline > now:
+            # A completed pass still needs live observations while it waits for
+            # a free squad. Otherwise a full counter survives the entire wait.
+            if now >= float(getattr(self, "_idle_march_refresh_at", 0.0)):
+                self._idle_march_refresh_at = now + 1.0
+                active = self.get_active_marches(now)
+                outcome = getattr(self, "routine_last_outcome", {}) or {}
+                if (active < self.routine_max_marches
+                        and outcome.get("task_id") == next_task["id"]
+                        and outcome.get("outcome") == "deferred_no_squad"
+                        and outcome.get("reason") == "all_ordinary_marches_busy"):
+                    # Remove only the artificial no-squad retry, preserving an
+                    # independently configured task cooldown.
+                    deadline = max(now, float(outcome.get("prior_deadline", now)))
+                    self.routine_next_run[next_task["id"]] = deadline
+                    self.routine_last_outcome = {**outcome, "outcome": "squad_available"}
+                    self.save_config()
+                    logger.info("Returned squad released the no-squad wait for %s; active=%s",
+                                next_task["id"], active)
         if deadline > now:
             self.set_status_message(
                 f"Очередь пройдена: {self.get_routine_task_name(next_task)} через "
@@ -5163,6 +5647,7 @@ class AutoClicker:
         return bool(
             self.account_rotation_enabled
             and self.routine_only_task_id is None
+            and int(getattr(self, "account_switch_failure_count", 0) or 0) == 0
             and not self.routine_forced_task_queue
             and self._account_rotation_cycle_ready()
             and float(now) >= float(getattr(self, "account_switch_retry_at", 0.0) or 0.0)
@@ -5246,6 +5731,16 @@ class AutoClicker:
             and now - started_at >= RESEARCH_UNCONFIRMED_BUDGET_SECONDS
         )
 
+    def _processing_factory_watchdog_due(self, now=None):
+        """Bound the entire factory visit, even when idle probes keep matching."""
+        if str(getattr(self, "current_routine_task_id", "") or "") not in {
+            "processing_factory", "processing_contest",
+        }:
+            return False
+        now = time.time() if now is None else float(now)
+        started_at = float(getattr(self, "routine_task_started_at", 0.0) or 0.0)
+        return bool(started_at > 0 and now - started_at >= PROCESSING_FACTORY_BUDGET_SECONDS)
+
     def _drain_expired_account_pass(self, now=None):
         """Keep the saved-order pass running after its diagnostic target.
 
@@ -5283,9 +5778,14 @@ class AutoClicker:
         if guard_image is None:
             logger.warning("Idle completion guard %s is missing", guard_uid)
             return False
-        location, _bbox, _confidence = self._locate_image(guard_image)
-        if location is None:
+        location, guard_bbox, _confidence = self._locate_image(guard_image)
+        if location is None or guard_bbox is None:
             self.routine_idle_confirmation_count = 0
+            return False
+        guard_valid, reject_reason = self._validate_detected_match(guard_image, guard_bbox)
+        if not guard_valid:
+            self.routine_idle_confirmation_count = 0
+            logger.info("Idle completion rejects its screen guard: %s", reject_reason)
             return False
         self.routine_idle_guard_visible = True
         for image in self.search_images:
@@ -5403,12 +5903,15 @@ class AutoClicker:
     def _advance_routine_after_outcome(self, task, now):
         """Advance normally, except while completing the atomic radar block."""
         task_id = str(task.get("id") or "")
+        if getattr(self, "own_rally_controller", None) is not None:
+            if task_id == 'collective_mind':
+                self.stop_event.set()
+            return
         if task_id == "research":
             self.routine_research_budget_started_at = 0.0
         if (
             task_id == "radar_marches"
             and bool(getattr(self, "routine_radar_in_progress_seen", False))
-            and not bool(task.get("settings", {}).get("dispatch_until_full", False))
             and self.routine_forced_task_active_id != task_id
         ):
             # An active/returning radar squad belongs to the current radar
@@ -5422,7 +5925,7 @@ class AutoClicker:
             self.routine_radar_return_active_seen = False
             self.routine_radar_return_observed_peak = 0
             return
-        if self.routine_forced_task_active_id == task_id:
+        if getattr(self, "routine_forced_task_active_id", None) == task_id:
             # A mandatory post-radar task can also have its own later position
             # in the saved order.  If that position is still ahead before the
             # queue reaches radar_marches again, keep it due so its configured
@@ -5518,18 +6021,6 @@ class AutoClicker:
         if not bool(getattr(self, "routine_radar_return_hold", False)):
             return False
         radar_task = self.get_routine_task("radar_marches")
-        if radar_task and bool(
-            radar_task.get("settings", {}).get("dispatch_until_full", False)
-        ):
-            self.routine_radar_return_hold = False
-            self.routine_radar_return_active_seen = False
-            self.routine_radar_return_observed_peak = 0
-            self.routine_next_run["radar_marches"] = float(now)
-            self.save_config()
-            logger.info(
-                "Legacy radar return hold released; dispatch-until-full resumes immediately"
-            )
-            return True
         retry_at = float(self.routine_next_run.get("radar_marches", now) or now)
         active_count = int(active_marches or 0)
         observed_peak = max(
@@ -5575,6 +6066,7 @@ class AutoClicker:
             return False
         dispatched_this_pass = bool(
             getattr(self, "routine_radar_dispatched_this_pass", False)
+            and not radar_task.get("settings", {}).get("dispatch_until_full", False)
         )
         if dispatched_this_pass:
             # The pass is allowed to send exactly one radar squad.  The return
@@ -5621,6 +6113,137 @@ class AutoClicker:
         )
         return True
 
+    def _remember_interrupted_login_context(self):
+        """Keep the pending forced pass while game_login temporarily owns it."""
+        login_task = self.get_routine_task("game_login")
+        if not login_task:
+            return
+        settings = login_task.setdefault("settings", {})
+        settings["_foreground_return_forced_context"] = {
+            "queue": list(getattr(self, "routine_forced_task_queue", [])),
+            "active_id": getattr(self, "routine_forced_task_active_id", None),
+            "return_index": getattr(self, "routine_forced_task_return_index", None),
+        }
+        if getattr(self, "routine_only_task_id", None) not in (None, "game_login", "__account_switch__"):
+            settings["_foreground_resume_only_task_id"] = self.routine_only_task_id
+            self.routine_only_task_id = None
+
+    def _enable_login_recovery(self):
+        if not hasattr(self, "groups"):
+            self.groups = {}
+        for task in self.routine_tasks:
+            if task.get("id") == "game_login":
+                task["enabled"] = True
+                self.groups[effective_task_group(task)] = True
+
+    def _disable_completed_game_login(self):
+        """A confirmed login is a one-time task for the current account."""
+        if not hasattr(self, "groups"):
+            self.groups = {}
+        for task in getattr(self, "routine_tasks", []):
+            if task.get("id") == "game_login":
+                task["enabled"] = False
+                task.setdefault("settings", {})["_completed_login"] = True
+                self.groups[effective_task_group(task)] = False
+        if getattr(self, "root", None):
+            self.root.event_generate("<<GroupsChanged>>")
+        logger.info("Confirmed game login disabled for the current account")
+
+    def _schedule_account_transition_retry(self, task, reason, now, *, restart_game=True):
+        """Hold the same target and ordered slot across a transient login failure."""
+        settings = task.get("settings", {})
+        transient = any(text in str(reason).casefold() for text in (
+            "другой igg id", "прежний igg id", "неверный игровой id",
+            "не совпал игровой id", "игровой id целевого аккаунта не проверен",
+            "истекло время", "не удалось прочитать id",
+            "главный экран игры не появился", "игра не подключилась к серверу",
+            "не удалось перезапустить игру", "не удалось открыть игру для проверки id",
+            "соединение с эмулятором восстановлено",
+        ))
+        profile = find_account(getattr(self, "account_profiles", []), settings.get("target_account_id"))
+        if (not transient or getattr(self, "input_backend", None) != "adb" or not profile
+                or settings.get("probe_only") or settings.get("login_method") != "igg"
+                or not profile.get("auto_login", False)
+                or self.stop_event.is_set() or getattr(self, "stop_hotkey_pressed", False)
+                or not self.account_has_saved_login(profile["id"])
+                or not self.account_has_saved_password(profile["id"])):
+            return False
+        count = int(settings.get("_transition_retry_count", 0)) + 1
+        delay = ACCOUNT_SWITCH_RETRY_SECONDS * (1, 2, 5)[min(count - 1, 2)]
+        for key in ("_verified_igg_id", "_identity_candidate", "_identity_check_started",
+                    "_identity_check_started_at", "_identity_retry", "_game_load_frame_bucket",
+                    "_server_error_restarts", "_game_launch_at"):
+            settings.pop(key, None)
+        settings.update({"_verify_only": False, "_transition_retry_count": count,
+                         "_transition_retry_at": float(now) + delay,
+                         "_transition_restart_game": bool(restart_game)})
+        task["timeout_seconds"] = ACCOUNT_SWITCH_TIMEOUT_SECONDS
+        self.account_switch_task = task
+        self.routine_only_task_id = "__account_switch__"
+        self.current_routine_task_id = None
+        self.current_routine_index = int(settings.get("_return_routine_index", self.current_routine_index))
+        self.routine_pass_completed = bool(settings.get("_return_pass_completed", self.routine_pass_completed))
+        self.account_switch_selected_at = 0.0
+        self.account_switch_confirmed = False
+        self.account_switch_probe_ready = False
+        self.account_switch_auto_login_attempted = False
+        self.account_switch_error = ""
+        self.account_switch_stop_message = ""
+        self.account_switch_failure_count = max(1, int(getattr(self, "account_switch_failure_count", 0)))
+        self.account_switch_retry_at = float(now) + delay
+        self.routine_completed_steps = set()
+        self.routine_current_had_action = False
+        self.routine_last_action_time = float(now)
+        self.routine_next_run["__account_switch__"] = float(now) + delay
+        self.blocked_coords.clear()
+        self.account_switch_last_result = (
+            f"Вход в {profile.get('name', profile['id'])} не подтверждён: "
+            f"повтор перехода через {int(delay)} сек (попытка {count + 1})"
+        )
+        self.set_status_message(self.account_switch_last_result, force=True)
+        logger.warning("Account transition retry scheduled for profile %s in %.0f seconds (retry %s): %s; queue held",
+                       profile["id"], delay, count, reason)
+        self.save_config()
+        return True
+
+    def _wait_or_restart_account_transition(self, now):
+        task = getattr(self, "account_switch_task", None)
+        if not task or getattr(self, "routine_only_task_id", None) != "__account_switch__":
+            return False
+        settings = task.get("settings", {})
+        retry_at = float(settings.get("_transition_retry_at", 0.0) or 0.0)
+        if not retry_at:
+            return False
+        if now < retry_at or self.stop_event.is_set() or getattr(self, "stop_hotkey_pressed", False):
+            return True
+        if settings.get("_transition_restart_game"):
+            try:
+                self.adb_client.force_stop_package(GAME_PACKAGE)
+                self._interruptible_sleep(2.0)
+                if self.stop_event.is_set() or getattr(self, "stop_hotkey_pressed", False):
+                    return True
+                self.adb_client.launch_package(GAME_PACKAGE)
+                self._invalidate_capture()
+                settings["_game_launch_at"] = time.time()
+                self._interruptible_sleep(8.0)
+            except AdbError:
+                logger.exception("Game restart for account transition failed")
+                self._schedule_account_transition_retry(
+                    task, "Не удалось перезапустить игру", time.time(),
+                )
+                return True
+            if self.stop_event.is_set() or getattr(self, "stop_hotkey_pressed", False):
+                return True
+        settings.pop("_transition_retry_at", None)
+        settings.pop("_transition_restart_game", None)
+        self.account_switch_retry_at = 0.0
+        self.routine_next_run["__account_switch__"] = 0.0
+        self.current_routine_task_id = None
+        self.save_config()
+        logger.info("Restarting account transition to the same profile %s; fresh identity verification required",
+                    settings.get("target_account_id"))
+        return False
+
     def _finish_current_routine(self, now=None, completion_clicked=False):
         now = time.time() if now is None else float(now)
         task = self.get_routine_task(self.current_routine_task_id)
@@ -5628,11 +6251,39 @@ class AutoClicker:
             self.current_routine_task_id = None
             return
 
+        if self._recover_interrupted_routine_foreground(task):
+            return
+
         if task.get("id") == "__account_switch__":
-            target_account_id = task.get("settings", {}).get("target_account_id")
-            probe_only = bool(task.get("settings", {}).get("probe_only", False))
+            switch_settings = task.get("settings", {})
+            target_account_id = switch_settings.get("target_account_id")
+            resume_current_pass = bool(switch_settings.get("_resume_current_pass"))
+            probe_only = bool(switch_settings.get("probe_only", False))
             switch_error = self.account_switch_error
-            switch_confirmed = self.account_switch_confirmed
+            switch_confirmed = False
+            if not switch_error and not probe_only:
+                try:
+                    switch_confirmed = bool(
+                        self.account_switch_confirmed
+                        and self._account_switch_main_screen_confirmed(task)
+                    )
+                except Exception:
+                    logger.exception("Final account identity verification failed")
+                if not target_account_id or not switch_confirmed:
+                    switch_error = "Переключение не подтверждено: игровой ID целевого аккаунта не проверен"
+                else:
+                    target_profile = find_account(self.account_profiles, target_account_id)
+                    verified_igg_id = str(switch_settings.get("_verified_igg_id") or "")
+                    if resume_current_pass and target_account_id != self.current_account_id:
+                        switch_error = "Переключение не подтверждено: выбранный профиль изменён во время проверки"
+                    elif target_profile is None:
+                        switch_error = "Переключение не подтверждено: целевой профиль больше не доступен"
+                    elif not re.fullmatch(r"[0-9]{6,20}", verified_igg_id):
+                        switch_error = "Переключение не подтверждено: игровой ID целевого аккаунта не проверен"
+                    else:
+                        target_profile["verified_igg_id"] = verified_igg_id
+            if switch_error and self._schedule_account_transition_retry(task, switch_error, now):
+                return
             self.current_routine_task_id = None
             self.routine_current_had_action = False
             self.account_switch_task = None
@@ -5642,47 +6293,114 @@ class AutoClicker:
             self.account_switch_probe_ready = False
             self.account_switch_auto_login_attempted = False
             self.routine_only_task_id = None
-            switch_failed = False
-            if switch_error:
-                self.account_switch_failure_count = max(
-                    1,
-                    int(getattr(self, "account_switch_failure_count", 0) or 0),
-                )
-                switch_failed = True
-                self.account_switch_last_result = switch_error
-                self.set_status_message(switch_error, force=True)
-            elif probe_only:
+            if not switch_error and probe_only:
                 count = len(self.account_switch_candidates)
                 self.account_switch_last_result = f"Найдено аккаунтов Google: {count}"
                 self.set_status_message(self.account_switch_last_result, force=True)
-            elif target_account_id and switch_confirmed:
-                self.select_account_profile(
-                    target_account_id,
-                    start_fresh_pass=True,
-                )
+            elif not switch_error and resume_current_pass:
+                # Verification is a barrier inside this pass, never a profile
+                # selection that reapplies its older timers or restarts VIP.
+                self.current_routine_index = int(switch_settings["_return_routine_index"])
+                self.routine_pass_completed = bool(switch_settings["_return_pass_completed"])
+                forced_context = switch_settings.get("_return_forced_context", {})
+                self.routine_forced_task_queue = list(forced_context.get("queue", []))
+                self.routine_forced_task_active_id = forced_context.get("active_id")
+                self.routine_forced_task_return_index = forced_context.get("return_index")
+                self.account_switch_failure_count = 0
+                self.account_switch_retry_at = 0.0
+                self.routine_next_run.pop("__account_switch__", None)
+                self.routine_completed_steps = set()
+                self._disable_completed_game_login()
+                self.routine_only_task_id = switch_settings.get("_return_only_task_id") or None
+                login_task = self.get_routine_task("game_login")
+                if login_task:
+                    login_task.setdefault("settings", {}).pop("_foreground_resume_only_task_id", None)
+                    login_task["settings"].pop("_foreground_return_forced_context", None)
+                profile = find_account(self.account_profiles, target_account_id)
+                self.account_switch_last_result = f"Аккаунт проверен: {profile.get('name')}"
+                self.set_status_message(self.account_switch_last_result, force=True)
+                self.save_config()
+            elif not switch_error and self.select_account_profile(
+                target_account_id,
+                start_fresh_pass=True,
+            ):
+                self._disable_completed_game_login()
+                self.save_config()
                 profile = find_account(self.account_profiles, target_account_id)
                 self.account_switch_last_result = (
                     f"Аккаунт переключён: {profile.get('name')}" if profile else "Аккаунт переключён"
                 )
                 self.set_status_message(self.account_switch_last_result, force=True)
             else:
+                if not switch_error:
+                    switch_error = "Переключение не подтверждено: целевой профиль больше не доступен"
+                elif not str(switch_error).startswith("Переключение не подтверждено:"):
+                    switch_error = f"Переключение не подтверждено: {switch_error}"
+                self.account_switch_error = switch_error
+                self.account_switch_confirmed = False
                 self.account_switch_failure_count = max(
                     1,
                     int(getattr(self, "account_switch_failure_count", 0) or 0),
                 )
-                switch_failed = True
-                self.account_switch_last_result = "Переключение не подтверждено главным экраном"
-                self.set_status_message(self.account_switch_last_result, force=True)
-            if switch_failed:
-                self.account_switch_retry_at = now + ACCOUNT_SWITCH_RETRY_SECONDS
-                logger.warning(
-                    "Account switch failed; automatic retry scheduled in %.0f seconds",
-                    ACCOUNT_SWITCH_RETRY_SECONDS,
+                self.account_switch_retry_at = 0.0
+                self.current_routine_index = int(
+                    switch_settings.get(
+                        "_return_routine_index",
+                        getattr(self, "current_routine_index", 0),
+                    ) or 0
                 )
-                self.save_config()
-            if not self.account_rotation_enabled:
+                self.routine_pass_completed = bool(
+                    switch_settings.get(
+                        "_return_pass_completed",
+                        getattr(self, "routine_pass_completed", False),
+                    )
+                )
+                if resume_current_pass:
+                    forced_context = switch_settings.get("_return_forced_context", {})
+                    self.routine_forced_task_queue = list(forced_context.get("queue", []))
+                    self.routine_forced_task_active_id = forced_context.get("active_id")
+                    self.routine_forced_task_return_index = forced_context.get("return_index")
+                self.account_switch_last_result = switch_error
+                self.account_switch_stop_message = switch_error
+                self.set_status_message(self.account_switch_last_result, force=True)
                 self.routine_mode = False
                 self.stop_event.set()
+                logger.warning("Account switch not verified; queue stopped at its saved position")
+                self.save_config()
+            if (
+                not self.account_rotation_enabled and not resume_current_pass
+            ) or switch_settings.get("_stop_after_verification", False):
+                self.routine_mode = False
+                self.stop_event.set()
+                self.account_switch_stop_message = self.account_switch_last_result
+            return
+
+        if task.get("id") == "game_login":
+            # A visible settlement proves launch, not which account loaded.
+            # Preserve a forced recovery's interrupted slot before replacing
+            # game_login with the identity barrier.
+            return_index = int(getattr(self, "current_routine_index", 0) or 0)
+            pass_completed = bool(getattr(self, "routine_pass_completed", False))
+            forced_return = getattr(self, "routine_forced_task_return_index", None)
+            if (
+                getattr(self, "routine_forced_task_active_id", None) == "game_login"
+                and forced_return is not None
+            ):
+                return_index = int(forced_return)
+            elif self.routine_tasks:
+                return_index += 1
+                if return_index >= len(self.routine_tasks):
+                    return_index = 0
+                    pass_completed = True
+            if self._prepare_current_account_verification(
+                return_index,
+                pass_completed=pass_completed,
+                after_login=True,
+                stop_after=self.routine_only_task_id == "game_login",
+            ) and self.account_switch_task is not None:
+                self.account_switch_task["settings"]["_return_only_task_id"] = (
+                    task.get("settings", {}).get("_foreground_resume_only_task_id")
+                )
             return
 
         completion_uid = task.get("completion_uid") or ""
@@ -5700,6 +6418,7 @@ class AutoClicker:
         if should_count_march:
             self.routine_deployment_blocked_until = 0.0
             self._register_routine_march(task, now)
+            self._remember_hunt_dispatch(task)
 
         if should_count_march and task.get("id") in {
             "food",
@@ -5983,7 +6702,9 @@ class AutoClicker:
         return True
 
     def _confirm_pending_radar_marker(self):
-        self.routine_radar_in_progress_seen = True
+        # Remember a handled/skipped card separately from an active squad.
+        # Unsupported cards also reach this helper after bounded retries;
+        # only a confirmed dispatch or running countdown may hold the queue.
         marker_key = self.routine_radar_pending_marker_key
         if marker_key is None:
             return
@@ -6011,6 +6732,8 @@ class AutoClicker:
         return is_valid
 
     def _tap_radar_fallback(self, target, label, runtime_step, marker=False):
+        if getattr(self, "routine_radar_dispatch_candidate", None):
+            return False
         target_x, target_y = map(int, target)
         coord_key = (
             "radar_dynamic" if marker else f"radar_dynamic_{runtime_step}",
@@ -6053,8 +6776,145 @@ class AutoClicker:
         self._interruptible_sleep(1.0)
         return True
 
+    def _confirm_radar_squad_dispatch(self):
+        """Stage a March attempt; a world transition alone is not success."""
+        if getattr(self, "routine_radar_dispatch_candidate", None):
+            return False
+        # Lock the attempt even if the first post-click frame is unreadable.
+        # Reconciliation must precede another March click.
+        self.routine_radar_dispatch_candidate = {
+            "account_id": getattr(self, "current_account_id", None),
+            "marker": getattr(self, "routine_radar_pending_marker_key", None),
+            "identity": getattr(self, "routine_radar_card_identity", None),
+            "started_at": time.time(), "opened": False, "attempts": 0,
+        }
+        stable_frames = 0
+        for _attempt in range(12):
+            self._check_worker_interrupted()
+            frame, _origin = self._capture_screen_bgr(force=True)
+            confirmed = (
+                detect_radar_squad_march_target(frame) is None
+                and detect_radar_deployment_prompt_target(frame) is None
+                and not radar_task_card_is_visible(frame)
+                and self._world_map_visible_in_frame(frame)
+            )
+            stable_frames = stable_frames + 1 if confirmed else 0
+            if stable_frames >= 2:
+                logger.info("Radar March changed the screen; awaiting this card's in-progress status")
+                return True
+            self._interruptible_sleep(0.5)
+        self._save_routine_calibration_frame("radar_marches", "dispatch_unconfirmed", frame)
+        self.set_status_message("Радар: отправка отряда ещё не подтверждена", force=True)
+        return False
+
+    def _try_confirm_pending_radar_dispatch(self, task):
+        candidate = getattr(self, "routine_radar_dispatch_candidate", None)
+        if not candidate or task.get("id") != "radar_marches":
+            return False
+        account_id = getattr(self, "current_account_id", None)
+        if candidate.get("account_id", account_id) != account_id:
+            self.routine_radar_dispatch_candidate = None
+            self.routine_radar_card_identity = None
+            return False
+        self._check_worker_interrupted()
+        frame, origin = self._capture_screen_bgr(force=True)
+        self._check_worker_interrupted()
+        marker = candidate.get("marker")
+        identity = candidate.get("identity")
+        expired = time.time() - float(candidate["started_at"]) >= 45.0
+        if expired or marker is None or identity is None:
+            self._save_routine_calibration_frame("radar_marches", "dispatch_unconfirmed", frame)
+            self.routine_radar_dispatch_candidate = None
+            self.routine_radar_card_identity = None
+            self._defer_current_routine_unavailable(
+                "отправка отряда не подтверждена статусом его карточки", retry_delay=60.0,
+            )
+            return True
+        if radar_task_card_is_visible(frame):
+            current_identity = cv2.resize(frame, (1280, 720))[160:335, 70:420]
+            same_card = float(cv2.matchTemplate(current_identity, identity, cv2.TM_CCOEFF_NORMED).max()) >= 0.90
+            if same_card and radar_card_has_active_countdown(frame):
+                self.routine_radar_pending_marker_key = marker
+                self.routine_radar_dispatch_candidate = None
+                self.routine_radar_card_identity = None
+                self.routine_radar_dispatched_this_pass = True
+                self.routine_radar_in_progress_seen = True
+                self._confirm_pending_radar_marker()
+                counts = getattr(self, "routine_action_counts", {})
+                counts["radar_dispatches"] = int(counts.get("radar_dispatches", 0)) + 1
+                self.routine_action_counts = counts
+                self.set_status_message(
+                    f"Радар: отправлено отрядов {counts['radar_dispatches']}; статус «В процессе» подтверждён", force=True,
+                )
+                logger.info("Radar dispatch confirmed by matching card identity and explicit in-progress timer")
+                self._return_to_main_screen(max_back_steps=6, require_settlement=True)
+                reset_radar_card_runtime_steps(self.routine_completed_steps)
+                self.routine_last_action_time = time.time()
+                self.routine_idle_confirmation_count = 0
+                self.save_config()
+                return True
+            # The original card may not have updated yet. Never press its
+            # action or March again while the first attempt is unresolved.
+            self._check_worker_interrupted()
+            if self.uses_adb:
+                self.adb_client.keyevent(4)
+            else:
+                pyautogui.press("escape")
+            self._invalidate_capture()
+            candidate["opened"] = False
+            self._interruptible_sleep(1.0)
+            return True
+        if radar_overview_is_visible(frame):
+            if candidate.get("opened") and time.time() - float(candidate.get("open_requested_at", 0.0)) < 2.5:
+                self._interruptible_sleep(0.5)
+                return True
+            if int(candidate["attempts"]) >= 2:
+                candidate["started_at"] = time.time() - 45.0
+                return True
+            target_x, target_y = int(marker[1]), int(marker[2])
+            self._check_worker_interrupted()
+            if self.uses_adb:
+                self.adb_client.tap(target_x, target_y)
+            else:
+                pyautogui.click(origin[0] + target_x, origin[1] + target_y)
+            candidate["attempts"] += 1
+            candidate["opened"] = True
+            candidate["open_requested_at"] = time.time()
+            self._invalidate_capture()
+            self._interruptible_sleep(1.0)
+            return True
+        if self._return_to_main_screen(max_back_steps=6, require_settlement=True):
+            home, home_origin = self._capture_screen_bgr(force=True)
+            target_x, target_y = round(110 * home.shape[1] / 1280), round(448 * home.shape[0] / 720)
+            self._check_worker_interrupted()
+            if self.uses_adb:
+                self.adb_client.tap(target_x, target_y)
+            else:
+                pyautogui.click(home_origin[0] + target_x, home_origin[1] + target_y)
+            self._invalidate_capture()
+        self._interruptible_sleep(1.0)
+        return True
+
+    def _try_radar_pending_card_fallback(self, task):
+        """Keep an opened card or squad flow ahead of other marker templates."""
+        if self._try_confirm_pending_radar_dispatch(task):
+            return True
+        if not is_radar_task_id(task.get("id")) or not task.get("settings", {}).get("visual_fallback", False):
+            return False
+        frame, _origin = self._capture_screen_bgr(force=True)
+        steps = getattr(self, "routine_completed_steps", set())
+        if (
+            ("radar_marker" in steps and radar_task_card_is_visible(frame))
+            or ("radar_forward" in steps and detect_radar_deployment_prompt_target(frame) is not None)
+            or ("radar_action" in steps and detect_radar_squad_march_target(frame) is not None)
+        ):
+            return self._try_radar_visual_fallback(task)
+        return False
+
     def _try_radar_in_progress_card_fallback(self, task):
         """Close a running radar card before any task template can reuse it."""
+        if getattr(self, "routine_radar_dispatch_candidate", None):
+            return False
         # Rewards cards may legitimately contain time-like text while their
         # claim action is available. Let the reward templates inspect those
         # cards; this guard is only for task categories that must skip an
@@ -6100,6 +6960,8 @@ class AutoClicker:
         return True
 
     def _try_radar_visual_fallback(self, task):
+        if self._try_confirm_pending_radar_dispatch(task):
+            return True
         if (
             not is_radar_task_id(task.get("id"))
             or not task.get("settings", {}).get("visual_fallback", False)
@@ -6152,7 +7014,12 @@ class AutoClicker:
         radar_guard_visible = (
             self._template_uid_is_visible(radar_guard_uid)
             or radar_overview_is_visible(frame)
-        )
+        ) and not radar_task_card_is_visible(frame)
+        if radar_guard_visible and "radar_complete_all_requested" not in self.routine_completed_steps:
+            auto_target = detect_radar_complete_all_target(frame)
+            if auto_target and self._tap_radar_fallback(auto_target, "запускаю доступное выполнение всех заданий", "radar_complete_all_requested"):
+                self.routine_completed_steps.add("radar_complete_all_requested")
+                return True
         deployment_target = detect_radar_deployment_prompt_target(frame)
         if deployment_target is not None:
             task_id = str(task.get("id") or "")
@@ -6192,10 +7059,8 @@ class AutoClicker:
             and str(task.get("id") or "") == "radar_marches"
             and "radar_action" in self.routine_completed_steps
         ):
-            # Reaching the populated squad panel proves that the create-squad
-            # transition completed even when its short-lived template was not
-            # visible.  Do not count the dispatch until the March panel itself
-            # disappears after the click.
+            # The panel proves squad selection. Only the same card's running
+            # status can prove the subsequent dispatch.
             self.routine_completed_steps.add("radar_squad")
             if self._tap_radar_fallback(
                 squad_march_target,
@@ -6203,43 +7068,12 @@ class AutoClicker:
                 "radar_march",
             ):
                 try:
-                    after, _after_origin = self._capture_screen_bgr(force=True)
+                    self._confirm_radar_squad_dispatch()
                 except Exception:
                     logger.exception("Radar march confirmation could not capture the screen")
                     self.routine_completed_steps.discard("radar_march")
                     return True
-                if (
-                    detect_radar_squad_march_target(after) is not None
-                    or not self._world_map_visible_in_frame(after)
-                ):
-                    self.routine_completed_steps.discard("radar_march")
-                    logger.warning(
-                        "Radar March button did not produce a confirmed world-map transition"
-                    )
-                    return True
-                self.routine_completed_steps.update({"radar_squad", "radar_march"})
-                self.routine_radar_dispatched_this_pass = True
-                self.routine_radar_in_progress_seen = True
-                self._confirm_pending_radar_marker()
-                action_counts = getattr(self, "routine_action_counts", None)
-                if not isinstance(action_counts, dict):
-                    action_counts = {}
-                    self.routine_action_counts = action_counts
-                dispatches = int(action_counts.get("radar_dispatches", 0) or 0) + 1
-                action_counts["radar_dispatches"] = dispatches
-                self.set_status_message(
-                    f"Радар: отправлено отрядов {dispatches}; ищу следующий свободный поход",
-                    force=True,
-                )
-                logger.info(
-                    "Radar squad dispatch %s confirmed; continuing until every march slot is full",
-                    dispatches,
-                )
-                self._return_to_main_screen(max_back_steps=6, require_settlement=True)
-                reset_radar_card_runtime_steps(self.routine_completed_steps)
-                self.routine_last_action_time = time.time()
-                self.routine_idle_confirmation_count = 0
-                self.save_config()
+                self.routine_completed_steps.discard("radar_march")
                 return True
 
         card_target = detect_radar_card_action_target(frame)
@@ -6275,7 +7109,7 @@ class AutoClicker:
             not radar_guard_visible
             and self.routine_completed_steps.issubset({"radar_open"})
             and self._is_settlement_screen_visible()
-            and self._is_main_screen_visible()
+            and (self._is_main_screen_visible() or settlement_region_button_is_visible(frame))
         ):
             height, width = frame.shape[:2]
             open_target = (
@@ -6291,22 +7125,20 @@ class AutoClicker:
 
         if task.get("id") == "radar_rewards":
             card_target = None
-        if (
-            card_target
-            and "radar_marker" in self.routine_completed_steps
-            and self._tap_radar_fallback(
+        if card_target and "radar_marker" in self.routine_completed_steps:
+            self.routine_radar_card_identity = cv2.resize(frame, (1280, 720))[160:335, 70:420].copy()
+            if self._tap_radar_fallback(
                 card_target,
                 "нажата доступная кнопка карточки",
                 "radar_forward",
-            )
-        ):
-            return True
+            ):
+                return True
 
         if radar_guard_visible:
-            for marker_target in detect_radar_notification_targets(frame):
+            for marker_target in detect_radar_notification_targets(frame) + detect_radar_task_pin_targets(frame):
                 if self._tap_radar_fallback(
                     marker_target,
-                    "выбрано новое задание по красной метке",
+                    "выбрано доступное задание на карте",
                     "radar_marker",
                     marker=True,
                 ):
@@ -6582,12 +7414,14 @@ class AutoClicker:
         self._interruptible_sleep(2.0)
         return True
 
-    def _try_account_switch_connection_recovery(self, task):
+    def _try_account_switch_connection_recovery(self, task, frame_bgr=None):
         """Dismiss an interrupted-session dialog and restart account navigation."""
         if task.get("id") != "__account_switch__":
             return False
         try:
-            frame, _origin = self._capture_screen_bgr(force=True)
+            frame = frame_bgr
+            if frame is None:
+                frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("Account switch recovery could not capture the screen")
             return False
@@ -6631,13 +7465,44 @@ class AutoClicker:
     def _try_account_switch_igg_game_confirmation(self, task, frame_bgr=None):
         if task.get("id") != "__account_switch__":
             return False
+        verify_only = bool(task.get("settings", {}).get("_verify_only"))
         try:
             frame = frame_bgr
             if frame is None:
                 frame, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("IGG game confirmation could not capture the screen")
+            if verify_only:
+                self._interruptible_sleep(0.5)
+                return True
             return False
+
+        if verify_only:
+            # This gate belongs to the current profile: first inspect its
+            # actual game ID without opening any account-selection controls.
+            # Own every frame so generic navigation cannot close the ID panel
+            # or start an unrelated login between the two independent reads.
+            if self._try_account_switch_connection_recovery(task, frame_bgr=frame):
+                if getattr(self, "account_switch_task", None) is not None and not self.account_switch_error:
+                    # Recovery can reload a different account. Discard even
+                    # the first ID reading and require two new captures.
+                    for key in ("_verified_igg_id", "_identity_candidate",
+                                "_identity_check_started", "_identity_check_started_at"):
+                        task["settings"].pop(key, None)
+                    self.routine_completed_steps.discard("account_switch_igg_loaded_id_verified")
+                    self.account_switch_confirmed = False
+                    self.account_switch_selected_at = time.time()
+                return True
+            if self._try_account_switch_verify_identity(task, frame):
+                return True
+            if self._account_switch_main_screen_confirmed(task):
+                self.account_switch_confirmed = True
+                self._finish_current_routine(time.time())
+                return True
+            if not self._is_game_home_visible():
+                self._try_game_login_visual_fallback({"id": "game_login"})
+            self._interruptible_sleep(0.5)
+            return True
 
         target = detect_igg_game_login_ok_target(frame)
         if (
@@ -6655,6 +7520,28 @@ class AutoClicker:
             }.issubset(self.routine_completed_steps)
         )
         if target is None and login_progressed:
+            if self._account_switch_main_screen_confirmed(task):
+                self.account_switch_confirmed = True
+                self._finish_current_routine(time.time())
+                return True
+            if self._wait_for_account_switch_game_load(task, frame):
+                return True
+            if (
+                task.get("settings", {}).get("login_method") == "igg"
+                and "account_switch_igg_id_selected" in self.routine_completed_steps
+                and "account_switch_igg_game_confirmed" not in self.routine_completed_steps
+                and time.time() - self.account_switch_selected_at
+                < ACCOUNT_SWITCH_IGG_CONFIRMATION_GRACE_SECONDS
+            ):
+                # The SDK can expose the previous settlement while the final
+                # game prompt is still pending. Identity navigation must honor
+                # the same grace as return-to-home recovery, without opening
+                # panels over a late confirmation. A detected prompt above is
+                # still handled immediately; this never establishes identity.
+                self._interruptible_sleep(0.5)
+                return True
+            if self._try_account_switch_verify_identity(task, frame):
+                return True
             if self._is_game_home_visible():
                 return False
             if self._try_equipment_report_overlay(frame, "account_switch_post_login"):
@@ -6692,20 +7579,229 @@ class AutoClicker:
         self.routine_completed_steps.add("account_switch_igg_id_selected")
         self.routine_completed_steps.add("account_switch_igg_game_confirmed")
         self.account_switch_selected_at = time.time()
-        logger.info("Final IGG game login confirmation accepted at %s", target)
+        logger.info("Final IGG game login confirmation requested at %s; awaiting game load and ID verification", target)
         self._interruptible_sleep(8.0)
         return True
 
     def _account_switch_main_screen_confirmed(self, task):
-        if not self.account_switch_selected_at or not self._is_game_home_visible():
+        if (
+            not self.account_switch_selected_at
+            or getattr(self, "account_switch_error", "")
+            or not self._is_game_home_visible()
+        ):
             return False
         settings = task.get("settings", {})
-        if settings.get("login_method") == "igg":
-            # The WebView authenticates the IGG account first; the game then
-            # asks separately whether to load its ID. Returning to the old
-            # settlement before that final OK is not a completed switch.
-            return "account_switch_igg_game_confirmed" in self.routine_completed_steps
+        expected = str(settings.get("_expected_igg_id") or "")
+        # A chooser row, a submitted login, or an arbitrary settlement cannot
+        # prove which game account was loaded. Only this attempt's fresh
+        # account-panel readings followed by a confirmed home return can.
+        return bool(
+            re.fullmatch(r"[0-9]{6,20}", expected)
+            and settings.get("_verified_igg_id") == expected
+            and "account_switch_igg_loaded_id_verified" in self.routine_completed_steps
+        )
+
+    def _wait_for_account_switch_game_load(self, task, frame):
+        """Keep navigation away from the previous account during game loading."""
+        settings = task.get("settings", {})
+        if (task.get("id") != "__account_switch__"
+                or settings.get("_verify_only")
+                or settings.get("login_method") != "igg"
+                or "account_switch_igg_game_confirmed" not in self.routine_completed_steps
+                or not self.account_switch_selected_at):
+            return False
+        elapsed = time.time() - self.account_switch_selected_at
+        if "account_switch_game_load_observed" in self.routine_completed_steps:
+            return False
+        # The offline-resource report appears after loading the settlement.
+        # Recognise both its label and button before dismissing it; an old
+        # home frame alone is not evidence that loading has finished.
+        if elapsed >= 12.0:
+            target = detect_offline_resources_confirm_target(frame)
+            if target is not None:
+                if self._tap_routine_fallback(
+                    target, ("account_switch_offline_resources", *target),
+                    "Игра загружена: закрываю отчёт о ресурсах и проверяю аккаунт",
+                ):
+                    self.routine_completed_steps.add("account_switch_game_load_observed")
+                    logger.info("Post-login resource report confirmed; continuing to fresh account ID verification")
+                return True
+        if elapsed >= ACCOUNT_SWITCH_GAME_LOAD_GRACE_SECONDS:
+            return False
+        bucket = max(0, int(elapsed // 15))
+        if settings.get("_game_load_frame_bucket") != bucket:
+            settings["_game_load_frame_bucket"] = bucket
+            if frame is not None:
+                self._save_routine_calibration_frame(
+                    "__account_switch__", f"game_load_after_ok_{bucket * 15:02d}", frame
+                )
+            logger.info("Waiting for IGG game load after confirmation (%s/%s seconds); identity navigation held",
+                        int(elapsed), int(ACCOUNT_SWITCH_GAME_LOAD_GRACE_SECONDS))
+        self._interruptible_sleep(0.5)
         return True
+
+    def _try_account_switch_verify_identity(self, task, frame):
+        settings = task.get("settings", {})
+        now = time.time()
+        if (
+            task.get("id") != "__account_switch__"
+            or getattr(self, "account_switch_error", "")
+            or not self.account_switch_selected_at
+            or "account_switch_igg_loaded_id_verified" in self.routine_completed_steps
+            or (
+                settings.get("login_method") == "igg"
+                and not settings.get("_verify_only")
+                and "account_switch_igg_id_selected" not in self.routine_completed_steps
+            )
+            or (not settings.get("_verify_only") and now - self.account_switch_selected_at < 12.0)
+        ):
+            return False
+        if self._wait_for_account_switch_game_load(task, frame):
+            return True
+        expected = str(settings.get("_expected_igg_id") or "")
+        if not re.fullmatch(r"[0-9]{6,20}", expected):
+            if not self._is_game_home_visible():
+                return False
+            self.account_switch_error = (
+                "Переключение не подтверждено: неизвестен IGG ID целевого аккаунта"
+            )
+            self.set_status_message(self.account_switch_error, force=True)
+            return True
+        overlay = detect_game_event_overlay_close_target(frame)
+        if overlay is not None:
+            self._tap_routine_fallback(
+                overlay, ("account_switch_identity_overlay", *overlay),
+                "Проверка IGG: закрываю баннер поверх аккаунта",
+            )
+            return True
+        started_at = float(settings.get("_identity_check_started_at", now))
+        if now - started_at >= 45.0:
+            self.account_switch_error = (
+                "Переключение не подтверждено: не удалось прочитать ID аккаунта "
+                "или вернуться на главный экран"
+            )
+            self.set_status_message(self.account_switch_error, force=True)
+            return True
+        if not settings.get("_identity_check_started"):
+            actual = read_game_igg_id(frame)
+            if actual:
+                # Selecting the currently loaded ID can leave the account
+                # panel open without a final OK or an intermediate home view.
+                # This is the first reading, never a shortcut to success.
+                settings["_identity_check_started"] = True
+                settings["_identity_check_started_at"] = now
+                settings["_identity_candidate"] = actual
+                self._invalidate_capture()
+                self._interruptible_sleep(0.5)
+                return True
+            if not self._is_game_home_visible():
+                return False
+            settings["_identity_check_started"] = True
+            settings["_identity_check_started_at"] = now
+            point = (48, 48)
+        else:
+            actual = read_game_igg_id(frame)
+            if actual:
+                # Require consecutive fresh captures, including for mismatch:
+                # one transition frame must not establish or reject identity.
+                if settings.get("_identity_candidate") != actual:
+                    settings["_identity_candidate"] = actual
+                    self._invalidate_capture()
+                    self._interruptible_sleep(0.5)
+                    return True
+                if actual == expected and self._return_to_main_screen(
+                    max_back_steps=8, require_settlement=True
+                ):
+                    settings["_verified_igg_id"] = actual
+                    self.routine_completed_steps.add("account_switch_igg_loaded_id_verified")
+                    settings.pop("_identity_check_started", None)
+                    logger.info("Loaded game account identity verified against the selected IGG ID")
+                    self.set_status_message(
+                        "IGG ID загруженного аккаунта совпал с целевым; вход подтверждён",
+                        force=True,
+                    )
+                elif actual != expected and not settings.get("_identity_retry"):
+                    self._return_to_main_screen(max_back_steps=8, require_settlement=True)
+                    if settings.get("_verify_only"):
+                        profile = find_account(self.account_profiles, settings.get("target_account_id"))
+                        if (
+                            profile is None
+                            or (
+                                settings.get("login_method") == "igg"
+                                and (
+                                    not profile.get("auto_login", False)
+                                    or not self.account_has_saved_login(profile["id"])
+                                    or not self.account_has_saved_password(profile["id"])
+                                )
+                            )
+                        ):
+                            self.account_switch_error = (
+                                "Переключение не подтверждено: открыт другой IGG ID, "
+                                "для входа в выбранный профиль нужны сохранённые учётные данные"
+                            )
+                            self.set_status_message(self.account_switch_error, force=True)
+                            return True
+                        settings["_verify_only"] = False
+                    settings["_identity_retry"] = True
+                    # A connection recovery can consume most of the original
+                    # slot. Allow this single verified-mismatch retry to finish
+                    # authentication; retain the original start and never renew
+                    # the allowance after a second mismatch.
+                    elapsed = max(0.0, now - float(getattr(self, "routine_task_started_at", now)))
+                    task["timeout_seconds"] = max(
+                        float(task.get("timeout_seconds", ACCOUNT_SWITCH_TIMEOUT_SECONDS)),
+                        elapsed + ACCOUNT_SWITCH_IDENTITY_RETRY_SECONDS
+                        + (ACCOUNT_SWITCH_GAME_LOAD_GRACE_SECONDS
+                           if settings.get("login_method") == "igg" else 0.0),
+                    )
+                    for key in ("_verified_igg_id", "_identity_candidate",
+                                "_identity_check_started", "_identity_check_started_at",
+                                "_game_load_frame_bucket"):
+                        settings.pop(key, None)
+                    self.account_switch_selected_at = 0.0
+                    self.account_switch_auto_login_attempted = False
+                    self.routine_completed_steps.clear()
+                    logger.warning("Game retained the previous IGG ID; retrying the transition once")
+                    self.set_status_message(
+                        "Открылся другой IGG ID: повторяю вход один раз", force=True
+                    )
+                elif actual != expected:
+                    self.account_switch_error = (
+                        "Переключение не подтверждено: после повторного входа открыт другой IGG ID"
+                    )
+                    self.set_status_message(self.account_switch_error, force=True)
+                return True
+            settings.pop("_identity_candidate", None)
+            if detect_account_details_close_target(frame) is not None:
+                point = (640, 618)
+            elif detect_settings_close_target(frame) is not None:
+                point = (288, 371)
+            elif detect_commander_profile_back_target(frame) is not None:
+                point = (180, 645)
+            elif self._is_game_home_visible():
+                point = (48, 48)
+            else:
+                # Own this short verification flow while panels animate.
+                # Generic return-to-home recovery would otherwise close the
+                # account page before a second independent reading.
+                self._interruptible_sleep(0.5)
+                return True
+        target = (round(point[0] * frame.shape[1] / 1280), round(point[1] * frame.shape[0] / 720))
+        if not self._tap_routine_fallback(
+            target, ("account_switch_identity", *target),
+            "Проверяю IGG ID загруженного аккаунта",
+        ):
+            self._interruptible_sleep(0.5)
+        return True
+
+    def _account_switch_ui_xml(self, task):
+        """Share one SDK inspection until an action or the next worker tick."""
+        cached = getattr(self, "_account_switch_ui_cache", None)
+        if cached is not None and cached[0] is task:
+            return cached[1]
+        xml = self.adb_client.ui_xml()
+        self._account_switch_ui_cache = (task, xml)
+        return xml
 
     def _try_account_switch_igg_rejected_login(self, task):
         if (
@@ -6716,7 +7812,7 @@ class AutoClicker:
         ):
             return False
         try:
-            target = extract_igg_unregistered_cancel_target(self.adb_client.ui_xml())
+            target = extract_igg_unregistered_cancel_target(self._account_switch_ui_xml(task))
         except AdbError:
             return False
         if target is None:
@@ -6839,6 +7935,15 @@ class AutoClicker:
                     logger.exception(
                         "Account switch title-screen IGG recovery failed"
                     )
+        commander_settings = detect_commander_settings_target(frame)
+        if commander_settings is not None:
+            if self._tap_routine_fallback(
+                commander_settings, ("account_switch_commander_settings",),
+                "Переключение аккаунта: открываю настройки профиля",
+            ):
+                self.routine_completed_steps.add("account_switch_navigation_started")
+                return True
+            return False
         main_screen_visible = self._is_main_screen_visible()
         settlement_visible = (
             self._is_settlement_screen_visible()
@@ -6881,6 +7986,10 @@ class AutoClicker:
             "Переключение аккаунта: открываю профиль командира",
         ):
             return False
+        # This is the first navigation action just as a template-driven tap is.
+        # Without it, one missing settings match makes the next fallback press
+        # Back on the profile it has just opened, repeating until the deadline.
+        self.routine_completed_steps.add("account_switch_navigation_started")
         logger.info("Account switch fallback opened commander profile at %s", target)
         self._interruptible_sleep(1.0)
         return True
@@ -7018,7 +8127,7 @@ class AutoClicker:
             # here can disturb the handoff on LDPlayer.
             return False
         try:
-            ui_xml = self.adb_client.ui_xml()
+            ui_xml = self._account_switch_ui_xml(task)
         except AdbError:
             return False
         if not requires_manual_google_verification(ui_xml):
@@ -7047,7 +8156,7 @@ class AutoClicker:
         try:
             if self.adb_client.current_foreground_package() != GAME_PACKAGE:
                 return False
-            form = extract_igg_login_form(self.adb_client.ui_xml())
+            form = extract_igg_login_form(self._account_switch_ui_xml(task))
         except AdbError:
             return False
         if not form:
@@ -7134,13 +8243,29 @@ class AutoClicker:
         ):
             return False
         chooser_index = min(20, max(1, int(settings.get("chooser_index", 1))))
+        profile = find_account(
+            self.account_profiles, str(settings.get("target_account_id") or "")
+        ) or {}
+        bound_id = str(profile.get("verified_igg_id") or "")
         try:
-            targets = extract_igg_id_targets(self.adb_client.ui_xml())
+            chooser_xml = self._account_switch_ui_xml(task)
+            targets = extract_igg_id_targets(chooser_xml)
         except AdbError:
+            chooser_xml = ""
             targets = []
 
         if targets:
             available_count = len(targets)
+            if bound_id:
+                matching_rows = [i for i, row in enumerate(targets, 1) if row.get("igg_id") == bound_id]
+                if len(matching_rows) != 1:
+                    self.account_switch_error = (
+                        "Список IGG не соответствует сохранённому ID профиля: "
+                        "нужный номер отсутствует или неоднозначен; вход остановлен"
+                    )
+                    self.set_status_message(self.account_switch_error, force=True)
+                    return True
+                chooser_index = matching_rows[0]
             target = targets[chooser_index - 1]["center"] if chooser_index <= available_count else None
         else:
             try:
@@ -7151,6 +8276,15 @@ class AutoClicker:
             visual_target = detect_igg_id_selection_target(frame)
             available_count = 1 if visual_target else 0
             target = visual_target if chooser_index == 1 else None
+            if visual_target and bound_id:
+                first_id = read_sdk_igg_id(frame)
+                if first_id:
+                    self._interruptible_sleep(.25)
+                    fresh, _origin = self._capture_screen_bgr(force=True)
+                    if read_sdk_igg_id(fresh) == first_id:
+                        targets = [{"igg_id": first_id, "center": visual_target}]
+                        chooser_index = 1
+                        target = visual_target
 
         if not available_count:
             return False
@@ -7161,14 +8295,41 @@ class AutoClicker:
             self.set_status_message(self.account_switch_error, force=True)
             return False
 
+        # Use the exact visible row that will be clicked, not XML traversal
+        # order. A verified profile binding must never silently change.
+        expected_id = targets[chooser_index - 1].get("igg_id") if targets else None
+        if bound_id and expected_id and bound_id != expected_id:
+            self.account_switch_error = (
+                "Выбранная строка IGG не соответствует сохранённому ID профиля; "
+                "переключение остановлено"
+            )
+        elif not expected_id:
+            self.account_switch_error = (
+                "Не удалось прочитать ID выбранной строки IGG; выбор без сверки номера запрещён"
+            )
+        elif not bound_id and "account_switch_igg_login_submitted" not in self.routine_completed_steps:
+            self.account_switch_error = (
+                "IGG ID ещё не привязан к профилю, а вход с его учётными данными не подтверждён"
+            )
+        if self.account_switch_error:
+            self.set_status_message(self.account_switch_error, force=True)
+            return True
+        expected_id = expected_id or bound_id
+        settings["_expected_igg_id"] = expected_id
+        for key in ("_verified_igg_id", "_identity_candidate",
+                    "_identity_check_started", "_identity_check_started_at"):
+            settings.pop(key, None)
+        self.routine_completed_steps.discard("account_switch_igg_loaded_id_verified")
+        self.routine_completed_steps.discard("account_switch_igg_same_id_verified")
         if not self._tap_routine_fallback(
             target,
             ("account_switch_igg_id", chooser_index, *target),
-            f"Выбран сохранённый IGG ID №{chooser_index}; загружаю игру",
+            f"Выбран IGG ID {expected_id}; загружаю и проверяю аккаунт",
         ):
             return False
         self.routine_completed_steps.add("account_switch_igg_id_selected")
         self.account_switch_selected_at = time.time()
+        settings.pop("_game_load_frame_bucket", None)
         logger.info("Saved IGG ID row %s selected at %s", chooser_index, target)
         # Keep this SDK-to-game transition atomic. The final native dialog
         # can appear while the WebView is closing; handing control back to
@@ -7177,12 +8338,23 @@ class AutoClicker:
             if self.stop_event.is_set():
                 break
             frame, _origin = self._capture_screen_bgr(force=True)
+            if _attempt in (0, 6, 23):
+                self._save_routine_calibration_frame(
+                    "__account_switch__", f"igg_transition_{_attempt:02d}", frame
+                )
             if detect_igg_game_login_ok_target(frame) is not None:
                 self._save_routine_calibration_frame(
                     "__account_switch__", "igg_confirmation", frame
                 )
                 if self._try_account_switch_igg_game_confirmation(task, frame_bgr=frame):
                     return True
+            if _attempt == 6 and read_sdk_igg_id(frame) == expected_id:
+                fresh_target = detect_igg_id_selection_target(frame)
+                if fresh_target is not None and self._tap_routine_fallback(
+                    fresh_target, ("account_switch_igg_id_retry", expected_id),
+                    "Строка IGG ещё открыта: повторяю подтверждённый выбор один раз",
+                ):
+                    self.account_switch_selected_at = time.time()
             self._interruptible_sleep(0.5)
         return True
 
@@ -7198,8 +8370,13 @@ class AutoClicker:
         # Selecting its only row may take noticeably longer to reveal the IGG
         # confirmation page.  Returning after the ordinary eight-second grace
         # abandons that page and leaves the switch permanently half-complete.
-        return_grace = 60.0 if login_progressed else 30.0
-        if time.time() - self.account_switch_selected_at < return_grace:
+        return_grace = (ACCOUNT_SWITCH_GAME_LOAD_GRACE_SECONDS if login_progressed
+                        else ACCOUNT_SWITCH_IGG_CONFIRMATION_GRACE_SECONDS)
+        # The post-login resource report already proves the loading phase has
+        # ended. Recover leftover panels now; the two fresh ID reads remain
+        # mandatory before completing the switch.
+        load_observed = "account_switch_game_load_observed" in self.routine_completed_steps
+        if not load_observed and time.time() - self.account_switch_selected_at < return_grace:
             return False
         if self._is_game_home_visible():
             return False
@@ -7232,7 +8409,8 @@ class AutoClicker:
                 "account_switch_profile_closed",
             }
         )
-        self.account_switch_selected_at = time.time()
+        # Closing an overlay is not another login. Keep the original loading
+        # deadline and immediately proceed to the still-required ID check.
         logger.info("Account switch returned to the main screen through Android Back")
         return True
 
@@ -7259,7 +8437,9 @@ class AutoClicker:
         self.routine_idle_confirmation_count = 0
         self.click_count += 1
         self.set_status_message(status_message, force=True)
-        self._interruptible_sleep(1.2)
+        # The SDK's final confirmation can disappear during its closing
+        # animation. Inspect it immediately after choosing the account row.
+        self._interruptible_sleep(0.05 if coord_key[0] == "account_switch_igg_id" else 1.2)
         return True
 
     def _dismiss_truck_arrival_overlay(self):
@@ -7324,6 +8504,11 @@ class AutoClicker:
         if not self._is_settlement_screen_visible():
             return False
 
+        frame, _origin = self._capture_screen_bgr(force=True)
+        target = detect_fence_survivor_target(frame)
+        if target is not None:
+            return self._tap_routine_fallback(target, ("fence_survivor", *target), "Выжившие у забора: собираю награду")
+
         scan_index = int(
             getattr(self, "routine_fence_survivor_scan_index", 0) or 0
         )
@@ -7346,6 +8531,7 @@ class AutoClicker:
             return False
 
         height, width = frame.shape[:2]
+        self._save_routine_calibration_frame("fence_survivors", f"scan_{scan_index:02}", frame)
         swipes = {
             "left": ((980, 420), (360, 420)),
             "right": ((360, 420), (980, 420)),
@@ -7392,32 +8578,61 @@ class AutoClicker:
         task_id = str(task.get("id") or "")
         if task_id not in {"processing_factory", "processing_contest"}:
             return False
-        if "pan_north" not in self.routine_completed_steps:
+        recovery_required = bool(getattr(self, "routine_processing_factory_recovery_required", False))
+        if "pan_north" not in self.routine_completed_steps and not recovery_required:
             return False
         # Once the refinery header has been positively confirmed, navigation
         # is finished.  Re-entering the camera fallback here used to click a
         # stale settlement coordinate while the factory/contest screen was
         # already open, producing a tight loop instead of collecting rewards.
-        if "open_refinery" in self.routine_completed_steps:
+        if "open_refinery" in self.routine_completed_steps and not recovery_required:
             return False
+        # Opening may finish late, or Back may close an overlay onto the factory.
+        # Recover the confirmed screen even after a failed click cleared select_refinery.
+        confirmation_image = next(
+            (image for image in self.search_images
+             if str(image.get("uid") or "") == "152e2db2-317c-53cf-91a1-eb1dca8f3f30"),
+            None,
+        )
+        if confirmation_image is not None:
+            location, bbox, _score = self._locate_image(confirmation_image)
+            if location is not None and bbox is not None:
+                valid, _reason = self._validate_detected_match(confirmation_image, bbox)
+                if valid:
+                    self.routine_completed_steps.update({"pan_north", "select_refinery", "open_refinery"})
+                    self.routine_processing_factory_dynamic_selected_at = 0.0
+                    self.routine_processing_factory_dynamic_target = None
+                    self.routine_processing_factory_radial_attempted = False
+                    self.routine_processing_factory_recovery_required = False
+                    self.routine_current_had_action = True
+                    self.routine_last_action_time = time.time()
+                    logger.info("Processing factory header confirmed; navigation state restored")
+                    return True
+        if recovery_required:
+            if self.stop_event.is_set():
+                return False
+            if not self._return_to_main_screen(max_back_steps=3, require_settlement=True):
+                if not self.stop_event.is_set():
+                    self._defer_current_routine_unavailable(
+                        "завод не открылся и возврат в убежище не подтверждён", time.time(),
+                    )
+                return True
+            self.routine_completed_steps.difference_update({
+                "select_refinery", "open_refinery", "open_slot", "open_contest",
+            })
+            self.routine_processing_factory_dynamic_selected_at = 0.0
+            self.routine_processing_factory_dynamic_target = None
+            self.routine_processing_factory_radial_attempted = False
+            self.routine_processing_factory_recovery_required = False
+            self.routine_processing_factory_force_scan = True
+            self.routine_idle_confirmation_count = 0
+            self.routine_idle_guard_visible = False
+            self.routine_idle_outside_since = 0.0
+            self.routine_last_action_time = time.time()
+            self._invalidate_capture()
+            logger.info("Processing factory recovery confirmed settlement; resuming bounded search")
+            return True
         if "select_refinery" in self.routine_completed_steps:
-            confirmation_image = next(
-                (
-                    image for image in self.search_images
-                    if str(image.get("uid") or "")
-                    == "152e2db2-317c-53cf-91a1-eb1dca8f3f30"
-                ),
-                None,
-            )
-            if confirmation_image is not None:
-                location, bbox, _score = self._locate_image(confirmation_image)
-                if location is not None and bbox is not None:
-                    valid, _reason = self._validate_detected_match(confirmation_image, bbox)
-                    if valid:
-                        self.routine_completed_steps.add("open_refinery")
-                        self.routine_processing_factory_dynamic_selected_at = 0.0
-                        logger.info("Processing factory header confirmed after selection")
-                        return True
             selected_at = float(
                 getattr(
                     self,
@@ -7498,12 +8713,16 @@ class AutoClicker:
             self.routine_processing_factory_dynamic_target = None
             self.routine_processing_factory_radial_attempted = False
             self.routine_processing_factory_force_scan = True
+            self.routine_processing_factory_recovery_required = True
             self._invalidate_capture()
             self.routine_last_action_time = time.time()
             logger.warning(
                 "Dynamic processing factory selection was not confirmed; continuing camera scan"
             )
             self._interruptible_sleep(0.8)
+            return True
+        if not self._is_settlement_screen_visible():
+            self.routine_processing_factory_recovery_required = True
             return True
         if "processing_factory_event_panel_checked" not in self.routine_completed_steps:
             if not self._is_settlement_screen_visible():
@@ -7874,6 +9093,75 @@ class AutoClicker:
         except Exception:
             logger.exception("Truck fallback could not inspect the truck center")
             return False
+        if truck_daily_dispatch_limit_is_visible(frame):
+            self.routine_truck_daily_limit_exhausted = True
+        if "truck_personal_slot_requested" in self.routine_completed_steps:
+            if truck_personal_dispatch_card_is_visible(frame):
+                self.routine_completed_steps.discard("truck_personal_slot_requested")
+                self.routine_completed_steps.add("truck_personal_slot_open")
+                logger.info("Personal truck dispatch card opening confirmed")
+                return True
+            if detect_truck_transporting_close_target(frame) is not None:
+                self.routine_completed_steps.discard("truck_personal_slot_requested")
+            elif getattr(self, "routine_truck_daily_limit_exhausted", False) and truck_express_overview_is_visible(frame):
+                self.routine_completed_steps.discard("truck_personal_slot_requested")
+            elif time.time() - float(getattr(self, "routine_truck_slot_requested_at", 0.0)) < 4.0:
+                self._invalidate_capture()
+                self._interruptible_sleep(0.5)
+                return True
+            else:
+                self.routine_completed_steps.discard("truck_personal_slot_requested")
+                if not truck_express_overview_is_visible(frame):
+                    self._defer_current_routine_unavailable(
+                        "открытие карточки личного грузовика не подтверждено",
+                        time.time(), retry_delay=60.0,
+                    )
+                    return True
+                logger.warning("Personal truck slot did not open; retry is bounded per slot")
+        if ("truck_transporting_close_requested" in self.routine_completed_steps
+                and truck_express_overview_is_visible(frame)):
+            checked = set(getattr(self, "routine_truck_checked_slots", set()))
+            slot = int(getattr(self, "routine_truck_current_slot", -1))
+            if 0 <= slot < 4:
+                checked.add(slot)
+            self.routine_truck_checked_slots = checked
+            self.routine_completed_steps.difference_update({
+                "truck_transporting_close_requested", "truck_personal_slot_open",
+                "truck_detail_check_open", "truck_escort_selection_requested",
+                "truck_saved_formation_requested", "truck_escort_selected",
+                "truck_dispatch_pending_verification", "truck_build_formation",
+                "truck_squad_editor_requested",
+            })
+            self.routine_action_counts.pop("truck_transporting_closes", None)
+            logger.info("In-transit personal truck card closed; overview confirmed, no new dispatch claimed")
+            return True
+        transporting_close = detect_truck_transporting_close_target(frame)
+        if transporting_close is not None:
+            attempts = self.routine_action_counts.get("truck_transporting_closes", 0)
+            if attempts >= 3:
+                self._defer_current_routine_unavailable(
+                    "закрытие карточки грузовика в пути не подтверждено",
+                    time.time(), retry_delay=60.0,
+                )
+                return True
+            if not self._tap_routine_fallback(
+                transporting_close, ("truck_transporting_close", *transporting_close),
+                "Грузовики: уже в пути, закрываю карточку",
+            ):
+                return False
+            self.routine_action_counts["truck_transporting_closes"] = attempts + 1
+            self.routine_completed_steps.add("truck_transporting_close_requested")
+            logger.info("In-transit personal truck close requested (%s/3); awaiting overview", attempts + 1)
+            return True
+        if (truck_express_overview_is_visible(frame)
+                and "truck_personal_slot_open" in self.routine_completed_steps
+                and "truck_dispatch_pending_verification" not in self.routine_completed_steps):
+            self.routine_completed_steps.difference_update({
+                "truck_personal_slot_open", "truck_escort_selection_requested",
+                "truck_saved_formation_requested", "truck_build_formation",
+                "truck_squad_editor_requested", "truck_escort_selected",
+            })
+            logger.info("Truck overview restored before dispatch; resuming the unsent personal slot")
         if (
             "truck_detail_check_open" in self.routine_completed_steps
             and "truck_dispatch_pending_verification"
@@ -7897,6 +9185,33 @@ class AutoClicker:
         # before applying the broad Alliance Escort rejection guard.
         if "truck_escort_selection_requested" in self.routine_completed_steps:
             self._save_routine_calibration_frame("trucks", "escort_selection", frame)
+            if "truck_build_formation" in self.routine_completed_steps:
+                if "truck_squad_editor_requested" in self.routine_completed_steps:
+                    target = detect_truck_squad_done_target(frame)
+                    if target is None:
+                        self._defer_current_routine_unavailable(
+                            "нет подтверждённого отряда для сопровождения грузовика",
+                            time.time(), retry_delay=60.0,
+                        )
+                        return True
+                    if self._tap_routine_fallback(target, ("truck_squad_done", *target), "Грузовики: добавляю доступный отряд"):
+                        self.routine_completed_steps.discard("truck_squad_editor_requested")
+                        return True
+                    return False
+                target = detect_truck_formation_add_target(frame)
+                if target is not None:
+                    attempts = self.routine_action_counts.get("truck_add_squad", 0)
+                    if attempts >= 3:
+                        self._defer_current_routine_unavailable("добавление сопровождения не подтверждено", time.time(), retry_delay=60.0)
+                        return True
+                    if self._tap_routine_fallback(target, ("truck_add_squad", attempts, *target), "Грузовики: выбираю доступных героев и войска"):
+                        self.routine_action_counts["truck_add_squad"] = attempts + 1
+                        self.routine_completed_steps.add("truck_squad_editor_requested")
+                        return True
+                    return False
+                if not truck_formation_is_visible(frame):
+                    return False
+                self.routine_completed_steps.add("truck_saved_formation_requested")
             if "truck_saved_formation_requested" not in self.routine_completed_steps:
                 height, width = frame.shape[:2]
                 formation_index = max(
@@ -7947,7 +9262,7 @@ class AutoClicker:
             self.routine_completed_steps.add("truck_escort_selected")
             logger.info("Personal truck escort formation confirmed at (%s, %s)", *target)
             return True
-        if truck_alliance_escort_is_visible(frame):
+        if truck_alliance_escort_is_visible(frame) or truck_formation_is_visible(frame):
             if "truck_escort_selected" in self.routine_completed_steps:
                 self._save_routine_calibration_frame(
                     "trucks", "escort_confirmation_unconfirmed", frame
@@ -7978,11 +9293,14 @@ class AutoClicker:
                         formation_index + 1,
                     )
                     return True
-                self._defer_current_routine_unavailable(
-                    "сохранённые построения заняты другими грузовиками",
-                    time.time(),
-                    retry_delay=60.0,
-                )
+                if truck_formation_is_visible(frame) and "truck_build_formation" not in self.routine_completed_steps:
+                    self.routine_completed_steps.discard("truck_escort_selected")
+                    self.routine_completed_steps.add("truck_escort_selection_requested")
+                    self.routine_completed_steps.add("truck_build_formation")
+                    self.routine_action_counts["truck_add_squad"] = 0
+                    logger.info("Saved truck formations unavailable; building escort from available squads")
+                    return True
+                self._defer_current_routine_unavailable("сопровождение грузовика не подтверждено", time.time(), retry_delay=60.0)
                 return True
             height, width = frame.shape[:2]
             target = (
@@ -7996,6 +9314,12 @@ class AutoClicker:
             ):
                 return False
             self.routine_completed_steps.discard("truck_personal_slot_open")
+            if self._is_settlement_screen_visible():
+                self.routine_completed_steps.discard("trucks_open")
+                self._defer_current_routine_unavailable(
+                    "ярлык временно открывает подготовку рейса альянса", time.time(), retry_delay=180.0
+                )
+                return True
             logger.warning(
                 "Truck fallback rejected Alliance Escort; personal dispatch was not confirmed"
             )
@@ -8048,6 +9372,9 @@ class AutoClicker:
                         "truck_saved_formation_requested"
                     )
                     self.routine_truck_formation_index = 1
+                    self.routine_completed_steps.discard("truck_build_formation")
+                    self.routine_completed_steps.discard("truck_squad_editor_requested")
+                    self.routine_action_counts.pop("truck_add_squad", None)
                 self.routine_truck_overview_confirmations = 0
                 self.routine_truck_arrival_dismiss_attempts = 0
                 logger.info(
@@ -8146,18 +9473,31 @@ class AutoClicker:
             if not truck_express_overview_is_visible(frame):
                 active_back_target = detect_truck_active_detail_back_target(frame)
                 if active_back_target is not None:
+                    attempts = self.routine_action_counts.get("truck_unexpected_detail_closes", 0)
+                    if attempts >= 3:
+                        self._save_routine_calibration_frame("trucks", "unexpected_detail_stalled", frame)
+                        self._defer_current_routine_unavailable(
+                            "возврат из карточки грузовика не подтверждён после трёх попыток",
+                            time.time(), retry_delay=60.0,
+                        )
+                        return True
                     if not self._tap_routine_fallback(
                         active_back_target,
                         ("truck_unexpected_detail_back", *active_back_target),
                         "Грузовики: закрываю карточку активного грузовика",
                     ):
                         return False
-                    logger.info("Unexpected active truck detail panel closed safely")
+                    self.routine_action_counts["truck_unexpected_detail_closes"] = attempts + 1
+                    logger.info("Unexpected truck detail close requested (%s/3); awaiting overview", attempts + 1)
                     return True
                 return False
             checked = set(getattr(self, "routine_truck_checked_slots", set()))
             occupied = detect_truck_occupied_slot_targets(frame)
-            for slot_index, occupied_target in enumerate(occupied):
+            slot_centers = ((207, 410), (768, 410), (497, 551), (1060, 551))
+            for occupied_target in occupied:
+                x = occupied_target[0] * 1280 / frame.shape[1]
+                y = occupied_target[1] * 720 / frame.shape[0]
+                slot_index = min(range(4), key=lambda i: (slot_centers[i][0] - x) ** 2 + (slot_centers[i][1] - y) ** 2)
                 if slot_index in checked:
                     continue
                 if not self._tap_routine_fallback(
@@ -8175,6 +9515,14 @@ class AutoClicker:
                     *occupied_target,
                 )
                 return True
+            # Collection/status checks above remain available at 0 daily
+            # dispatches. Only creating another shipment is prohibited.
+            if getattr(self, "routine_truck_daily_limit_exhausted", False):
+                self._defer_current_routine_unavailable(
+                    "суточный лимит отправок грузовиков исчерпан",
+                    time.time(), retry_delay=3600.0,
+                )
+                return True
             target = detect_truck_personal_slot_target(frame)
             if target is None:
                 retry_minutes = min(
@@ -8187,20 +9535,42 @@ class AutoClicker:
                     retry_delay=retry_minutes * 60.0,
                 )
                 return True
+            x, y = target[0] * 1280 / frame.shape[1], target[1] * 720 / frame.shape[0]
+            slot_index = min(
+                range(4), key=lambda i: (slot_centers[i][0] - x) ** 2 + (slot_centers[i][1] - y) ** 2
+            )
+            attempt_key = f"truck_slot_open_requests_{slot_index}"
+            attempts = self.routine_action_counts.get(attempt_key, 0)
+            if attempts >= 2:
+                self._defer_current_routine_unavailable(
+                    "слот грузовика не открылся после двух попыток",
+                    time.time(), retry_delay=60.0,
+                )
+                return True
             if not self._tap_routine_fallback(
                 target,
                 ("truck_personal_slot_fallback", *target),
                 "Грузовики: открываю свободный слот личной отправки",
             ):
                 return False
-            self.routine_completed_steps.add("truck_personal_slot_open")
-            logger.info("Truck fallback opened a personal shipment slot at (%s, %s)", *target)
+            self.routine_action_counts[attempt_key] = attempts + 1
+            self.routine_completed_steps.add("truck_personal_slot_requested")
+            self.routine_truck_slot_requested_at = time.time()
+            self.routine_truck_current_slot = slot_index
+            logger.info("Personal truck slot opening requested at %s (%s/2); awaiting card", target, attempts + 1)
             return True
 
         self._save_routine_calibration_frame("trucks", "personal_dispatch", frame)
         target = detect_truck_start_dispatch_target(frame)
         if target is not None:
             if "truck_escort_selected" not in self.routine_completed_steps:
+                attempts = self.routine_action_counts.get("truck_escort_open_attempts", 0)
+                if attempts >= 6:
+                    self._defer_current_routine_unavailable(
+                        "выбор сопровождения повторяется без подтверждения",
+                        time.time(), retry_delay=60.0,
+                    )
+                    return True
                 height, width = frame.shape[:2]
                 escort_target = (
                     int(round(width * 637 / 1280.0)),
@@ -8213,6 +9583,7 @@ class AutoClicker:
                 ):
                     return False
                 self.routine_completed_steps.add("truck_escort_selection_requested")
+                self.routine_action_counts["truck_escort_open_attempts"] = attempts + 1
                 logger.info("Personal truck escort selection requested at (%s, %s)", *escort_target)
                 return True
             if not self._tap_routine_fallback(
@@ -8236,6 +9607,38 @@ class AutoClicker:
             retry_delay=retry_minutes * 60.0,
         )
         return True
+
+    def _verify_merchant_purchase_target(self, frame, target):
+        """Require the same resource price on two fresh, settled merchant frames."""
+        def contains_target(candidate_frame):
+            return mysterious_merchant_screen_is_visible(candidate_frame) and any(
+                np.hypot(point[0] - target[0], point[1] - target[1]) <= 8.0
+                for point in detect_mysterious_merchant_non_gem_offer_targets(candidate_frame)
+            )
+
+        if not contains_target(frame):
+            return None
+        self._interruptible_sleep(0.4)
+        if getattr(self, "stop_event", None) and self.stop_event.is_set():
+            return None
+        try:
+            fresh, _origin = self._capture_screen_bgr(force=True)
+        except Exception:
+            logger.exception("Merchant price verification could not capture a fresh frame")
+            return None
+        if getattr(self, "stop_event", None) and self.stop_event.is_set():
+            return None
+        if fresh.shape != frame.shape or not contains_target(fresh):
+            return None
+        height, width = frame.shape[:2]
+        x, y = map(int, target)
+        half_width, half_height = max(1, int(width * 95 / 1280)), max(1, int(height * 18 / 720))
+        bounds = (slice(max(0, y - half_height), min(height, y + half_height)),
+                  slice(max(0, x - half_width), min(width, x + half_width)))
+        before, after = frame[bounds], fresh[bounds]
+        if before.size == 0 or float(np.mean(cv2.absdiff(before, after))) > 6.0:
+            return None
+        return fresh
 
     def _try_mysterious_merchant_visual_fallback(self, task):
         if task.get("id") != "mysterious_merchant":
@@ -8330,8 +9733,7 @@ class AutoClicker:
             return False
         merchant_screen_visible = mysterious_merchant_screen_is_visible(frame)
         if (
-            not merchant_screen_visible
-            and "merchant_shop_open_requested" in self.routine_completed_steps
+            "merchant_shop_open_requested" in self.routine_completed_steps
             and "merchant_tab_requested" not in self.routine_completed_steps
         ):
             tab_target = detect_shop_merchant_tab_target(frame)
@@ -8364,6 +9766,18 @@ class AutoClicker:
                 "Merchant offer grid ignored until the verified Shop action is opened"
             )
         if merchant_screen_visible:
+            free_refresh = detect_merchant_free_refresh_target(frame)
+            if "merchant_refresh_requested" in self.routine_completed_steps:
+                if free_refresh is not None:
+                    if time.time() - self.routine_merchant_refresh_requested_at < 4.0:
+                        self._interruptible_sleep(0.6)
+                        return True
+                    self._defer_current_routine_unavailable("бесплатное обновление торговца не подтверждено", time.time(), retry_delay=60.0)
+                    return True
+                self.routine_completed_steps.discard("merchant_refresh_requested")
+                self.routine_completed_steps.add("merchant_refreshed")
+                self.routine_action_counts["merchant_offer_scrolls"] = 0
+                logger.info("Merchant free refresh confirmed; checking the refreshed offers")
             targets = detect_mysterious_merchant_non_gem_offer_targets(frame)
             pending = getattr(self, "routine_merchant_pending_target", None)
             if pending is not None:
@@ -8372,6 +9786,9 @@ class AutoClicker:
                     for target in targets
                 )
                 if still_present:
+                    if time.time() - float(getattr(self, "routine_merchant_pending_at", 0.0)) < 4.0:
+                        self._interruptible_sleep(0.6)
+                        return True
                     self._save_routine_calibration_frame(
                         "mysterious_merchant", "purchase_confirmation_unresolved", frame
                     )
@@ -8381,6 +9798,20 @@ class AutoClicker:
                         retry_delay=60.0,
                     )
                     return True
+                # A transient cover or animation is not proof of purchase.
+                self._interruptible_sleep(0.4)
+                confirmation, _confirmation_origin = self._capture_screen_bgr(force=True)
+                if not mysterious_merchant_screen_is_visible(confirmation) or any(
+                    np.hypot(candidate[0] - pending[0], candidate[1] - pending[1]) <= 45.0
+                    for candidate in detect_mysterious_merchant_non_gem_offer_targets(confirmation)
+                ):
+                    if time.time() - float(getattr(self, "routine_merchant_pending_at", 0.0)) >= 4.0:
+                        self._save_routine_calibration_frame("mysterious_merchant", "unstable_purchase_result", confirmation)
+                        self._defer_current_routine_unavailable(
+                            "результат покупки не подтверждён", time.time(), retry_delay=60.0
+                        )
+                    return True
+                frame = confirmation
                 purchases = self.routine_action_counts.get("max_purchases", 0) + 1
                 self.routine_action_counts["max_purchases"] = purchases
                 self.routine_merchant_pending_target = None
@@ -8409,6 +9840,12 @@ class AutoClicker:
                 self.set_status_message("Таинственный торговец: проверяю нижние предложения", force=True)
                 return True
             if purchases >= maximum or not targets:
+                if free_refresh is not None and "merchant_refreshed" not in self.routine_completed_steps:
+                    if not self._tap_routine_fallback(free_refresh, ("merchant_free_refresh", *free_refresh), "Таинственный торговец: бесплатное обновление"):
+                        return False
+                    self.routine_completed_steps.add("merchant_refresh_requested")
+                    self.routine_merchant_refresh_requested_at = time.time()
+                    return True
                 self.routine_completed_steps.add("merchant_complete")
                 logger.info(
                     "Mysterious Merchant complete: %s non-gem purchases; gem offers skipped",
@@ -8417,6 +9854,26 @@ class AutoClicker:
                 self._finish_current_routine(time.time())
                 return True
             target = targets[0]
+            verified_frame = self._verify_merchant_purchase_target(frame, target)
+            if verified_frame is None:
+                attempts = int(self.routine_action_counts.get("merchant_price_unstable", 0)) + 1
+                self.routine_action_counts["merchant_price_unstable"] = attempts
+                if attempts >= 3:
+                    self._save_routine_calibration_frame("mysterious_merchant", "unstable_resource_price", frame)
+                    self._defer_current_routine_unavailable(
+                        "цена предложения не подтверждена на свежих кадрах", time.time(), retry_delay=60.0
+                    )
+                    return True
+                self.set_status_message("Таинственный торговец: ожидаю устойчивое предложение с ресурсной ценой", force=True)
+                return True
+            self.routine_action_counts["merchant_price_unstable"] = 0
+            if self._recover_interrupted_routine_foreground(task):
+                return True
+            self._save_routine_calibration_frame(
+                "mysterious_merchant", f"before_resource_purchase_{purchases + 1}", verified_frame
+            )
+            if self.stop_event.is_set():
+                return True
             if not self._tap_routine_fallback(
                 target,
                 ("merchant_non_gem_purchase", purchases, *target),
@@ -8424,10 +9881,17 @@ class AutoClicker:
             ):
                 return False
             self.routine_merchant_pending_target = target
+            self.routine_merchant_pending_at = time.time()
             logger.info("Requested strictly non-gem merchant offer at (%s, %s)", *target)
             return True
 
         if "merchant_shop_open_requested" in self.routine_completed_steps:
+            if self._recover_interrupted_routine_foreground(task):
+                return True
+            if time.time() - self.routine_last_action_time < 4.0:
+                self._interruptible_sleep(0.5)
+                return True
+            self._save_routine_calibration_frame("mysterious_merchant", "unverified_shop_page", frame)
             if self.routine_only_task_id == "mysterious_merchant":
                 # Diagnostic mode is outcome-driven: do not convert a failed
                 # screen verification into a one-hour schedule wait.
@@ -8452,9 +9916,9 @@ class AutoClicker:
                 )
                 return True
             self._defer_current_routine_unavailable(
-                "Таинственный торговец сейчас не доступен в магазине",
+                "не удалось подтвердить страницу торговца в магазине",
                 time.time(),
-                retry_delay=max(60.0, float(settings.get("arrival_retry_minutes", 60) or 60) * 60.0),
+                retry_delay=60.0,
             )
             return True
         if (
@@ -9223,6 +10687,42 @@ class AutoClicker:
             action_counts = {}
             self.routine_action_counts = action_counts
         queue_checks = int(action_counts.get("training_queue_fallback_checks", 0) or 0)
+        if task_id == "train_vehicles" and queue_checks:
+            # The overview always picks the first idle barracks; repeated taps
+            # cannot reach vehicles while infantry is idle. Search the garage
+            # itself, then use the normal troop-title/form checks above.
+            target = detect_vehicle_barracks_target(frame)
+            attempts = int(action_counts.get("training_vehicle_search", 0))
+            if attempts < 6:
+                action_counts["training_vehicle_search"] = attempts + 1
+                if target is not None:
+                    self._tap_routine_fallback(
+                        target, ("training_vehicle_building", *target),
+                        "Производство машин: открываю найденные казармы инженеров",
+                    )
+                else:
+                    # Inspect neighbouring parts of the settlement without
+                    # repeatedly returning the camera to the infantry queue.
+                    shifts = ((820, 330, 380, 330), (380, 330, 820, 330),
+                              (640, 490, 640, 280), (640, 280, 640, 490),
+                              (380, 330, 820, 330), (820, 330, 380, 330))
+                    x1, y1, x2, y2 = shifts[attempts]
+                    sx, sy = frame.shape[1] / 1280, frame.shape[0] / 720
+                    if self.uses_adb:
+                        self.adb_client.swipe(round(x1*sx), round(y1*sy), round(x2*sx), round(y2*sy), 450)
+                    else:
+                        pyautogui.moveTo(round(x1*sx), round(y1*sy))
+                        pyautogui.dragTo(round(x2*sx), round(y2*sy), duration=0.45)
+                    self._invalidate_capture()
+                    self.routine_last_action_time = time.time()
+                    self._interruptible_sleep(0.6)
+                self._save_routine_calibration_frame("train_vehicles", f"building_search_{attempts}", frame)
+                return True
+            self._defer_current_routine_unavailable(
+                "казармы инженеров не подтверждены после поиска в убежище",
+                time.time(), retry_delay=60.0,
+            )
+            return True
         max_checks = max(
             4,
             int(task.get("settings", {}).get("max_queue_checks", 5) or 5),
@@ -9364,6 +10864,16 @@ class AutoClicker:
                     return True
         return False
 
+    def _wait_for_healing_retry(self, reason, now=None, retry_delay=2.0):
+        """Wait within a known hospital flow without resetting it as a failure."""
+        now = time.time() if now is None else float(now)
+        delay = max(0.1, min(3600.0, float(retry_delay)))
+        self.routine_next_run["heal"] = now + delay
+        self.set_status_message(f"Лечение: {reason}", force=True)
+        logger.info("Healing flow waits %.1f seconds (%s); keeping hospital and collection state", delay, reason)
+        self._interruptible_sleep(delay)
+        self.routine_last_action_time = time.time()
+
     def _try_healing_troop_form(self, task, frame):
         if not healing_troop_form_is_visible(frame):
             return False
@@ -9393,7 +10903,7 @@ class AutoClicker:
                 except (TypeError, ValueError):
                     retry_delay = 2.0
                 retry_delay = max(1.0, min(5.0, retry_delay))
-                self._defer_current_routine_unavailable(
+                self._wait_for_healing_retry(
                     "текущее лечение ещё не завершено",
                     time.time(),
                     retry_delay=retry_delay,
@@ -9513,7 +11023,7 @@ class AutoClicker:
                     "%s seconds remaining",
                     remaining_seconds,
                 )
-                self._defer_current_routine_unavailable(
+                self._wait_for_healing_retry(
                     f"сбор вылеченных через {remaining_seconds} сек",
                     now,
                     retry_delay=remaining,
@@ -9590,7 +11100,7 @@ class AutoClicker:
                     )
                     now = time.time()
                     if now - last_attempt_at < retry_delay:
-                        self._defer_current_routine_unavailable(
+                        self._wait_for_healing_retry(
                             (
                                 "жду завершения лечения"
                                 if collection_pending
@@ -9707,6 +11217,17 @@ class AutoClicker:
                         settings["_hospital_target_failures"] = failures
                         self.save_config()
                         if failures < 2:
+                            if collection_pending:
+                                # A ready batch is collected on the map by the
+                                # first tap; only the next tap opens the idle
+                                # hospital. Keep pending until that form proves
+                                # collection, but do not impose the 30s failure
+                                # cooldown between these two bounded attempts.
+                                self._wait_for_healing_retry(
+                                    "проверяю госпиталь после нажатия сбора",
+                                    time.time(), retry_delay=retry_delay,
+                                )
+                                return True
                             self._defer_current_routine_unavailable(
                                 (
                                     "лечение ещё не завершено"
@@ -10044,6 +11565,70 @@ class AutoClicker:
         )
         return True
 
+    def _confirm_collective_transition(self, image, display):
+        """Do not consume a rally step until its next screen actually opens."""
+        step = image.get("runtime_step")
+        next_step = {"rally": "confirm_rally", "confirm_rally": "march"}[step]
+        next_image = next((candidate for candidate in self.search_images
+                           if candidate.get("group") == image.get("group")
+                           and candidate.get("runtime_step") == next_step), None)
+        if next_image is not None:
+            for attempt in range(3):
+                for _poll in range(8):
+                    self._check_worker_interrupted()
+                    if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                        return False
+                    self._invalidate_capture()
+                    frame, _origin = self._capture_screen_bgr(force=True)
+                    if step == "rally" and collective_target_busy_is_visible(frame):
+                        self.routine_action_failure_reason = "collective_target_busy"
+                        logger.info("Collective target already has an alliance rally; choose a lower level")
+                        return False
+                    location, bbox, _score = self._locate_image(next_image)
+                    if location is not None and bbox is not None:
+                        logger.info("Collective transition confirmed: %s -> %s", step, next_step)
+                        return True
+                    self._interruptible_sleep(0.4)
+                if attempt == 2:
+                    break
+                # Retry only a button observed again on the current screen.
+                # Reusing its old coordinates could click a different dialog.
+                self._invalidate_capture()
+                location, bbox, _score = self._locate_image(image)
+                if location is None or bbox is None:
+                    break
+                valid, _reason = self._validate_detected_match(image, bbox)
+                if not valid:
+                    break
+                self._check_worker_interrupted()
+                if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                    return False
+                offset = image.get("click_offset", (0, 0))
+                target = (round(location.x + offset[0] * display.scale_x),
+                          round(location.y + offset[1] * display.scale_y))
+                click = self.adb_client.tap if self.uses_adb else pyautogui.click
+                click(*target)
+                logger.info("Collective %s did not open %s; retrying visible button (%s/3)",
+                            step, next_step, attempt + 2)
+                self.set_status_message("Коллективный разум: окно не открылось, повторяю нажатие", force=True)
+                self._interruptible_sleep(0.8)
+        self.routine_action_failure_reason = "collective_transition"
+        self.set_status_message("Коллективный разум: открытие сбора не подтверждено", force=True)
+        return False
+
+    def _defer_collective_busy_target(self):
+        _context, key = self._hunt_context("collective_mind")
+        ceiling = 7 if int(self._current_task_settings().get("level", 6) or 6) == 7 else 6
+        found = getattr(self, "hunt_found_levels", {}).pop(key, ceiling)
+        levels = getattr(self, "hunt_search_levels", {})
+        self.hunt_search_levels = levels
+        levels[key] = max(1, min(ceiling, int(found) - 1)) if found > 1 else ceiling
+        self._defer_current_routine_unavailable(
+            (f"цель уже занята сбором альянса; следующий поиск уровня {levels[key]}"
+             if found > 1 else "цели до первого уровня заняты сборами альянса"),
+            time.time(), retry_delay=5.0 if found > 1 else 60.0,
+        )
+
     def _try_collective_tutorial_fallback(self, task):
         if (
             task.get("id") != "collective_mind"
@@ -10196,8 +11781,8 @@ class AutoClicker:
         compact = cv2.resize(gray, (48, 24), interpolation=cv2.INTER_AREA)
         return (compact // 16).astype(np.uint8).tobytes()
 
-    def _try_research_tree_row(self, frame, row_y, display, branch, page_index):
-        """Try one frontier row and restore the tree after a full node."""
+    def _try_research_tree_row(self, frame, row_y, display, branch, page_index, node_x=None):
+        """Open one visible technology, including unfinished earlier nodes."""
         current = frame
         for tap_attempt in range(2):
             candidates = self._research_tree_candidates(current)
@@ -10206,8 +11791,14 @@ class AutoClicker:
             ]
             if not same_row:
                 return False, current
-            node_x, node_y = max(same_row, key=lambda point: point[0])
-            target = self._tap_research_reference(node_x, node_y, display)
+            if tap_attempt == 0:
+                selected_x, node_y = (
+                    max(same_row, key=lambda point: point[0]) if node_x is None
+                    else min(same_row, key=lambda point: abs(point[0] - node_x))
+                )
+            else:
+                selected_x, node_y = min(same_row, key=lambda point: abs(point[0] - 660))
+            target = self._tap_research_reference(selected_x, node_y, display)
             logger.info(
                 "Research branch=%s page=%s row=%s tap=%s target=%s",
                 branch,
@@ -10313,35 +11904,29 @@ class AutoClicker:
             if signature:
                 seen_pages.add(signature)
 
-            attempted_rows = []
-            for _row_attempt in range(6):
+            attempted_nodes = []
+            for _row_attempt in range(18):
                 if self._research_watchdog_due():
                     logger.warning("Research scan budget expired between rows in branch=%s page=%s", branch, page_index + 1)
                     return False
                 candidates = self._research_tree_candidates(frame)
                 if not candidates:
                     break
-                frontier_x = max(point[0] for point in candidates)
-                frontier = [
-                    point for point in candidates if point[0] >= frontier_x - 60
+                available_nodes = [
+                    point for point in sorted(candidates, key=lambda point: (point[0], abs(point[1] - 360)))
+                    if all(np.hypot(point[0] - x, point[1] - y) >= 55 for x, y in attempted_nodes)
                 ]
-                available_rows = []
-                for _node_x, node_y in sorted(
-                    frontier,
-                    key=lambda point: (abs(point[1] - 360), point[1]),
-                ):
-                    if all(abs(node_y - seen_y) >= 45 for seen_y in attempted_rows):
-                        available_rows.append(int(node_y))
-                if not available_rows:
+                if not available_nodes:
                     break
-                row_y = available_rows[0]
-                attempted_rows.append(row_y)
+                node_x, row_y = available_nodes[0]
+                attempted_nodes.append((node_x, row_y))
                 found, frame = self._try_research_tree_row(
                     frame,
                     row_y,
                     display,
                     branch,
                     page_index,
+                    node_x,
                 )
                 if found:
                     return True
@@ -10392,12 +11977,45 @@ class AutoClicker:
                 return branch
         return None
 
+    def _cancel_research_gem_confirmation(self, frame):
+        """Decline a paid research/resource dialog, then defer this task."""
+        target = detect_gem_confirmation_cancel_target(frame)
+        if target is None:
+            return False
+        self._save_routine_calibration_frame("research", "gem_confirmation", frame)
+        # Back does not reliably dismiss this modal. Click its explicit No
+        # control and verify dismissal before normal navigation can resume.
+        for _attempt in range(2):
+            if self.uses_adb:
+                self.adb_client.tap(*target)
+            else:
+                pyautogui.click(*target)
+            self._invalidate_capture()
+            self._interruptible_sleep(0.8)
+            after, _origin = self._capture_screen_bgr(force=True)
+            target = detect_gem_confirmation_cancel_target(after)
+            if target is None:
+                logger.warning("Research gem confirmation declined; paid action was not executed")
+                self._defer_current_routine_unavailable(
+                    "исследование требует кристаллы; платное действие отменено",
+                    retry_delay=300.0,
+                )
+                return True
+        # Preserve the current queue slot if the dialog cannot be closed.
+        # Never let another routine or account navigation run over it.
+        self.stop_event.set()
+        self._set_state(BotState.STOPPED)
+        self.set_status_message(
+            "Не удалось закрыть запрос кристаллов: бот остановлен, очередь сохранена",
+            force=True,
+        )
+        logger.error("Research gem confirmation could not be dismissed after two cancellation attempts; queue stopped")
+        self.save_config()
+        return True
+
     def _try_research_visual_fallback(self, task):
         """Collect a finished research or start the selected next research."""
-        if task.get("id") != "research" or not {
-            "lab",
-            "select",
-        }.intersection(self.routine_completed_steps):
+        if task.get("id") != "research":
             return False
         collected_waiting_for_selection = (
             "collect" in self.routine_completed_steps
@@ -10407,6 +12025,10 @@ class AutoClicker:
             before, _origin = self._capture_screen_bgr(force=True)
         except Exception:
             logger.exception("Research action fallback could not capture the screen")
+            return False
+        if self._cancel_research_gem_confirmation(before):
+            return True
+        if not {"lab", "select"}.intersection(self.routine_completed_steps):
             return False
         if research_tree_progress_is_active(before):
             now = time.time()
@@ -10487,6 +12109,8 @@ class AutoClicker:
         self._invalidate_capture()
         self._interruptible_sleep(1.4)
         after, _after_origin = self._capture_screen_bgr(force=True)
+        if self._cancel_research_gem_confirmation(after):
+            return True
         if after.shape != before.shape:
             before = cv2.resize(
                 before,
@@ -10499,7 +12123,7 @@ class AutoClicker:
             or research_tree_progress_is_active(after)
         )
         button_still_visible = detect_research_action_target(after) is not None
-        if screen_change < 2.0 and button_still_visible and not active_after:
+        if (selected_research and not active_after) or (screen_change < 2.0 and button_still_visible and not active_after):
             logger.warning(
                 "Research action fallback was not confirmed (screen change %.2f)",
                 screen_change,
@@ -10540,6 +12164,9 @@ class AutoClicker:
         task = self.get_routine_task(self.current_routine_task_id)
         if not task:
             self.current_routine_task_id = None
+            return
+
+        if self._recover_interrupted_routine_foreground(task):
             return
 
         retry_delay = no_action_retry_delay(task)
@@ -10762,24 +12389,6 @@ class AutoClicker:
             settings.get("_no_squad_confirmations", 0) or 0
         ) + 1
         settings["_no_squad_confirmations"] = no_squad_confirmations
-        if no_squad_confirmations >= 2:
-            settings.pop("_no_squad_confirmations", None)
-            logger.info(
-                "Radar reached squad capacity after two confirmations; "
-                "the ordered queue can continue to radar_rewards"
-            )
-            self._return_to_main_screen(
-                max_back_steps=6,
-                require_settlement=True,
-            )
-            self.set_status_message(
-                "Радар: свободных отрядов нет, отправка до отказа подтверждена",
-                force=True,
-            )
-            self._queue_post_radar_followups(task, now)
-            self._finish_current_routine(now, completion_clicked=True)
-            return True
-
         self.routine_next_run["radar_marches"] = now + retry_delay
         logger.warning(
             "Radar squad capacity needs confirmation (%s); ordered queue remains on radar_marches and retries in %.0f seconds",
@@ -10788,7 +12397,7 @@ class AutoClicker:
         )
         self._return_to_main_screen(max_back_steps=6, require_settlement=True)
         self.set_status_message(
-            "Радар: перепроверяю отсутствие свободного отряда через 15 сек",
+            "Радар: жду свободный отряд, затем продолжу оставшиеся задания",
             force=True,
         )
         self.routine_last_outcome = {
@@ -10823,6 +12432,9 @@ class AutoClicker:
         task = self.get_routine_task(self.current_routine_task_id)
         if not task:
             self.current_routine_task_id = None
+            return
+
+        if self._recover_interrupted_routine_foreground(task):
             return
 
         reason = str(reason)
@@ -11044,7 +12656,7 @@ class AutoClicker:
             reset_manual_run_deadlines(enabled_tasks, self.routine_next_run)
             self.current_routine_index = 0
             self.routine_pass_completed = False
-        if not recovering_forced_login:
+        if not (resume or recovering_forced_login):
             self.routine_forced_task_queue = []
             self.routine_forced_task_active_id = None
             self.routine_forced_task_return_index = None
@@ -11069,7 +12681,30 @@ class AutoClicker:
             elif not (resume or recovering_forced_login):
                 self._reset_account_pass_clock(clock_now)
             self.save_config()
-        return self.start()
+        return_index = (
+            int(self.routine_forced_task_return_index)
+            if recovering_forced_login else self.current_routine_index
+        )
+        # Starting checked tasks on the open game does not perform an account
+        # transition. In particular, a cancelled startup check from older
+        # versions must not block a single-account Heal run. Keep its failure
+        # latch for rotation; do not turn a manual start into identity proof.
+        needs_identity_recovery = getattr(self, "account_rotation_enabled", False) and (
+            recovering_forced_login
+            or int(getattr(self, "account_switch_failure_count", 0) or 0) > 0
+        )
+        if not needs_identity_recovery:
+            return self.start()
+        if not self._prepare_current_account_verification(
+            return_index, pass_completed=self.routine_pass_completed,
+        ):
+            return False
+        if self.start():
+            return True
+        self.current_routine_task_id = "__account_switch__"
+        self.account_switch_error = "Переключение не подтверждено: не удалось запустить проверку аккаунта"
+        self._finish_current_routine()
+        return False
 
     def _running_emulator_targets(self):
         """Return every running LDPlayer that currently answers through ADB."""
@@ -11336,6 +12971,45 @@ class AutoClicker:
         self.stop()
         self._stop_multi_workers()
 
+    def start_own_rally_mode(self, settings=None):
+        selected = dict(settings or self.own_rally_settings)
+        if not self.uses_adb:
+            self.set_status_message("Свои сборы работают через ADB", force=True)
+            return False
+        leader = find_account(self.account_profiles, selected.get("leader_id"))
+        if leader is None:
+            self.set_status_message("Выберите основной аккаунт для своих сборов", force=True)
+            return False
+        if not leader.get("auto_login") or not self.account_has_saved_login(leader["id"]) or not self.account_has_saved_password(leader["id"]):
+            self.set_status_message("Для основного аккаунта нужен сохранённый вход IGG", force=True)
+            return False
+        candidates = participant_candidates(self.account_profiles, leader["id"], selected.get("participant_id", "any"))
+        if not any(p.get("auto_login") and self.account_has_saved_login(p["id"])
+                   and self.account_has_saved_password(p["id"]) for p in candidates):
+            self.set_status_message("Нужен участник с сохранённым входом на том же эмуляторе", force=True)
+            return False
+        self.stop_all_emulators()
+        previous = getattr(self, "_thread", None)
+        if previous is not None and previous.is_alive():
+            previous.join(timeout=5)
+            if previous.is_alive():
+                self.set_status_message("Предыдущее действие ещё завершается; повторите запуск режима", force=True)
+                return False
+        self.own_rally_settings = selected
+        self.adb_serial = str(leader.get("adb_serial") or self.adb_serial)
+        self._refresh_adb_client()
+        self.own_rally_controller = OwnRallyController(selected)
+        self._own_rally_task = deepcopy(next(t for t in self.routine_tasks if t["id"] == "collective_mind"))
+        self._own_rally_task["enabled"] = True
+        self.routine_mode = True
+        self.routine_only_task_id = "collective_mind"
+        self.save_config()
+        if self.start():
+            return True
+        self.own_rally_controller = None
+        self._own_rally_task = None
+        return False
+
     def start_task_only(self, task_id):
         task = self.get_routine_task(task_id)
         if not task:
@@ -11378,6 +13052,7 @@ class AutoClicker:
         if running_thread is not None and running_thread.is_alive():
             self.set_status_message("Ожидаю завершения предыдущего запуска", force=True)
             return False
+        self.account_switch_stop_message = ""
         if self.uses_adb and not self.check_runtime_environment(notify=False, wait_seconds=8.0):
             self.set_status_message(self.tr('adb_required', serial=self.adb_serial), force=True)
             self._show_notification('error', 'adb_required', serial=self.adb_serial)
@@ -11394,9 +13069,7 @@ class AutoClicker:
         def is_active(img):
             if not img["enabled"]:
                 return False
-            if img["group"] and img["group"] in self.groups:
-                return self.groups[img["group"]]
-            return True
+            return self._routine_group_enabled(img.get("group"))
 
         if self.routine_mode:
             routine_groups = {
@@ -11465,6 +13138,9 @@ class AutoClicker:
         return True
 
     def stop(self):
+        own_controller = getattr(self, "own_rally_controller", None)
+        if own_controller is not None:
+            own_controller.cancel.set()
         self.stop_event.set()
         self._set_state(BotState.STOPPED)
         self.pause_started_at = None
@@ -11499,6 +13175,8 @@ class AutoClicker:
         self.last_action_time = now
         if self.routine_mode:
             self.routine_last_action_time = now
+            if getattr(self, "current_routine_task_id", None) in {"processing_factory", "processing_contest"}:
+                self.routine_task_started_at += paused_for
             self.routine_march_deadlines = [
                 deadline + paused_for for deadline in self.routine_march_deadlines
             ]
@@ -11621,7 +13299,11 @@ class AutoClicker:
 
     def _clicker_loop(self):
         try:
-            self._run_clicker_loop()
+            own_controller = getattr(self, "own_rally_controller", None)
+            if own_controller is not None:
+                own_controller.run(self)
+            else:
+                self._run_clicker_loop()
         finally:
             self.stop_event.set()
             self._set_state(BotState.STOPPED)
@@ -11630,7 +13312,10 @@ class AutoClicker:
                 device_lease.release()
                 self.device_lease = None
             logger.info("Цикл кликера завершён")
-            self.set_status_message(self.tr('state_stopped'), force=True)
+            self.set_status_message(
+                getattr(self, "account_switch_stop_message", "") or self.tr('state_stopped'),
+                force=True,
+            )
             if self.root:
                 self.gui_queue.put((self.root.deiconify, (), {}))
 
@@ -11639,6 +13324,12 @@ class AutoClicker:
         logger.info("Цикл кликера запущен")
         while not self.stop_event.is_set() and not self.stop_hotkey_pressed:
             try:
+                self._account_switch_ui_cache = None
+                # Template matching shares a frame only within this iteration.
+                # Idle scheduler paths may return before matching starts.
+                self._adb_iteration_frame = None
+                if self._check_runtime_memory():
+                    continue
                 if self.is_paused:
                     time.sleep(0.1)
                     continue
@@ -11670,6 +13361,12 @@ class AutoClicker:
                 current_group = None
                 current_routine_task = None
                 if self.routine_mode:
+                    if self._processing_factory_watchdog_due(now):
+                        logger.warning("Routine %s exhausted its 180-second factory visit budget", self.current_routine_task_id)
+                        self._defer_current_routine_unavailable(
+                            "проверка завода не завершилась за 3 минуты", now, retry_delay=60.0,
+                        )
+                        continue
                     if self._research_watchdog_due(now):
                         # The visual path has already consumed its cumulative
                         # slot.  Record an explicit deferral rather than letting
@@ -11685,6 +13382,46 @@ class AutoClicker:
                     if current_routine_task is None:
                         time.sleep(max(0.1, min(0.5, self.sleep_not_found)))
                         continue
+                    if self._recover_interrupted_routine_foreground(current_routine_task):
+                        continue
+                    # The explicit exhausted counter has its own short settle
+                    # period. Waiting for the general idle timeout first made
+                    # the configured 15 seconds silently become 45 seconds.
+                    if current_routine_task.get("id") == "alliance_donations" and donation_exhaustion_is_complete(
+                        current_routine_task,
+                        self.routine_completed_steps,
+                        time.time() - self.routine_last_action_time,
+                    ):
+                        self.set_status_message(
+                            "Пожертвования: доступные попытки исчерпаны", force=True,
+                        )
+                        self._finish_current_routine(time.time())
+                        continue
+                    if (
+                        current_routine_task.get("id") in {"processing_factory", "processing_contest"}
+                        and getattr(self, "routine_processing_factory_recovery_required", False)
+                        and self._try_processing_factory_visual_fallback(current_routine_task)
+                    ):
+                        continue
+                    if current_routine_task.get("id") == "__account_switch__":
+                        switch_elapsed = now - self.routine_task_started_at
+                        switch_timeout = float(current_routine_task.get(
+                            "timeout_seconds", ACCOUNT_SWITCH_TIMEOUT_SECONDS
+                        ))
+                        if (
+                            self.account_switch_error
+                            or self.account_switch_probe_ready
+                            or switch_elapsed >= switch_timeout
+                        ):
+                            if (
+                                not self.account_switch_error
+                                and not self.account_switch_probe_ready
+                            ):
+                                self.account_switch_error = (
+                                    "Переключение не подтверждено: истекло время проверки игрового ID"
+                                )
+                            self._finish_current_routine(now)
+                            continue
                     if (
                         current_routine_task.get("id") == "__account_switch__"
                         and self._try_account_switch_igg_game_confirmation(current_routine_task)
@@ -11712,17 +13449,7 @@ class AutoClicker:
                         # block immediately at 4/4 (or the configured maximum).
                         active_marches = self.get_active_marches(now)
                         if active_marches >= self.routine_max_marches:
-                            logger.info(
-                                "Radar dispatch capacity reached: %s/%s; advancing to radar_rewards",
-                                active_marches,
-                                self.routine_max_marches,
-                            )
-                            self.set_status_message(
-                                f"Радар: все походы заняты {active_marches}/{self.routine_max_marches}; "
-                                "перехожу к наградам",
-                                force=True,
-                            )
-                            self._finish_current_routine(now)
+                            self._hold_radar_marches_for_free_squad("все походы заняты", now)
                             continue
                     if self._pause_for_manual_account_verification(current_routine_task):
                         continue
@@ -11749,6 +13476,7 @@ class AutoClicker:
                         img for img in self.search_images
                         if (
                             img.get("group") == current_group
+                            and current_routine_task.get("id") != "mysterious_merchant"
                             and self._is_active(img)
                             and not self._missing_template_uses_visual_fallback(img)
                             and not (
@@ -11780,8 +13508,9 @@ class AutoClicker:
                     self.routine_mode
                     and current_routine_task
                     and is_radar_task_id(current_routine_task.get("id"))
-                    and self._try_radar_in_progress_card_fallback(
-                        current_routine_task
+                    and (
+                        self._try_radar_in_progress_card_fallback(current_routine_task)
+                        or self._try_radar_pending_card_fallback(current_routine_task)
                     )
                 ):
                     continue
@@ -11807,10 +13536,15 @@ class AutoClicker:
                 if (
                     self.routine_mode
                     and current_routine_task
-                    and current_routine_task.get("id") in {"mysterious_merchant", "trucks"}
-                    and not self.get_routine_templates(
-                        current_routine_task,
-                        active_only=True,
+                    and (
+                        current_routine_task.get("id") == "mysterious_merchant"
+                        or (
+                            current_routine_task.get("id") == "trucks"
+                            and not self.get_routine_templates(
+                                current_routine_task,
+                                active_only=True,
+                            )
+                        )
                     )
                 ):
                     if (
@@ -11915,9 +13649,8 @@ class AutoClicker:
                             )
                             continue
 
-                        if img_config["group"] and img_config["group"] in self.groups:
-                            if not self.groups[img_config["group"]]:
-                                continue
+                        if not self._routine_group_enabled(img_config.get("group")):
+                            continue
                         if img_config.get("guard_only"):
                             continue
                         if (
@@ -12079,6 +13812,10 @@ class AutoClicker:
                                     is_radar_task_id(current_routine_task.get("id"))
                                     and img_config.get("prevents_idle_completion")
                                 ):
+                                    marker_frame, _marker_origin = self._capture_screen_bgr(force=True)
+                                    if radar_task_card_is_visible(marker_frame) or not radar_overview_is_visible(marker_frame):
+                                        logger.debug("Radar marker ignored while an existing card or squad is open")
+                                        continue
                                     # Remember the marker before executing its action. Some
                                     # radar cards open even when their post-click verifier
                                     # rejects the resulting screen. The countdown guard must
@@ -12090,15 +13827,44 @@ class AutoClicker:
                                     )
                                 action_confirmed = self._execute_action(img_config, location)
                                 if action_confirmed is False:
+                                    if self.routine_action_failure_reason == "radar_dispatch_pending":
+                                        refresh_after_action = True
+                                        break
                                     logger.warning(
                                         "Действие не подтверждено экраном: %s",
                                         img_config.get("description"),
                                     )
+                                    if (
+                                        self.routine_mode
+                                        and current_routine_task.get("id") in {"processing_factory", "processing_contest"}
+                                        and getattr(self, "routine_processing_factory_recovery_required", False)
+                                    ):
+                                        refresh_after_action = True
+                                        break
                                     if self.routine_action_failure_reason == "stamina":
                                         self._defer_current_routine_unavailable(
                                             "не хватает выносливости или закончились предметы",
                                             time.time(),
                                             retry_delay=60.0,
+                                        )
+                                        refresh_after_action = True
+                                        break
+                                    if self.routine_action_failure_reason == "collective_target_busy":
+                                        self._defer_collective_busy_target()
+                                        refresh_after_action = True
+                                        break
+                                    if self.routine_action_failure_reason == "collective_transition":
+                                        self._defer_current_routine_unavailable(
+                                            "окно сбора пока не открылось",
+                                            time.time(),
+                                            retry_delay=30.0,
+                                        )
+                                        refresh_after_action = True
+                                        break
+                                    if self.routine_action_failure_reason == "own_rally_preset":
+                                        self._defer_current_routine_unavailable(
+                                            "сохранённый отряд №1 не загружен",
+                                            time.time(), retry_delay=30.0,
                                         )
                                         refresh_after_action = True
                                         break
@@ -12144,11 +13910,6 @@ class AutoClicker:
                                         )
                                     runtime_step = str(img_config.get("runtime_step") or "")
                                     if runtime_step:
-                                        if (
-                                            current_routine_task.get("id") == "radar_marches"
-                                            and runtime_step == "radar_march"
-                                        ):
-                                            self.routine_radar_dispatched_this_pass = True
                                         if (
                                             is_radar_task_id(current_routine_task.get("id"))
                                             and runtime_step == "radar_marker"
@@ -12474,11 +14235,12 @@ class AutoClicker:
                                 self._finish_current_routine(time.time())
                             elif (
                                 current_routine_task.get("settings", {}).get("login_method") == "igg"
+                                and "account_switch_igg_id_selected" not in self.routine_completed_steps
                                 and time.time() - self.account_switch_selected_at >= 15.0
                             ):
                                 try:
                                     igg_form_visible = bool(
-                                        extract_igg_login_form(self.adb_client.ui_xml())
+                                        extract_igg_login_form(self._account_switch_ui_xml(current_routine_task))
                                     )
                                 except AdbError:
                                     igg_form_visible = False
@@ -12571,17 +14333,6 @@ class AutoClicker:
                         self._finish_current_routine(time.time())
                         continue
                     if not action_occurred and idle >= idle_check_timeout:
-                        if donation_exhaustion_is_complete(
-                            current_routine_task,
-                            self.routine_completed_steps,
-                            idle,
-                        ):
-                            self.set_status_message(
-                                "Пожертвования: все доступные проекты проверены",
-                                force=True,
-                            )
-                            self._finish_current_routine(time.time())
-                            continue
                         if current_routine_task.get("manual_screen_required", False):
                             guard_uid = str(
                                 current_routine_task.get("idle_completion_guard_uid") or ""
@@ -12678,7 +14429,8 @@ class AutoClicker:
                                     time.time(),
                                 )
                                 continue
-                            self.routine_last_action_time = time.time()
+                            if current_routine_task.get("id") not in {"processing_factory", "processing_contest"}:
+                                self.routine_last_action_time = time.time()
                             logger.info(
                                 "Routine %s is idle outside its completion screen for %.1f sec; continuing",
                                 current_routine_task.get("id"),
@@ -12705,6 +14457,8 @@ class AutoClicker:
             except Exception:
                 logger.exception("Ошибка в цикле кликера")
                 time.sleep(self.sleep_error)
+            finally:
+                self._adb_iteration_frame = None
 
     def _switch_to_next_group(self):
         if not self.cycle_groups:
@@ -12723,9 +14477,7 @@ class AutoClicker:
             return False
         if not img["enabled"]:
             return False
-        if img["group"] and img["group"] in self.groups:
-            return self.groups[img["group"]]
-        return True
+        return self._routine_group_enabled(img.get("group"))
 
     def _missing_template_uses_visual_fallback(self, image):
         """Allow a missing radar opener when the guarded visual opener is enabled."""
@@ -13007,9 +14759,290 @@ class AutoClicker:
             return False
         return True
 
+    def _hunt_context(self, task_id):
+        context = routine_march_context_key(
+            self.input_backend, getattr(self, "adb_serial", "desktop"),
+            getattr(self, "current_account_id", "default"),
+        )
+        return context, f"{context}|{task_id}"
+
+    def _remember_hunt_dispatch(self, task):
+        task_id = task.get("id")
+        if task_id not in {"zombie_hunt", "collective_mind"}:
+            return
+        _context, key = self._hunt_context(task_id)
+        found = getattr(self, "hunt_found_levels", {}).pop(key, None)
+        if found is None:
+            return
+        levels = getattr(self, "hunt_search_levels", {})
+        self.hunt_search_levels = levels
+        if task_id == "zombie_hunt":
+            # Zombie values are offsets below the player's starting level.
+            levels[key] = max(0, int(found) - 1)
+        else:
+            ceiling = 7 if int(task.get("settings", {}).get("level", 6) or 6) == 7 else 6
+            levels[key] = min(ceiling, int(found) + 1)
+        self.save_config()
+
+    def _confirm_collective_search_result(self, display):
+        frame, _origin = self._capture_screen_bgr(force=True)
+        if collective_search_not_found_is_visible(frame):
+            logger.info("Collective search closed with the no-target message")
+            return False
+        if collective_target_card_is_visible(frame):
+            return True
+        if not self._world_map_visible_in_frame(frame):
+            return False
+        if self.uses_adb:
+            self.adb_client.tap(display.width // 2, round(display.height * .49))
+        else:
+            pyautogui.click(*self._screen_normalized_point(.5, .49))
+        for _ in range(8):
+            self._interruptible_sleep(.4)
+            if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                return False
+            frame, _origin = self._capture_screen_bgr(force=True)
+            if collective_search_not_found_is_visible(frame):
+                return False
+            if collective_target_card_is_visible(frame):
+                return True
+        self._save_routine_calibration_frame('collective_mind', 'unconfirmed_search', frame)
+        logger.warning("Collective search did not produce a collective-mind target card")
+        return False
+
+    def _confirm_zombie_search_result(self, display):
+        frame, _origin = self._capture_screen_bgr(force=True)
+        if zombie_search_not_found_is_visible(frame):
+            logger.info("Zombie search closed with the no-target message")
+            return False
+        if zombie_target_card_is_visible(frame):
+            return True
+        if not self._world_map_visible_in_frame(frame):
+            return False
+        if self.uses_adb:
+            self.adb_client.tap(display.width // 2, round(display.height * .49))
+        else:
+            pyautogui.click(*self._screen_normalized_point(.5, .49))
+        for _ in range(8):
+            self._interruptible_sleep(.4)
+            if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                return False
+            frame, _origin = self._capture_screen_bgr(force=True)
+            if zombie_search_not_found_is_visible(frame):
+                return False
+            if zombie_target_card_is_visible(frame):
+                return True
+        self._save_routine_calibration_frame('zombie_hunt', 'unconfirmed_search', frame)
+        logger.warning("Zombie search did not produce a zombie target card")
+        return False
+
+    def _reopen_collective_search(self, image, display):
+        return self._reopen_hunt_search(image, display)
+
+    def _reopen_hunt_search(self, image, display):
+        if not self._prepare_world_search_screen():
+            return None
+        icon_step = 'zombie_icon' if image.get('action') == 'zombie_search' else 'leader_icon'
+        leader = next((i for i in self.search_images if i.get('group') == image.get('group')
+                       and i.get('runtime_step') == icon_step), None)
+        if leader is None:
+            return None
+        self._invalidate_capture()
+        point, bbox, _score = self._locate_image(leader)
+        if point is None or bbox is None or not self._validate_detected_match(leader, bbox)[0]:
+            return None
+        if not self._execute_action(leader, point):
+            return None
+        self._invalidate_capture()
+        point, bbox, _score = self._locate_image(image)
+        if point is None or bbox is None or not self._validate_detected_match(image, bbox)[0]:
+            return None
+        offset = image.get('click_offset', (0, 0))
+        return point.x + offset[0]*display.scale_x, point.y + offset[1]*display.scale_y
+
+    def _execute_hunt_search(self, img_config, target_x, target_y, display):
+        zombie = img_config.get("action") == "zombie_search"
+        task_id = "zombie_hunt" if zombie else "collective_mind"
+        label = "Зомби" if zombie else "Коллективный разум"
+        context, key = self._hunt_context(task_id)
+        levels = getattr(self, "hunt_search_levels", {})
+        self.hunt_search_levels = levels
+        found_levels = getattr(self, "hunt_found_levels", {})
+        self.hunt_found_levels = found_levels
+        found_levels.pop(key, None)
+        settings = self._current_task_settings()
+        minus_x = round(target_x - 146 * display.scale_x)
+        plus_x = round(target_x + 144 * display.scale_x)
+        level_y = round(target_y - 76 * display.scale_y)
+        click = self.adb_client.tap if self.uses_adb else pyautogui.click
+
+        def stopped():
+            return self.stop_event.is_set() or self.stop_hotkey_pressed
+
+        def collective_level(level):
+            for x, count in ((plus_x, 7), (minus_x, 7-level)):
+                for _ in range(count):
+                    if stopped():
+                        return False
+                    click(x, level_y)
+                    self._interruptible_sleep(.3)
+            return not stopped()
+
+        panel_reopened = False
+        zombie_panel_closed = False
+        if zombie:
+            limit = zombie_fallback_levels(settings)
+            restore = getattr(self, "zombie_level_restore", {})
+            self.zombie_level_restore = restore
+            pending = getattr(self, "zombie_level_restore_pending", {})
+            self.zombie_level_restore_pending = pending
+            # The physical offset may exceed a newly lowered search limit.
+            # Restore it in full so the player's starting level cannot drift.
+            offset = min(10, max(0, int(pending.pop(context, restore.get(context, 0)) or 0)))
+            restore[context] = offset
+
+            def move_offset(destination):
+                nonlocal offset
+                while offset != destination:
+                    if stopped():
+                        return False
+                    lowering = offset < destination
+                    click(minus_x if lowering else plus_x, level_y)
+                    offset += 1 if lowering else -1
+                    restore[context] = offset
+                    self.save_config()
+                    self._interruptible_sleep(0.35)
+                return not stopped()
+
+            start = min(limit, max(0, int(levels.get(key, 0))))
+            if offset != start:
+                self.set_status_message(f"Зомби: меняю уровень поиска с -{offset} на -{start}", force=True)
+            if not move_offset(start):
+                return False
+            candidates = range(start, limit + 1)
+        else:
+            ceiling = 7 if int(settings.get("level", 6) or 6) == 7 else 6
+            start = min(ceiling, max(1, int(levels.get(key, ceiling))))
+            # Collective searches have a fixed maximum of 7. Re-establish
+            # that anchor even after a restart or a manually changed slider.
+            if not collective_level(start):
+                return False
+            candidates = range(start, 0, -1)
+
+        for candidate in candidates:
+            if stopped():
+                return False
+            if zombie:
+                if not move_offset(candidate):
+                    return False
+                level_text = "стартовый" if candidate == 0 else f"-{candidate} от стартового"
+            else:
+                if candidate != start:
+                    if panel_reopened:
+                        if not collective_level(candidate):
+                            return False
+                        panel_reopened = False
+                    else:
+                        click(minus_x, level_y)
+                        self._interruptible_sleep(0.35)
+                    if stopped():
+                        return False
+                level_text = str(candidate)
+            self.set_status_message(f"{label}: поиск, уровень {level_text}", force=True)
+            click(round(target_x), round(target_y))
+            self._interruptible_sleep(2.5)
+            if stopped():
+                return False
+            self._invalidate_capture()
+            search_location, _bbox, _confidence = self._locate_image(img_config)
+            if search_location is not None:
+                self.set_status_message(f"{label}: цель не найдена, пробую ниже", force=True)
+                continue
+            if zombie and not self._confirm_zombie_search_result(display):
+                if stopped():
+                    return False
+                zombie_panel_closed = True
+                self.set_status_message(f"Зомби: цель уровня {level_text} не подтверждена, пробую ниже", force=True)
+                if candidate == limit:
+                    break
+                point = self._reopen_hunt_search(img_config, display)
+                if point is None:
+                    levels[key] = candidate+1
+                    self.save_config()
+                    self._defer_current_routine_unavailable(
+                        "зомби: повторное открытие поиска не подтверждено",
+                        time.time(), retry_delay=10,
+                    )
+                    return False
+                target_x, target_y = point
+                minus_x = round(target_x - 146*display.scale_x)
+                plus_x = round(target_x + 144*display.scale_x)
+                level_y = round(target_y - 76*display.scale_y)
+                zombie_panel_closed = False
+                continue
+            if not zombie and not self._confirm_collective_search_result(display):
+                if stopped():
+                    return False
+                self.set_status_message(f"{label}: цель уровня {candidate} не подтверждена, пробую ниже", force=True)
+                if candidate == 1:
+                    break
+                point = self._reopen_collective_search(img_config, display)
+                if point is None:
+                    levels[key] = candidate-1
+                    self.save_config()
+                    self._defer_current_routine_unavailable(
+                        "коллективный разум: повторное открытие поиска не подтверждено",
+                        time.time(), retry_delay=10,
+                    )
+                    return False
+                target_x, target_y = point
+                minus_x = round(target_x - 146*display.scale_x)
+                plus_x = round(target_x + 144*display.scale_x)
+                level_y = round(target_y - 76*display.scale_y)
+                panel_reopened = True
+                continue
+            found_levels[key] = candidate
+            if zombie:
+                self.save_config()
+            self._invalidate_capture()
+            img_config["last_used"] = time.time()
+            self.set_status_message(f"{label}: цель найдена, уровень {level_text}", force=True)
+            self._interruptible_sleep(img_config.get("delay", self.sleep_found))
+            return True
+
+        if zombie:
+            # If the final empty search closed the panel, retain the physical
+            # offset and restore it on the next confirmed search panel.
+            if not zombie_panel_closed:
+                if not move_offset(0):
+                    return False
+                restore.pop(context, None)
+            levels[key] = 0
+        else:
+            # A failed search can close the panel. Re-anchor its slider on the
+            # next confirmed search screen, never tap old controls on the map.
+            levels[key] = ceiling
+        self.save_config()
+        img_config["last_used"] = time.time()
+        retry_seconds = max(10, min(3600, int(settings.get("not_found_retry_seconds", 60) or 60)))
+        self._defer_current_routine_unavailable(
+            "зомби подходящего уровня не найдены" if zombie else "коллективный разум доступных уровней не найден",
+            time.time(), retry_delay=retry_seconds,
+        )
+        return False
+
     def _execute_action(self, img_config, location):
         self._check_worker_interrupted()
         self.routine_action_failure_reason = ""
+        own_rally = getattr(self, "own_rally_controller", None)
+        if (own_rally is not None
+                and getattr(self, "current_routine_task_id", None) == "collective_mind"
+                and img_config.get("runtime_step") == "march"):
+            location = own_rally.select_first_saved_squad(self, img_config)
+            if location is None:
+                self.routine_action_failure_reason = "own_rally_preset"
+                self.set_status_message("Свои сборы: отряд №1 не загружен, отправка отложена", force=True)
+                return False
         x, y = location.x, location.y
         offset = img_config.get("click_offset", (0, 0))
         display = self.get_display_profile() if self.uses_adb else make_display_profile(1280, 720)
@@ -13019,6 +15052,16 @@ class AutoClicker:
         action = img_config.get("action", "click")
         numbers = self._resolve_action_numbers(img_config)
         click_seq = img_config.get("click_sequence", [])
+
+        if getattr(self, "current_routine_task_id", None) == "radar_marches":
+            if getattr(self, "routine_radar_dispatch_candidate", None):
+                self.routine_action_failure_reason = "radar_dispatch_pending"
+                return False
+            if img_config.get("runtime_step") == "radar_forward":
+                card_frame, _card_origin = self._capture_screen_bgr(force=True)
+                if not radar_task_card_is_visible(card_frame) or radar_card_has_active_countdown(card_frame):
+                    return False
+                self.routine_radar_card_identity = cv2.resize(card_frame, (1280, 720))[160:335, 70:420].copy()
 
         if self._resource_result_level_rejected(img_config):
             return False
@@ -13074,6 +15117,8 @@ class AutoClicker:
                     )
                     return True
 
+            if self.stop_event.is_set():
+                return False
             logger.warning(
                 "Processing factory opening rejected: factory header did not appear"
             )
@@ -13087,6 +15132,10 @@ class AutoClicker:
             self._invalidate_capture()
             self.routine_completed_steps.discard("select_refinery")
             self.routine_processing_factory_force_scan = True
+            self.routine_processing_factory_dynamic_selected_at = 0.0
+            self.routine_processing_factory_dynamic_target = None
+            self.routine_processing_factory_radial_attempted = False
+            self.routine_processing_factory_recovery_required = True
             self.set_status_message(
                 "Завод не открылся: возвращаюсь и повторяю поиск",
                 force=True,
@@ -13219,25 +15268,29 @@ class AutoClicker:
                 )
                 return False
             target_x, target_y = target
+            if not self.uses_adb:
+                target_x += _origin[0]
+                target_y += _origin[1]
+            self._check_worker_interrupted()
             if self.uses_adb:
                 self.adb_client.tap(target_x, target_y)
             else:
                 pyautogui.click(target_x, target_y)
             self._invalidate_capture()
-            img_config["last_used"] = time.time()
-            logger.info(
-                "Alliance marked project selected at (%s, %s)",
-                target_x,
-                target_y,
-            )
-            self.set_status_message(
-                "Пожертвования: выбран отмеченный проект",
-                force=True,
-            )
             self._interruptible_sleep(img_config.get("delay", self.sleep_found))
-            project_frame, _origin = self._capture_screen_bgr(force=True)
-            self._save_routine_calibration_frame("alliance_donations", "project", project_frame)
-            return True
+            for _attempt in range(4):
+                project_frame, _origin = self._capture_screen_bgr(force=True)
+                if alliance_marked_project_is_visible(project_frame):
+                    self._save_routine_calibration_frame("alliance_donations", "project", project_frame)
+                    img_config["last_used"] = time.time()
+                    logger.info("Marked donation project panel confirmed at (%s, %s)", target_x, target_y)
+                    self.set_status_message("Пожертвования: открытие отмеченного проекта подтверждено", force=True)
+                    return True
+                self._interruptible_sleep(0.5)
+            self._save_routine_calibration_frame("alliance_donations", "project_unconfirmed", project_frame)
+            self.set_status_message("Пожертвования: отмеченный проект ещё не открылся, повторю проверку", force=True)
+            logger.warning("Marked project click did not open a confirmed marked donation panel")
+            return False
 
         if action == "radar_defer_in_progress":
             self.routine_radar_in_progress_seen = True
@@ -13273,6 +15326,15 @@ class AutoClicker:
             return True
 
         if action == "radar_return_shelter":
+            if (
+                getattr(self, "current_routine_task_id", None) == "radar_marches"
+                and "radar_march" in self.routine_completed_steps
+            ):
+                # A legacy Return button cannot prove the preceding March.
+                # Reconcile the selected card before recording any outcome.
+                self._confirm_radar_squad_dispatch()
+                self.routine_action_failure_reason = "radar_dispatch_pending"
+                return False
             if not (
                 {"radar_action", "radar_march"}
                 & self.routine_completed_steps
@@ -13282,10 +15344,6 @@ class AutoClicker:
                     sorted(self.routine_completed_steps),
                 )
                 return False
-            dispatched_radar_march = bool(
-                getattr(self, "current_routine_task_id", None) == "radar_marches"
-                and "radar_march" in self.routine_completed_steps
-            )
             if self.uses_adb:
                 self.adb_client.tap(int(round(target_x)), int(round(target_y)))
             else:
@@ -13298,31 +15356,6 @@ class AutoClicker:
             self.routine_idle_outside_since = 0.0
             self.routine_idle_recovery_attempted = False
             img_config["last_used"] = self.routine_last_action_time
-            if dispatched_radar_march:
-                self.routine_radar_dispatched_this_pass = True
-                for active_task in getattr(self, "routine_tasks", ()):
-                    if str(active_task.get("id") or "") == "radar_marches":
-                        active_task.setdefault("settings", {}).pop(
-                            "_no_squad_confirmations",
-                            None,
-                        )
-                        break
-                action_counts = getattr(self, "routine_action_counts", None)
-                if not isinstance(action_counts, dict):
-                    action_counts = {}
-                    self.routine_action_counts = action_counts
-                dispatches = int(action_counts.get("radar_dispatches", 0) or 0) + 1
-                action_counts["radar_dispatches"] = dispatches
-                self.set_status_message(
-                    f"Радар: отправлено отрядов {dispatches}; проверяю следующий свободный поход",
-                    force=True,
-                )
-                self._interruptible_sleep(img_config.get("delay", 0.8))
-                reset_radar_card_runtime_steps(self.routine_completed_steps)
-                self.routine_last_action_time = time.time()
-                self.routine_idle_confirmation_count = 0
-                self.save_config()
-                return True
             reset_radar_card_runtime_steps(self.routine_completed_steps)
             self.set_status_message(
                 "Радар: задание обработано, возвращаюсь к следующей карточке",
@@ -13554,6 +15587,9 @@ class AutoClicker:
 
         if action == "research_confirm":
             before, _before_origin = self._capture_screen_bgr(force=True)
+            if detect_gem_confirmation_cancel_target(before) is not None:
+                # The next routine iteration owns cancellation and deferral.
+                return False
             if self.uses_adb:
                 self.adb_client.tap(int(round(target_x)), int(round(target_y)))
             else:
@@ -13573,9 +15609,9 @@ class AutoClicker:
                 or research_tree_progress_is_active(after)
             )
             button_still_visible = detect_research_action_target(after) is not None
-            if screen_change < 2.0 and button_still_visible and not active_after:
+            if not active_after:
                 logger.warning(
-                    "Research confirmation button did not advance the screen (%.2f)",
+                    "Research confirmation has no active timer yet (screen change %.2f)",
                     screen_change,
                 )
                 return False
@@ -13696,194 +15732,7 @@ class AutoClicker:
             return
 
         if action in {"zombie_search", "hivemind_search"}:
-            minus_x = int(round(target_x - 146 * display.scale_x))
-            plus_x = int(round(target_x + 144 * display.scale_x))
-            level_y = int(round(target_y - 76 * display.scale_y))
-            click = self.adb_client.tap if self.uses_adb else pyautogui.click
-
-            if action == "zombie_search":
-                settings = self._current_task_settings()
-                fallback_levels = zombie_fallback_levels(settings)
-                context = routine_march_context_key(
-                    self.input_backend,
-                    getattr(self, "adb_serial", "desktop"),
-                    getattr(self, "current_account_id", "default"),
-                )
-                restore_by_context = getattr(self, "zombie_level_restore", {})
-                self.zombie_level_restore = restore_by_context
-                pending_restore = getattr(self, "zombie_level_restore_pending", {})
-                self.zombie_level_restore_pending = pending_restore
-                startup_offset = min(
-                    fallback_levels,
-                    max(0, int(pending_restore.pop(context, 0) or 0)),
-                )
-                if startup_offset:
-                    self.set_status_message(
-                        f"Зомби: восстанавливаю уровень после остановки (+{startup_offset})",
-                        force=True,
-                    )
-                    for _ in range(startup_offset):
-                        click(plus_x, level_y)
-                        self._interruptible_sleep(0.35)
-                        if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                            return False
-                    restore_by_context.pop(context, None)
-                    self.save_config()
-                previous_level_exists = context in restore_by_context
-                current_offset = min(
-                    fallback_levels,
-                    max(0, int(restore_by_context.get(context, 0) or 0)),
-                )
-
-                if previous_level_exists and fallback_levels > 0:
-                    if current_offset >= fallback_levels:
-                        self.set_status_message(
-                            f"Зомби: возвращаю стартовый уровень (+{current_offset})",
-                            force=True,
-                        )
-                        for _ in range(current_offset):
-                            click(plus_x, level_y)
-                            self._interruptible_sleep(0.35)
-                            if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                                return False
-                        current_offset = 0
-                    else:
-                        current_offset += 1
-                        click(minus_x, level_y)
-                        self._interruptible_sleep(0.35)
-                        if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                            return False
-                    restore_by_context[context] = current_offset
-                    self.save_config()
-                elif current_offset:
-                    self.set_status_message(
-                        f"Зомби: возвращаю стартовый уровень (+{current_offset})",
-                        force=True,
-                    )
-                    for _ in range(current_offset):
-                        click(plus_x, level_y)
-                        self._interruptible_sleep(0.35)
-                        if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                            return False
-                    current_offset = 0
-                    restore_by_context.pop(context, None)
-                    self.save_config()
-
-                found_offset = None
-                for level_offset in range(current_offset, fallback_levels + 1):
-                    if level_offset > current_offset:
-                        click(minus_x, level_y)
-                        restore_by_context[context] = level_offset
-                        self.save_config()
-                        self._interruptible_sleep(0.4)
-                        if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                            return False
-
-                    level_text = "сохранённом уровне" if level_offset == 0 else f"уровне -{level_offset}"
-                    self.set_status_message(f"Поиск зомби на {level_text}", force=True)
-                    click(int(round(target_x)), int(round(target_y)))
-                    self._interruptible_sleep(2.5)
-                    if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                        return False
-                    self._invalidate_capture()
-                    search_location, _bbox, _confidence = self._locate_image(img_config)
-                    if search_location is None:
-                        found_offset = level_offset
-                        break
-                    if level_offset < fallback_levels:
-                        self.set_status_message(
-                            f"Зомби не найдены: понижаю уровень ({level_offset + 1}/{fallback_levels})",
-                            force=True,
-                        )
-
-                if found_offset is None:
-                    for _ in range(fallback_levels):
-                        click(plus_x, level_y)
-                        self._interruptible_sleep(0.35)
-                    restore_by_context.pop(context, None)
-                    self.save_config()
-                    img_config["last_used"] = time.time()
-                    self.set_status_message(
-                        f"Зомби не найдены на стартовом и {fallback_levels} нижних уровнях",
-                        force=True,
-                    )
-                    retry_seconds = max(
-                        10,
-                        min(3600, int(settings.get("not_found_retry_seconds", 60) or 60)),
-                    )
-                    self._defer_current_routine_unavailable(
-                        "зомби подходящего уровня не найдены",
-                        time.time(),
-                        retry_delay=retry_seconds,
-                    )
-                    return False
-
-                # Keep the chosen level in the game and rotate to the next
-                # configured level for the following squad. This prevents the
-                # search from selecting the same zombie for every free march.
-                restore_by_context[context] = found_offset
-                self.save_config()
-                if self.uses_adb:
-                    self.adb_client.tap(display.width // 2, int(round(display.height * 0.49)))
-                else:
-                    center_x, center_y = self._screen_normalized_point(0.5, 0.49)
-                    pyautogui.click(center_x, center_y)
-                self._invalidate_capture()
-                img_config["last_used"] = time.time()
-                suffix = "" if found_offset == 0 else f" (-{found_offset} от стартового)"
-                self.set_status_message(f"Зомби найдены{suffix}", force=True)
-                self._interruptible_sleep(img_config.get("delay", self.sleep_found))
-                return True
-
-            selected_level = 7 if int(self._current_task_settings().get("level", 6) or 6) == 7 else 6
-            for _ in range(7):
-                click(plus_x, level_y)
-                self._interruptible_sleep(0.3)
-                if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                    return False
-            for _ in range(7 - selected_level):
-                click(minus_x, level_y)
-                self._interruptible_sleep(0.3)
-                if self.stop_event.is_set() or self.stop_hotkey_pressed:
-                    return False
-            self.set_status_message(
-                f"Коллективный разум: выбран уровень {selected_level}",
-                force=True,
-            )
-            click(int(round(target_x)), int(round(target_y)))
-            self._interruptible_sleep(2.0)
-            self._invalidate_capture()
-            no_result_uid = str(img_config.get("no_result_template_uid") or "")
-            no_result = next(
-                (
-                    image for image in self.search_images
-                    if str(image.get("uid") or "") == no_result_uid
-                ),
-                None,
-            ) if no_result_uid else None
-            if no_result is not None:
-                no_result_location, _bbox, _confidence = self._locate_image(no_result)
-                if no_result_location is not None:
-                    img_config["last_used"] = time.time()
-                    self.set_status_message(
-                        "Коллективный разум выбранного уровня рядом не найден; повтор позже",
-                        force=True,
-                    )
-                    self._interruptible_sleep(img_config.get("delay", self.sleep_found))
-                    return True
-            if self.uses_adb:
-                self.adb_client.tap(display.width // 2, int(round(display.height * 0.49)))
-            else:
-                center_x, center_y = self._screen_normalized_point(0.5, 0.49)
-                pyautogui.click(center_x, center_y)
-            self._invalidate_capture()
-            img_config["last_used"] = time.time()
-            self.set_status_message(
-                f"Поиск коллективного разума уровня {selected_level}",
-                force=True,
-            )
-            self._interruptible_sleep(img_config.get("delay", self.sleep_found))
-            return True
+            return self._execute_hunt_search(img_config, target_x, target_y, display)
 
         if action == "prize_start_or_prepare":
             if self.uses_adb:
@@ -14830,9 +16679,9 @@ class AutoClicker:
 
         if action == "zombie_attack":
             frame, _origin = self._capture_screen_bgr(force=True)
-            if zombie_camp_checkbox_is_checked(frame):
-                camp_x = int(round(820 * frame.shape[1] / 1280.0))
-                camp_y = int(round(518 * frame.shape[0] / 720.0))
+            if zombie_camp_checkbox_is_checked(frame, (target_x - _origin[0], target_y - _origin[1])):
+                camp_x = int(round(target_x - 146 * frame.shape[1] / 1280.0))
+                camp_y = int(round(target_y - 43 * frame.shape[0] / 720.0))
                 self.set_status_message(
                     "Охота на зомби: отключаю разбивку лагеря после атаки",
                     force=True,
@@ -14946,6 +16795,34 @@ class AutoClicker:
                 logger.info(f"Блокирующая задержка {delay} сек после клика по {img_config['description']}")
             self._interruptible_sleep(delay)
 
+        if current_routine_task_id == "radar_marches" and img_config.get("runtime_step") == "radar_march":
+            self._confirm_radar_squad_dispatch()
+            self.routine_action_failure_reason = "radar_dispatch_pending"
+            return False
+
+        if is_radar_task_id(current_routine_task_id) and img_config.get("runtime_step") == "radar_marker":
+            # Several tasks share the same map icon, and the selected icon can
+            # remain behind its card. Confirm the card instead of waiting for
+            # every matching map icon to disappear like a march button.
+            for _attempt in range(4):
+                self._check_worker_interrupted()
+                if self.stop_event.is_set():
+                    return False
+                card_frame, _card_origin = self._capture_screen_bgr(force=True)
+                self._check_worker_interrupted()
+                if self.stop_event.is_set():
+                    return False
+                if radar_task_card_is_visible(card_frame):
+                    logger.info("Radar marker selection confirmed by its open task card")
+                    return True
+                self._interruptible_sleep(0.35)
+            self.set_status_message("Радар: карточка задания не открылась", force=True)
+            return False
+
+        if (current_routine_task_id == "collective_mind"
+                and img_config.get("runtime_step") in {"rally", "confirm_rally"}):
+            return self._confirm_collective_transition(img_config, display)
+
         if img_config.get("confirm_disappears", False):
             stamina_frame, stamina_origin = self._capture_screen_bgr(force=True)
             settings = self._current_task_settings()
@@ -14954,8 +16831,22 @@ class AutoClicker:
             max_refill_attempts = 8
             stamina_enabled = current_routine_task_id is None or current_routine_task_id in {
                 "zombie_hunt",
+                "collective_mind",
                 "wasteland_exploration",
             }
+            hunt_dispatch = current_routine_task_id in {"zombie_hunt", "collective_mind"}
+            if hunt_dispatch:
+                # The insufficient-stamina toast briefly covers the dialog
+                # heading. Wait for the actual map or the settled dialog;
+                # a hidden March button alone does not prove deployment.
+                for _attempt in range(6):
+                    if (stamina_dialog_is_visible(stamina_frame)
+                            or self._world_map_visible_in_frame(stamina_frame)):
+                        break
+                    self._interruptible_sleep(0.5)
+                    if self.stop_event.is_set() or self.stop_hotkey_pressed:
+                        return False
+                    stamina_frame, stamina_origin = self._capture_screen_bgr(force=True)
             while stamina_enabled and stamina_dialog_is_visible(stamina_frame):
                 if not bool(settings.get("use_stamina_items", True)):
                     self.routine_action_failure_reason = "stamina"
@@ -15118,7 +17009,9 @@ class AutoClicker:
                         )
                         break
                     location_after, bbox_after, _score = self._locate_image(img_config)
-                    if not location_after or not bbox_after:
+                    if (not location_after or not bbox_after) and (
+                        not hunt_dispatch or self._world_map_visible_in_frame(confirmation_frame)
+                    ):
                         logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
                         return True
                 if stamina_required_again:
@@ -15136,10 +17029,6 @@ class AutoClicker:
             deadline = time.monotonic() + 6.0
             while time.monotonic() < deadline and not self.stop_event.is_set():
                 self._interruptible_sleep(0.5)
-                location_after, bbox_after, _score = self._locate_image(img_config)
-                if not location_after or not bbox_after:
-                    logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
-                    return True
                 confirmation_frame, _confirmation_origin = self._capture_screen_bgr(force=True)
                 if stamina_enabled and stamina_dialog_is_visible(confirmation_frame):
                     self.routine_action_failure_reason = "stamina"
@@ -15148,6 +17037,12 @@ class AutoClicker:
                         force=True,
                     )
                     return False
+                location_after, bbox_after, _score = self._locate_image(img_config)
+                if (not location_after or not bbox_after) and (
+                    not hunt_dispatch or self._world_map_visible_in_frame(confirmation_frame)
+                ):
+                    logger.info("Отправка похода подтверждена сменой экрана: %s", img_config["description"])
+                    return True
             self.set_status_message(
                 "Отправка похода не подтверждена: отряд остался на экране",
                 force=True,
@@ -18261,7 +20156,10 @@ def main():
 
         root.after(400, poll_parent_command)
 
-    if should_autostart_all_emulators() and not is_multi_worker:
+    if "--own-rally" in sys.argv and not is_multi_worker:
+        logger.info("Own rally mode requested")
+        root.after(1500, bot.start_own_rally_mode)
+    elif should_autostart_all_emulators() and not is_multi_worker:
         logger.info("Autostart-all requested: starting selected tasks on every LDPlayer")
         root.after(1500, bot.start_all_emulators)
     elif should_autostart_merchant_only():

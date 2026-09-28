@@ -588,7 +588,7 @@ class HealingTests(unittest.TestCase):
             )
         bot._capture_screen_bgr = lambda force=False: (marker_frame, (0, 0))
         deferred = []
-        bot._defer_current_routine_unavailable = (
+        bot._wait_for_healing_retry = (
             lambda reason, now=None, retry_delay=None: deferred.append(
                 (reason, retry_delay)
             )
@@ -998,6 +998,7 @@ class HealingTests(unittest.TestCase):
         )
         bot.save_config = lambda: None
         bot._defer_current_routine_unavailable = lambda *_args, **_kwargs: None
+        bot._wait_for_healing_retry = lambda *_args, **_kwargs: None
         task = {
             "id": "heal",
             "settings": {

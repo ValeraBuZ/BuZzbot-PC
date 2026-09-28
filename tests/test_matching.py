@@ -421,13 +421,16 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertFalse(settlement_building_catalogue_is_visible(frame))
 
-    def test_merchant_detector_accepts_dark_offer_grid(self):
+    def test_merchant_detector_requires_grid_title_and_selected_tab(self):
         hsv = np.full((720, 1280, 3), (20, 100, 100), dtype=np.uint8)
         hsv[90:590, 0:155] = (0, 100, 100)
         frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
         self.assertFalse(mysterious_merchant_screen_is_visible(frame))
         frame[61:89, 154:443] = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_title.png"))
+        self.assertFalse(mysterious_merchant_screen_is_visible(frame))
+        merchant = cv2.imread(str(Path(__file__).parent / "assets/merchant/merchant_grid.png"))
+        frame[365:478, 15:125] = merchant[365:478, 15:125]
 
         self.assertTrue(mysterious_merchant_screen_is_visible(frame))
 
@@ -440,7 +443,7 @@ class DynamicGameControlTests(unittest.TestCase):
         self.assertEqual(detect_shop_merchant_tab_target(vip), (68, 424))
         self.assertTrue(mysterious_merchant_screen_is_visible(merchant))
 
-    def test_merchant_prices_follow_scroll_and_exclude_gems_and_footer(self):
+    def test_merchant_gold_bars_without_currency_cannot_be_purchased(self):
         hsv = np.full((720, 1280, 3), (20, 100, 80), dtype=np.uint8)
         hsv[90:590, 0:155] = (0, 100, 100)
         hsv[369:406, 601:756] = (20, 180, 220)
@@ -450,11 +453,14 @@ class DynamicGameControlTests(unittest.TestCase):
         hsv[625:666, 909:1064] = (20, 180, 220)
         frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
         frame[61:89, 154:443] = cv2.imread(str(MERCHANT_ASSET_DIR / "merchant_title.png"))
+        merchant = cv2.imread(str(Path(__file__).parent / "assets/merchant/merchant_grid.png"))
+        frame[365:478, 15:125] = merchant[365:478, 15:125]
+        self.assertTrue(mysterious_merchant_screen_is_visible(frame))
 
         self.assertEqual(detect_mysterious_merchant_non_gem_offer_targets(frame),
-                         [(678, 388), (370, 554)])
+                         [])
         self.assertEqual(detect_mysterious_merchant_non_gem_offer_targets(
-            cv2.resize(frame, (640, 360))), [(339, 194), (185, 277)])
+            cv2.resize(frame, (640, 360))), [])
 
     def test_detects_research_collect_or_confirm_button(self):
         frame = np.full((720, 1280, 3), (35, 40, 45), dtype=np.uint8)
@@ -713,17 +719,32 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(detect_igg_game_login_ok_target(frame), (784, 508))
         self.assertIsNone(detect_igg_game_login_ok_target(np.zeros_like(frame)))
-        stale_unity_frame = frame.copy()
-        stale_unity_frame[:150] = 0
-        self.assertIsNone(detect_igg_game_login_ok_target(stale_unity_frame))
+        sdk_transition_frame = frame.copy()
+        sdk_transition_frame[:150] = 0
+        self.assertEqual(detect_igg_game_login_ok_target(sdk_transition_frame), (784, 508))
 
         lighter_overlay = frame.copy()
         lighter_overlay[:150, :] = 50
         self.assertEqual(detect_igg_game_login_ok_target(lighter_overlay), (784, 508))
 
+    def test_real_igg_confirmation_on_bright_map_requires_igg_text_and_buttons(self):
+        frame = cv2.imread(str(Path(__file__).parent / 'assets/accounts/igg_confirmation_bright_map.png'))
+        for scale in (1, .75):
+            scaled = cv2.resize(frame, None, fx=scale, fy=scale)
+            self.assertEqual(detect_igg_game_login_ok_target(scaled),
+                             (round(784*scale), round(508*scale)))
+        for region in ((slice(260,430),slice(370,930)),
+                       (slice(478,540),slice(355,635)),
+                       (slice(478,540),slice(645,925))):
+            partial = frame.copy()
+            partial[region] = 0
+            self.assertIsNone(detect_igg_game_login_ok_target(partial))
+
     @staticmethod
     def stamina_dialog_frame(width=1280, height=720):
         frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        title = cv2.imread(str(Path(__file__).resolve().parents[1] / "buzzbot/assets/stamina/dialog_title.png"))
+        frame[83:110, 529:748] = title
         cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
         cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
         for x1, y1, x2, y2 in (
@@ -925,7 +946,7 @@ class DynamicGameControlTests(unittest.TestCase):
             (392, 254),
         )
 
-    def test_detects_marked_alliance_project_and_ignores_other_red_shapes(self):
+    def test_red_notification_shapes_do_not_prove_a_marked_project(self):
         frame = np.full((720, 1280, 3), (45, 50, 55), dtype=np.uint8)
         cv2.circle(frame, (474, 263), 7, (10, 25, 230), thickness=-1)
         cv2.rectangle(frame, (650, 470), (675, 475), (10, 25, 230), thickness=-1)
@@ -933,36 +954,34 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(
             detect_alliance_marked_project_target(frame),
-            (419, 263),
+            None,
         )
 
-    def test_alliance_marker_target_scales_back_to_the_device_frame(self):
+    def test_scaled_red_dot_does_not_prove_a_marked_project(self):
         frame = np.full((360, 640, 3), (45, 50, 55), dtype=np.uint8)
         cv2.circle(frame, (237, 132), 4, (10, 25, 230), thickness=-1)
 
         target = detect_alliance_marked_project_target(frame)
 
-        self.assertIsNotNone(target)
-        self.assertTrue(205 <= target[0] <= 215)
-        self.assertTrue(128 <= target[1] <= 136)
+        self.assertIsNone(target)
 
-    def test_detects_wide_marked_alliance_project_ribbon(self):
+    def test_red_ribbon_without_marked_text_is_not_a_project(self):
         frame = np.full((720, 1280, 3), (45, 50, 55), dtype=np.uint8)
         cv2.rectangle(frame, (343, 151), (499, 188), (20, 45, 210), thickness=-1)
 
         self.assertEqual(
             detect_alliance_marked_project_target(frame),
-            (326, 170),
+            None,
         )
 
-    def test_detects_live_marked_ribbon_split_by_light_text(self):
+    def test_split_red_ribbon_without_marked_text_is_not_a_project(self):
         frame = np.full((720, 1280, 3), (45, 50, 55), dtype=np.uint8)
         cv2.rectangle(frame, (395, 428), (489, 443), (20, 45, 210), thickness=-1)
         cv2.rectangle(frame, (413, 447), (476, 466), (20, 45, 210), thickness=-1)
 
         self.assertEqual(
             detect_alliance_marked_project_target(frame),
-            (347, 436),
+            None,
         )
 
     def test_detects_radar_notification_dots_and_targets_the_markers(self):
@@ -1018,6 +1037,13 @@ class DynamicGameControlTests(unittest.TestCase):
 
     def test_detects_active_radar_card_countdown(self):
         frame = np.full((720, 1280, 3), (190, 205, 215), dtype=np.uint8)
+        label = imread_unicode(
+            Path(__file__).resolve().parents[1]
+            / "buzzbot/assets/radar/in_progress_label.png"
+        )
+        self.assertIsNotNone(label)
+        height, width = label.shape[:2]
+        frame[595:595 + height, 180:180 + width] = label
         for x in (302, 315, 334, 347, 367, 380):
             cv2.rectangle(frame, (x, 356), (x + 8, 370), (35, 35, 35), thickness=-1)
 
@@ -1028,6 +1054,13 @@ class DynamicGameControlTests(unittest.TestCase):
 
     def test_rejects_radar_card_without_six_digit_countdown(self):
         frame = np.full((720, 1280, 3), (190, 205, 215), dtype=np.uint8)
+        label = imread_unicode(
+            Path(__file__).resolve().parents[1]
+            / "buzzbot/assets/radar/in_progress_label.png"
+        )
+        self.assertIsNotNone(label)
+        height, width = label.shape[:2]
+        frame[595:595 + height, 180:180 + width] = label
         for x in (302, 315, 334, 347):
             cv2.rectangle(frame, (x, 356), (x + 8, 370), (35, 35, 35), thickness=-1)
 
@@ -1113,26 +1146,73 @@ class DynamicGameControlTests(unittest.TestCase):
 
         self.assertEqual(detect_camped_march_card_targets(frame), [])
 
+    def test_detects_real_camp_without_selecting_its_portrait_first(self):
+        for name in ("camped_unselected.png", "camped_selected.png"):
+            with self.subTest(screen=name):
+                frame = cv2.imread(str(Path(__file__).parent / "assets/marches" / name))
+                self.assertEqual(detect_camped_march_card_targets(frame), [(1218, 222)])
+
+    def test_camp_rejects_returning_squad_on_real_map(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/marches/retreat_returning.png"))
+        self.assertEqual(detect_camped_march_card_targets(frame), [])
+
     def test_detects_selected_march_retreat_action(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
         self.assertIsNone(detect_march_retreat_target(frame))
 
-        cv2.circle(frame, (582, 456), 38, (40, 145, 205), thickness=-1)
-        cv2.circle(frame, (696, 456), 38, (40, 145, 205), thickness=-1)
+        frame = cv2.imread(str(Path(__file__).parent / "assets/marches/camped_retreat.png"))
         target = detect_march_retreat_target(frame)
-        self.assertIsNotNone(target)
-        self.assertLessEqual(abs(target[0] - 696), 8)
-        self.assertLessEqual(abs(target[1] - 456), 8)
+        self.assertEqual(target, (696, 456))
+
+    def test_detects_retreat_at_smaller_screen_resolution(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/marches/camped_retreat.png"))
+        target = detect_march_retreat_target(cv2.resize(frame, (960, 540)))
+        self.assertEqual(target, (522, 342))
+
+    def test_detects_retreat_on_independent_live_capture(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/marches/camped_selected.png"))
+        self.assertEqual(detect_march_retreat_target(frame), (696, 456))
+
+    def test_retreat_at_minimum_map_zoom_is_recognized_at_both_resolutions(self):
+        frame=cv2.imread(str(Path(__file__).parent / 'assets/marches/camped_zoomed_out.png'))
+        for scale in (1,.75):
+            target=detect_march_retreat_target(cv2.resize(frame,None,fx=scale,fy=scale))
+            self.assertIsNotNone(target)
+            self.assertAlmostEqual(target[0],450*scale,delta=1)
+            self.assertAlmostEqual(target[1],544*scale,delta=1)
+        for region in ((slice(525,560),slice(362,396)),(slice(526,559),slice(432,471))):
+            partial=frame.copy();partial[region]=0
+            self.assertIsNone(detect_march_retreat_target(partial))
 
     def test_detects_moved_retreat_action_pair(self):
-        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
-        cv2.circle(frame, (445, 519), 28, (40, 145, 205), thickness=-1)
-        cv2.circle(frame, (531, 519), 28, (40, 145, 205), thickness=-1)
+        frame = cv2.imread(str(Path(__file__).parent / "assets/marches/camped_retreat.png"))
+        frame = cv2.warpAffine(frame, np.float32([[0.75, 0, 9], [0, 0.75, 177]]), (1280, 720))
 
         target = detect_march_retreat_target(frame)
         self.assertIsNotNone(target)
         self.assertLessEqual(abs(target[0] - 531), 8)
         self.assertLessEqual(abs(target[1] - 519), 8)
+
+    def test_retreat_requires_both_specific_action_icons(self):
+        original = cv2.imread(str(Path(__file__).parent / "assets/marches/camped_retreat.png"))
+        for left, right in ((545, 622), (656, 735)):
+            with self.subTest(hidden_icon=left):
+                frame = original.copy()
+                frame[419:484, left:right] = (35, 45, 55)
+                self.assertIsNone(detect_march_retreat_target(frame))
+
+    def test_rejects_generic_gold_circles_as_retreat(self):
+        frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)
+        cv2.circle(frame, (582, 456), 38, (40, 145, 205), thickness=-1)
+        cv2.circle(frame, (696, 456), 38, (40, 145, 205), thickness=-1)
+        self.assertIsNone(detect_march_retreat_target(frame))
+
+    def test_retreat_rejects_other_real_game_screens(self):
+        paths = list((Path(__file__).parent / "assets/zombie").glob("*"))
+        paths.append(Path(__file__).parent / "assets/marches/returned_no_panel.png")
+        for path in paths:
+            with self.subTest(screen=path.name):
+                self.assertIsNone(detect_march_retreat_target(cv2.imread(str(path))))
 
     def test_rejects_asymmetric_world_map_circle_pair(self):
         frame = np.full((720, 1280, 3), (35, 45, 55), dtype=np.uint8)

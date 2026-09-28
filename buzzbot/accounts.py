@@ -27,6 +27,7 @@ def default_account_profiles(serial="emulator-5564"):
             "session_minutes": 30.0,
             "login_method": "igg",
             "chooser_index": 2,
+            "verified_igg_id": "",
             "google_login": "",
             "igg_login": "",
             "auto_login": False,
@@ -69,6 +70,9 @@ def normalize_account_profiles(raw_profiles, serial="emulator-5564"):
         login_method = str(source.get("login_method") or "igg").strip().lower()
         if login_method not in {"igg", "google"}:
             login_method = "igg"
+        verified_igg_id = str(source.get("verified_igg_id") or "").strip()
+        if re.fullmatch(r"[0-9]{6,20}", verified_igg_id) is None:
+            verified_igg_id = ""
         normalized.append(
             {
                 "id": account_id,
@@ -79,6 +83,7 @@ def normalize_account_profiles(raw_profiles, serial="emulator-5564"):
                 "session_minutes": _number(source.get("session_minutes"), 30.0, 1.0, 1440.0),
                 "login_method": login_method,
                 "chooser_index": int(_number(source.get("chooser_index"), index + 1, 1, 20)),
+                "verified_igg_id": verified_igg_id,
                 "google_login": str(source.get("google_login") or "").strip(),
                 "igg_login": str(source.get("igg_login") or "").strip(),
                 "auto_login": bool(source.get("auto_login", False)),
@@ -150,6 +155,7 @@ def recover_account_profiles(raw_profiles, credential_keys, serial="emulator-556
                 "session_minutes": 30.0,
                 "login_method": preferred_method,
                 "chooser_index": 1,
+                "verified_igg_id": "",
                 "google_login": "",
                 "igg_login": "",
                 "auto_login": True,
@@ -476,48 +482,95 @@ def extract_igg_unregistered_cancel_target(ui_xml):
 
 
 def extract_igg_id_targets(ui_xml):
-    """Return saved IGG ID rows from the account-selection WebView."""
+    """Return visible SDK rows with the ID belonging to each click target.
+
+    Accessibility tree order can differ from visual row order, and WebViews
+    may expose one row through both a parent View and a child TextView. Keep
+    identity and coordinates together throughout filtering and sorting.
+    """
     try:
         root = ET.fromstring(str(ui_xml or ""))
     except ET.ParseError:
         return []
 
-    page_title_visible = any(
-        "igg id" in " ".join(
-            (
-                str(node.attrib.get("text", "")),
-                str(node.attrib.get("content-desc", "")),
+    def node_bounds(node):
+        match = re.fullmatch(
+            r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]",
+            str(node.get("bounds", "")),
+        )
+        return tuple(map(int, match.groups())) if match is not None else None
+
+    # Full Android dumps carry the display bounds on the root window. Small
+    # diagnostics may contain only rows from the supported 1280x720 display.
+    viewport = (0, 0, 1280, 720)
+    for window in (root, *list(root)):
+        if window is not root and window.get("class") not in {
+            "android.widget.FrameLayout", "android.widget.LinearLayout", "android.view.ViewGroup",
+        }:
+            continue
+        bounds = node_bounds(window)
+        if (
+            bounds is not None and bounds[:2] == (0, 0)
+            and bounds[2] > 100 and bounds[3] > 100
+        ):
+            viewport = bounds
+            break
+    minimum_row_top = int(round(68 * (viewport[3] - viewport[1]) / 720))
+    rows = {}
+
+    def visit(node, clip, visible):
+        visible = visible and all(
+            node.get(key, "true").casefold() != "false"
+            for key in ("visible-to-user", "displayed", "enabled")
+        )
+        if not visible:
+            return
+        bounds = node_bounds(node)
+        child_clip = clip
+        if bounds is not None:
+            left, top, right, bottom = bounds
+            if right <= left or bottom <= top:
+                return
+            child_clip = (
+                max(clip[0], left), max(clip[1], top),
+                min(clip[2], right), min(clip[3], bottom),
             )
-        ).casefold()
-        for node in root.iter()
-        if node.attrib.get("class") == "android.widget.TextView"
+            if child_clip[2] <= child_clip[0] or child_clip[3] <= child_clip[1]:
+                return
+            if (
+                node.get("class") in {"android.widget.TextView", "android.view.View"}
+                and top >= minimum_row_top
+                and child_clip == bounds
+            ):
+                identities = {
+                    match[1]
+                    for value in (node.get("text", ""), node.get("content-desc", ""))
+                    if (match := re.fullmatch(r"\s*IGG\s*ID\s*:\s*([0-9]{6,20})\s*", value, re.I))
+                }
+                if len(identities) == 1:
+                    igg_id = next(iter(identities))
+                    area = (right - left) * (bottom - top)
+                    row = {
+                        "center": ((left + right) // 2, (top + bottom) // 2),
+                        "igg_id": igg_id,
+                    }
+                    # The most precise label bounds remain inside its row's
+                    # clickable parent. Repeated accessibility labels must
+                    # not shift every subsequent chooser_index.
+                    preference = (area, top, left)
+                    if igg_id not in rows or preference < rows[igg_id][0]:
+                        rows[igg_id] = (preference, row)
+        for child in node:
+            visit(child, child_clip, visible)
+
+    visit(root, viewport, True)
+    ordered_rows = sorted(
+        (row for _preference, row in rows.values()),
+        key=lambda row: (row["center"][1], row["center"][0]),
     )
-    if not page_title_visible:
-        return []
-
-    centers = []
-    seen = set()
-    for node in root.iter():
-        if node.attrib.get("class") != "android.widget.TextView":
-            continue
-        label = str(node.attrib.get("text", "")).strip()
-        if re.match(r"^IGG\s*ID\s*:\s*\d+", label, re.IGNORECASE) is None:
-            continue
-        bounds = _BOUNDS_RE.fullmatch(str(node.attrib.get("bounds", "")))
-        if bounds is None:
-            continue
-        left, top, right, bottom = map(int, bounds.groups())
-        if right <= left or bottom <= top or top < 68:
-            continue
-        center = ((left + right) // 2, (top + bottom) // 2)
-        if center not in seen:
-            seen.add(center)
-            centers.append(center)
-
-    centers.sort(key=lambda point: (point[1], point[0]))
     return [
-        {"chooser_index": index, "center": center}
-        for index, center in enumerate(centers, start=1)
+        {"chooser_index": index, **row}
+        for index, row in enumerate(ordered_rows, start=1)
     ]
 
 

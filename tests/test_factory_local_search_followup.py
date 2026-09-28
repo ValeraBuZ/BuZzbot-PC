@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -15,6 +16,7 @@ class FactoryLocalSearchTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = Mock()
+        bot.stop_event = threading.Event()
         bot.routine_completed_steps = {"pan_north"}
         bot.routine_processing_factory_recenter_attempted = True
         bot.routine_processing_factory_scan_index = 0
@@ -25,6 +27,8 @@ class FactoryLocalSearchTests(unittest.TestCase):
         bot.search_images = []
         bot._capture_screen_bgr = Mock(return_value=(frame if frame is not None else np.zeros((720, 1280, 3), np.uint8), (0, 0)))
         bot._is_settlement_screen_visible = Mock(return_value=True)
+        bot._return_to_main_screen = Mock(return_value=True)
+        bot._defer_current_routine_unavailable = Mock()
         bot._locate_image = Mock(return_value=(None, None, 0.0))
         bot._validate_detected_match = Mock(return_value=(True, ""))
         bot._execute_action = Mock(return_value=True)
@@ -72,9 +76,9 @@ class FactoryLocalSearchTests(unittest.TestCase):
     def test_recenter_waits_for_settlement_marker_to_disappear(self):
         bot = self.make_bot()
         bot.routine_processing_factory_recenter_attempted = False
-        # First call is the starting settlement; the first post-tap frame still
-        # shows it. Only the second post-tap frame confirms the world surface.
-        bot._is_settlement_screen_visible.side_effect = [True, True, False]
+        # Entry and recenter both require the settlement. The first post-tap
+        # frame still shows it; only the second confirms the world surface.
+        bot._is_settlement_screen_visible.side_effect = [True, True, True, False]
         bot._is_main_screen_visible = Mock(return_value=True)
         bot._switch_to_settlement_screen = Mock(return_value=True)
         bot.routine_completed_steps.add("processing_factory_event_panel_checked")
@@ -91,7 +95,7 @@ class FactoryLocalSearchTests(unittest.TestCase):
         bot = self.make_bot()
         bot.routine_processing_factory_recenter_attempted = False
         bot.routine_processing_factory_scan_index = 17
-        bot._is_settlement_screen_visible.side_effect = [True, False]
+        bot._is_settlement_screen_visible.side_effect = [True, True, False]
         bot._is_main_screen_visible = Mock(return_value=True)
         bot._switch_to_settlement_screen = Mock(return_value=False)
         bot.routine_completed_steps.add("processing_factory_event_panel_checked")
@@ -144,7 +148,13 @@ class FactoryLocalSearchTests(unittest.TestCase):
             self.tick(bot, 105.0)
             self.assertNotIn("select_refinery", bot.routine_completed_steps)
             self.assertTrue(bot.routine_processing_factory_force_scan)
-            self.tick(bot, 106.0)
+            self.assertTrue(bot.routine_processing_factory_recovery_required)
+            self.assertTrue(self.tick(bot, 106.0))
+            bot._return_to_main_screen.assert_called_once_with(max_back_steps=3, require_settlement=True)
+            bot.adb_client.swipe.assert_not_called()
+            self.assertEqual(bot.routine_processing_factory_scan_index, 3)
+            self.assertFalse(bot.routine_processing_factory_recovery_required)
+            self.tick(bot, 107.0)
         bot._tap_routine_fallback.assert_called_once()
         bot.adb_client.keyevent.assert_called_once_with(4)
         bot.adb_client.swipe.assert_called_once_with(640, 450, 640, 330, 600)
@@ -158,7 +168,9 @@ class FactoryLocalSearchTests(unittest.TestCase):
     def test_non_settlement_never_starts_local_camera_gesture(self):
         bot = self.make_bot()
         bot._is_settlement_screen_visible.return_value = False
-        self.assertFalse(self.tick(bot))
+        self.assertTrue(self.tick(bot))
+        self.assertTrue(bot.routine_processing_factory_recovery_required)
+        bot._return_to_main_screen.assert_not_called()
         bot.adb_client.swipe.assert_not_called()
         self.assertEqual(bot.routine_processing_factory_scan_index, 0)
 

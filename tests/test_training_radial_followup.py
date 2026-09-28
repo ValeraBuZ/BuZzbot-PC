@@ -53,6 +53,8 @@ class TrainingRadialRuntimeTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = Mock()
+        # This fixture models training inside the game, not a foreground loss.
+        bot.adb_client.current_foreground_package.return_value = "com.igg.android.doomsdaylastsurvivors"
         bot._check_worker_interrupted = Mock()
         bot.get_display_profile = Mock(return_value=make_display_profile(1280, 720))
         bot._resolve_action_numbers = Mock(return_value=[])

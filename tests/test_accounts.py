@@ -276,7 +276,7 @@ class AccountProfileTests(unittest.TestCase):
         )
         self.assertIsNone(extract_igg_login_form(xml))
 
-    def test_extracts_saved_igg_id_rows_without_exposing_ids(self):
+    def test_extracts_saved_igg_id_rows_with_their_exact_identity(self):
         xml = (
             '<hierarchy><node class="android.widget.TextView" text="Выбрать IGG ID" '
             'bounds="[543,15][736,52]" />'
@@ -286,8 +286,8 @@ class AccountProfileTests(unittest.TestCase):
             'bounds="[261,214][894,241]" /></hierarchy>'
         )
         self.assertEqual(extract_igg_id_targets(xml), [
-            {"chooser_index": 1, "center": (577, 162)},
-            {"chooser_index": 2, "center": (577, 227)},
+            {"chooser_index": 1, "center": (577, 162), "igg_id": "123456789"},
+            {"chooser_index": 2, "center": (577, 227), "igg_id": "987654321"},
         ])
 
 

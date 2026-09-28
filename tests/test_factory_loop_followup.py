@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -17,6 +18,7 @@ class FactoryLoopFollowupTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = Mock()
+        bot.stop_event = threading.Event()
         bot.routine_completed_steps = {"pan_north", "select_refinery"}
         bot.routine_processing_factory_dynamic_selected_at = 100.0
         bot.routine_processing_factory_dynamic_target = (705, 285)
@@ -35,6 +37,8 @@ class FactoryLoopFollowupTests(unittest.TestCase):
         bot._invalidate_capture = Mock()
         bot._capture_screen_bgr = Mock(return_value=(np.zeros((720, 1280, 3), dtype=np.uint8), (0, 0)))
         bot._is_settlement_screen_visible = Mock(return_value=True)
+        bot._return_to_main_screen = Mock(return_value=True)
+        bot._defer_current_routine_unavailable = Mock()
         bot._save_routine_calibration_frame = Mock()
         bot.set_status_message = Mock()
         bot.click_count = 0
@@ -57,11 +61,17 @@ class FactoryLoopFollowupTests(unittest.TestCase):
         self.assertTrue(self.tick(bot, 105.0))
         bot.adb_client.keyevent.assert_called_once_with(4)
         self.assertNotIn("select_refinery", bot.routine_completed_steps)
+        self.assertTrue(bot.routine_processing_factory_recovery_required)
 
         with patch("buzzbot_app.detect_back_confirmation_cancel_target", return_value=None), patch(
             "buzzbot_app.detect_processing_factory_target", return_value=(705, 285)
         ) as detect:
             self.assertTrue(self.tick(bot, 106.0))
+            bot._return_to_main_screen.assert_called_once_with(max_back_steps=3, require_settlement=True)
+            bot.adb_client.swipe.assert_not_called()
+            self.assertEqual(bot.routine_processing_factory_scan_index, 7)
+            self.assertFalse(bot.routine_processing_factory_recovery_required)
+            self.assertTrue(self.tick(bot, 107.0))
 
         detect.assert_not_called()
         bot._tap_routine_fallback.assert_not_called()

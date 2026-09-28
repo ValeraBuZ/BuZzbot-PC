@@ -3,6 +3,9 @@ name: BuZzbot Portable Windows build
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'gear_value/**'
+      - '.github/workflows/gear-value.yml'
   workflow_dispatch:
 
 permissions:

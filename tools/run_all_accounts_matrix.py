@@ -78,6 +78,8 @@ TASK_TIMEOUTS = {
     # runs reuse the remembered route and complete much faster.
     "heal": 420.0,
     "mysterious_merchant": 420.0,
+    "trucks": 360.0,
+    "fence_survivors": 180.0,
     "food": 75.0,
     "wood": 75.0,
     "metal": 75.0,

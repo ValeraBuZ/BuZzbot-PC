@@ -1,11 +1,13 @@
 import threading
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pyautogui
 import cv2
 import numpy as np
+from pathlib import Path
+from buzzbot.matching import zombie_camp_checkbox_is_checked, stamina_dialog_is_visible
 
 from buzzbot.routines import routine_march_context_key
 from buzzbot_app import AutoClicker
@@ -20,6 +22,47 @@ class FakeAdbClient:
 
 
 class ZombieSearchTests(unittest.TestCase):
+    def test_stamina_dialog_requires_real_header_not_world_or_shop_colors(self):
+        assets = Path(__file__).parent / "assets/zombie"
+        for name, expected in (("stamina_dialog.png", True), ("march_dispatched.jpg", False),
+                               ("shop_false_positive.jpg", False), ("left_card.jpg", False)):
+            frame = cv2.imread(str(assets / name))
+            for scale in (1, 0.75):
+                with self.subTest(name=name, scale=scale):
+                    self.assertEqual(stamina_dialog_is_visible(cv2.resize(frame,None,fx=scale,fy=scale)), expected)
+
+    @staticmethod
+    def stamp_stamina_title(frame):
+        title = cv2.imread(str(Path(__file__).resolve().parents[1] / "buzzbot/assets/stamina/dialog_title.png"))
+        frame[83:110, 529:748] = title
+        return frame
+    def test_attack_uses_checkbox_on_same_side_as_detected_card(self):
+        for attack_x in (321, 966):
+            for checked in (False, True):
+                with self.subTest(attack_x=attack_x, checked=checked):
+                    bot = self.make_bot()
+                    bot.cycle_mode = False
+                    frame = np.full((720, 1280, 3), (35, 45, 55), np.uint8)
+                    # Bright map decoration at the old fixed checkbox location.
+                    if attack_x == 321:
+                        frame[506:530, 809:831] = (20, 210, 80)
+                    if checked:
+                        x = attack_x - 146
+                        cv2.line(frame, (x-8, 514), (x-2, 523), (20, 210, 80), 3)
+                        cv2.line(frame, (x-2, 523), (x+8, 509), (20, 210, 80), 3)
+                    bot._capture_screen_bgr = lambda **kw: (frame, (0, 0))
+                    image = dict(self.search_image(), action="zombie_attack", description="Attack")
+                    bot._execute_action(image, SimpleNamespace(x=attack_x, y=561))
+                    expected = [(attack_x-146, 518), (attack_x, 561)] if checked else [(attack_x, 561)]
+                    self.assertEqual(bot.adb_client.taps, expected)
+
+    def test_real_left_card_does_not_mistake_world_map_for_checked_option(self):
+        frame = cv2.imread(str(Path(__file__).parent / "assets/zombie/left_card.jpg"))
+        self.assertIsNotNone(frame)
+        for scale in (1.0, 0.75):
+            resized = cv2.resize(frame, None, fx=scale, fy=scale)
+            self.assertFalse(zombie_camp_checkbox_is_checked(resized, (321*scale, 561*scale)))
+
     def make_bot(self, fallback_levels=3):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
@@ -39,6 +82,7 @@ class ZombieSearchTests(unittest.TestCase):
         )
         bot._current_task_settings = lambda: {"fallback_levels": fallback_levels}
         bot._resource_result_level_rejected = lambda _image: False
+        bot._confirm_zombie_search_result = Mock(return_value=True)
         bot._interruptible_sleep = lambda _seconds: None
         bot._invalidate_capture = lambda: None
         bot.set_status_message = lambda *_args, **_kwargs: None
@@ -81,7 +125,6 @@ class ZombieSearchTests(unittest.TestCase):
                 (640, 620),
                 (494, 544),
                 (640, 620),
-                (640, 353),
             ],
         )
         context = routine_march_context_key("adb", "emulator-5564", "account-a")
@@ -103,10 +146,12 @@ class ZombieSearchTests(unittest.TestCase):
             [("зомби подходящего уровня не найдены", 60)],
         )
 
-    def test_rotates_to_the_next_lower_level_before_the_next_hunt(self):
+    def test_raises_one_level_only_after_confirmed_dispatch(self):
         bot = self.make_bot(fallback_levels=3)
         context = routine_march_context_key("adb", "emulator-5564", "account-a")
         bot.zombie_level_restore[context] = 2
+        bot.hunt_found_levels = {f"{context}|zombie_hunt": 2}
+        bot._remember_hunt_dispatch({"id": "zombie_hunt", "settings": {"fallback_levels": 3}})
         bot._locate_image = lambda _image: (None, None, 0.0)
 
         result = bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620))
@@ -114,9 +159,9 @@ class ZombieSearchTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(
             bot.adb_client.taps,
-            [(494, 544), (640, 620), (640, 353)],
+            [(784, 544), (640, 620)],
         )
-        self.assertEqual(bot.zombie_level_restore[context], 3)
+        self.assertEqual(bot.zombie_level_restore[context], 1)
 
     def test_restores_interrupted_offset_before_searching_starting_level(self):
         bot = self.make_bot(fallback_levels=3)
@@ -129,7 +174,7 @@ class ZombieSearchTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(
             bot.adb_client.taps,
-            [(784, 544), (784, 544), (784, 544), (640, 620), (640, 353)],
+            [(784, 544), (784, 544), (784, 544), (640, 620)],
         )
         self.assertNotIn(context, bot.zombie_level_restore_pending)
         self.assertEqual(bot.zombie_level_restore[context], 0)
@@ -145,11 +190,52 @@ class ZombieSearchTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(
             bot.adb_client.taps,
-            [(784, 544), (784, 544), (784, 544), (640, 620), (640, 353)],
+            [(784, 544), (784, 544), (784, 544), (640, 620)],
         )
         self.assertEqual(bot.zombie_level_restore[context], 0)
 
-    def test_screen_mode_clicks_the_ldplayer_client_center_after_search(self):
+    def test_ten_level_fallback_then_climbs_one_step_per_success(self):
+        bot = self.make_bot(fallback_levels=10)
+        context = routine_march_context_key("adb", "emulator-5564", "account-a")
+        visible = iter([True] * 10 + [False])
+        bot._locate_image = lambda _image: ((SimpleNamespace(x=640, y=620), None, 0.9)
+                                          if next(visible) else (None, None, 0.0))
+        self.assertTrue(bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620)))
+        self.assertEqual(bot.zombie_level_restore[context], 10)
+        bot._locate_image = lambda _image: (None, None, 0.0)
+        for expected_offset in (*range(9, -1, -1), 0):
+            bot._remember_hunt_dispatch({"id": "zombie_hunt", "settings": {"fallback_levels": 10}})
+            self.assertTrue(bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620)))
+            self.assertEqual(bot.zombie_level_restore[context], expected_offset)
+        self.assertEqual(bot.adb_client.taps.count((494, 544)), 10)
+        self.assertEqual(bot.adb_client.taps.count((784, 544)), 10)
+
+    def test_ten_level_offset_is_restored_after_restart(self):
+        bot = self.make_bot(fallback_levels=10)
+        context = routine_march_context_key("adb", "emulator-5564", "account-a")
+        bot.zombie_level_restore_pending[context] = 10
+        bot._locate_image = lambda _image: (None, None, 0.0)
+        self.assertTrue(bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620)))
+        self.assertEqual(bot.adb_client.taps[:10], [(784, 544)] * 10)
+        self.assertEqual(bot.zombie_level_restore[context], 0)
+        self.assertNotIn(context, bot.zombie_level_restore_pending)
+
+    def test_interrupted_raise_preserves_remaining_offset_even_after_limit_reduced(self):
+        bot = self.make_bot(fallback_levels=3)
+        context, key = bot._hunt_context("zombie_hunt")
+        bot.zombie_level_restore_pending[context] = 10
+        bot._interruptible_sleep = lambda seconds: bot.stop_event.set()
+        self.assertFalse(bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620)))
+        self.assertEqual(bot.zombie_level_restore[context], 9)
+        self.assertNotIn(context, bot.zombie_level_restore_pending)
+        bot.stop_event.clear()
+        bot._interruptible_sleep = lambda seconds: None
+        bot._locate_image = lambda image: (None, None, 0.0)
+        self.assertTrue(bot._execute_action(self.search_image(), SimpleNamespace(x=640, y=620)))
+        self.assertEqual(bot.zombie_level_restore[context], 0)
+        self.assertEqual(bot.adb_client.taps.count((784, 544)), 10)
+
+    def test_screen_mode_does_not_click_again_after_target_card_is_confirmed(self):
         bot = self.make_bot(fallback_levels=0)
         bot.input_backend = "screen"
         bot._screen_game_region = lambda: (84, 108, 1280, 720)
@@ -164,7 +250,7 @@ class ZombieSearchTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(
             [call.args for call in click.call_args_list],
-            [(211, 549), (724, 461)],
+            [(211, 549)],
         )
 
     def test_screen_region_excludes_the_ldplayer_custom_title_bar(self):
@@ -206,7 +292,7 @@ class ZombieSearchTests(unittest.TestCase):
     def test_march_uses_one_50_stamina_item_then_retries_and_confirms(self):
         bot = self.make_bot()
         bot.cycle_mode = False
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = self.stamp_stamina_title(np.zeros((720, 1280, 3), dtype=np.uint8))
         cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
         cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
         for x1, y1, x2, y2 in (
@@ -254,7 +340,7 @@ class ZombieSearchTests(unittest.TestCase):
     def test_march_auto_skips_exhausted_50_and_uses_100_stamina(self):
         bot = self.make_bot()
         bot.cycle_mode = False
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = self.stamp_stamina_title(np.zeros((720, 1280, 3), dtype=np.uint8))
         cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
         cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
         cv2.rectangle(frame, (868, 326), (1068, 370), (85, 85, 85), thickness=-1)
@@ -302,7 +388,7 @@ class ZombieSearchTests(unittest.TestCase):
     def test_stamina_failure_is_not_reported_as_no_available_squad(self):
         bot = self.make_bot()
         bot.cycle_mode = False
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        frame = self.stamp_stamina_title(np.zeros((720, 1280, 3), dtype=np.uint8))
         cv2.rectangle(frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
         cv2.rectangle(frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
         cv2.rectangle(frame, (868, 326), (1068, 370), (0, 180, 255), thickness=-1)
@@ -331,7 +417,7 @@ class ZombieSearchTests(unittest.TestCase):
     def test_march_repeats_50_stamina_until_attack_is_funded(self):
         bot = self.make_bot()
         bot.cycle_mode = False
-        stamina_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+        stamina_frame = self.stamp_stamina_title(np.zeros((720, 1280, 3), dtype=np.uint8))
         cv2.rectangle(stamina_frame, (1030, 74), (1085, 120), (0, 150, 210), thickness=-1)
         cv2.rectangle(stamina_frame, (210, 160), (305, 245), (20, 180, 40), thickness=-1)
         cv2.rectangle(stamina_frame, (868, 326), (1068, 370), (0, 180, 255), thickness=-1)

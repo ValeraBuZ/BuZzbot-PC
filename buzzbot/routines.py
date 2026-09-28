@@ -935,6 +935,10 @@ def prize_hunt_branch_allows_image(image, repeat_until_stopped):
 def no_action_retry_delay(task):
     """Use a bounded retry delay when a task timed out without any action."""
     interval_seconds = float(task.get("interval_minutes", 1.0)) * 60.0
+    if task.get("id") == "collective_mind":
+        # Five minutes is the interval after a successful rally, not after
+        # a missed button or an unconfirmed dialog transition.
+        return 30.0
     if task.get("id") == "heal":
         settings = task.get("settings", {})
         if settings.get("_collection_pending", False):
@@ -1528,7 +1532,9 @@ def upgrade_mysterious_merchant_metadata(images, tasks):
             1440,
             max(1, int(settings.get("arrival_retry_minutes", 60) or 60)),
         )
-        settings["visual_fallback"] = bool(settings.get("visual_fallback", True))
+        # Merchant prices always need live currency proof; legacy one-frame
+        # purchase templates cannot opt out of that confirmation.
+        settings["visual_fallback"] = True
         task["completion_runtime_step"] = "merchant_complete"
     return upgraded
 

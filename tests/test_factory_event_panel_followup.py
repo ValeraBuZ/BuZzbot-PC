@@ -1,4 +1,5 @@
 from pathlib import Path
+import threading
 import unittest
 from unittest.mock import Mock, patch
 
@@ -18,6 +19,7 @@ class FactoryEventPanelTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         bot.input_backend = "adb"
         bot.adb_client = Mock()
+        bot.stop_event = threading.Event()
         bot.routine_completed_steps = {"pan_north"}
         bot.routine_processing_factory_recenter_attempted = False
         bot.routine_processing_factory_scan_index = 17
@@ -25,6 +27,8 @@ class FactoryEventPanelTests(unittest.TestCase):
         bot._is_settlement_screen_visible = Mock(return_value=True)
         bot._is_main_screen_visible = Mock(return_value=True)
         bot._switch_to_settlement_screen = Mock(return_value=True)
+        bot._return_to_main_screen = Mock(return_value=True)
+        bot._defer_current_routine_unavailable = Mock()
         bot._capture_screen_bgr = Mock(return_value=(cv2.imread(str(FIXTURE)) if frame is None else frame, (0, 0)))
         bot._tap_routine_fallback = Mock(return_value=True)
         bot._save_routine_calibration_frame = Mock()
@@ -59,7 +63,9 @@ class FactoryEventPanelTests(unittest.TestCase):
     def test_recognized_ribbon_outside_settlement_does_not_cause_input(self):
         bot = self.make_bot()
         bot._is_settlement_screen_visible.return_value = False
-        self.assertFalse(self.tick(bot))
+        self.assertTrue(self.tick(bot))
+        self.assertTrue(bot.routine_processing_factory_recovery_required)
+        bot._return_to_main_screen.assert_not_called()
         self.assertNotIn(CHECKED, bot.routine_completed_steps)
         bot._tap_routine_fallback.assert_not_called()
         bot._capture_screen_bgr.assert_not_called()

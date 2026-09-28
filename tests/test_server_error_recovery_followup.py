@@ -10,7 +10,6 @@ import numpy as np
 from buzzbot.adb import AdbError
 from buzzbot.matching import imread_unicode
 from buzzbot_app import (
-    ACCOUNT_SWITCH_RETRY_SECONDS,
     AutoClicker,
     GAME_LOGIN_RESTART_SECONDS,
     GAME_PACKAGE,
@@ -246,9 +245,11 @@ class ServerErrorRecoveryTests(unittest.TestCase):
         self.assertIn("ErrCode:0x2", bot.account_switch_error)
         self.assertEqual(bot.current_account_id, "old-profile")
         bot.select_account_profile.assert_not_called()
-        self.assertEqual(bot.account_switch_retry_at, 1100.0 + ACCOUNT_SWITCH_RETRY_SECONDS)
+        self.assertEqual(bot.account_switch_retry_at, 0.0)
+        self.assertGreater(bot.account_switch_failure_count, 0)
         self.assertIsNone(bot.current_routine_task_id)
-        self.assertFalse(bot.stop_event.is_set())
+        self.assertTrue(bot.stop_event.is_set())
+        self.assertFalse(bot.routine_mode)
 
     @patch("buzzbot_app.detect_game_server_connection_error", return_value=True)
     @patch("buzzbot_app.time.time", return_value=1100.0)

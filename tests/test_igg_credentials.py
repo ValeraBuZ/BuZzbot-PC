@@ -269,7 +269,10 @@ class IggCredentialTests(unittest.TestCase):
         bot.account_switch_selected_at = 1.0
         bot.routine_completed_steps = {"account_switch_igg_id_selected"}
         bot._is_main_screen_visible = lambda: True
+        bot.account_switch_error = ""
         task = self.task()
+        task["settings"]["_expected_igg_id"] = "1234567890"
+        task["settings"]["_verified_igg_id"] = "1234567890"
 
         self.assertFalse(bot._account_switch_main_screen_confirmed(task))
 
@@ -282,6 +285,8 @@ class IggCredentialTests(unittest.TestCase):
 
         bot.routine_completed_steps.remove("account_switch_igg_interrupted_after_selection")
         bot.routine_completed_steps.add("account_switch_igg_game_confirmed")
+        self.assertFalse(bot._account_switch_main_screen_confirmed(task))
+        bot.routine_completed_steps.add("account_switch_igg_loaded_id_verified")
         self.assertTrue(bot._account_switch_main_screen_confirmed(task))
 
     def test_selected_igg_id_uses_visual_confirmation_without_reopening_webview_inspection(self):
@@ -381,7 +386,7 @@ class IggCredentialTests(unittest.TestCase):
 
     @patch("buzzbot_app.detect_game_event_overlay_close_target", return_value=(1152, 112))
     @patch("buzzbot_app.detect_igg_game_login_ok_target", return_value=None)
-    def test_post_login_overlay_detector_does_not_click_main_screen(self, _confirm, _overlay):
+    def test_post_login_without_expected_id_stops_instead_of_clicking_main_screen(self, _confirm, _overlay):
         bot = AutoClicker.__new__(AutoClicker)
         bot.account_switch_selected_at = 10.0
         bot.routine_completed_steps = {
@@ -394,8 +399,10 @@ class IggCredentialTests(unittest.TestCase):
         )
         bot._is_main_screen_visible = lambda: True
         bot._tap_routine_fallback = lambda *_args: self.fail("main screen must not be tapped")
+        bot.set_status_message = lambda *_args, **_kwargs: None
 
-        self.assertFalse(bot._try_account_switch_igg_game_confirmation(self.task()))
+        self.assertTrue(bot._try_account_switch_igg_game_confirmation(self.task()))
+        self.assertIn("ID", bot.account_switch_error)
 
     def test_delayed_igg_confirmation_does_not_complete_google_switch(self):
         bot = AutoClicker.__new__(AutoClicker)
@@ -493,12 +500,17 @@ class IggCredentialTests(unittest.TestCase):
         bot = AutoClicker.__new__(AutoClicker)
         task = {
             "id": "__account_switch__",
-            "settings": {"target_account_id": "main", "probe_only": False},
+            "settings": {
+                "target_account_id": "main",
+                "probe_only": False,
+                "_verified_igg_id": "1234567890",
+            },
         }
         bot.current_routine_task_id = "__account_switch__"
         bot.get_routine_task = lambda _task_id: task
         bot.account_switch_error = ""
         bot.account_switch_confirmed = True
+        bot._account_switch_main_screen_confirmed = lambda _task: True
         bot.account_switch_selected_at = 2.0
         bot.account_switch_probe_ready = False
         bot.account_switch_auto_login_attempted = True
@@ -515,11 +527,13 @@ class IggCredentialTests(unittest.TestCase):
         bot.account_rotation_enabled = False
         bot.routine_mode = True
         bot.stop_event = threading.Event()
+        bot.save_config = lambda: None
 
         bot._finish_current_routine()
 
         self.assertTrue(bot.account_switch_confirmed)
         self.assertEqual(bot.account_switch_last_result, "Аккаунт переключён: Main")
+        self.assertEqual(bot.account_profiles[0]["verified_igg_id"], "1234567890")
         self.assertEqual(
             selected,
             [("main", {"start_fresh_pass": True})],

@@ -58,6 +58,61 @@ def _bind_numeric_wheel(widget, variable, minimum, maximum, increment=1):
     widget.bind("<MouseWheel>", on_wheel)
 
 
+class OwnRallyDialog:
+    def __init__(self, parent, bot):
+        self.bot = bot
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Свои сборы на коллективный разум")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        self.dialog.resizable(False, False)
+        _center(self.dialog, 510, 345)
+        body = ttk.Frame(self.dialog, padding=18)
+        body.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(body, text="Основной создаёт → участник вступает → возврат",
+                  font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 15))
+        labels = {f"{p['name']} [{p['id']}]": p['id'] for p in bot.account_profiles}
+        settings = getattr(bot, "own_rally_settings", {})
+        leader = settings.get("leader_id") or bot.current_account_id
+        self.leader_var = tk.StringVar(value=next((k for k,v in labels.items() if v==leader), ""))
+        self.leaders = labels
+        ttk.Label(body, text="Основной аккаунт — создаёт сбор").pack(anchor="w")
+        ttk.Combobox(body, textvariable=self.leader_var, values=list(labels), state="readonly").pack(fill=tk.X, pady=(3, 10))
+        self.participants = {"Любой доступный": "any", **labels}
+        self.participant_var = tk.StringVar(value=next(
+            (k for k,v in self.participants.items() if v==settings.get("participant_id", "any")), "Любой доступный"))
+        ttk.Label(body, text="Аккаунт участника").pack(anchor="w")
+        ttk.Combobox(body, textvariable=self.participant_var, values=list(self.participants), state="readonly").pack(fill=tk.X, pady=(3, 10))
+        self.repeat_var = tk.BooleanVar(value=bool(settings.get("repeat", True)))
+        ttk.Checkbutton(body, text="Повторять по кругу", variable=self.repeat_var).pack(anchor="w")
+        ttk.Label(body, text="За один круг вступает один аккаунт. Нужен общий альянс.\nСоздание и вступление: сохранённый отряд №1.",
+                  foreground="#6b7280").pack(anchor="w", pady=(7, 10))
+        buttons = ttk.Frame(body)
+        buttons.pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Button(buttons, text="Сохранить", command=self.save).pack(side=tk.LEFT)
+        ttk.Button(buttons, text="Запустить режим", command=self.start).pack(side=tk.RIGHT)
+
+    def selection(self):
+        leader = self.leaders.get(self.leader_var.get())
+        participant = self.participants.get(self.participant_var.get(), "any")
+        if not leader or leader == participant:
+            messagebox.showerror("Свои сборы", "Создатель и участник должны быть разными аккаунтами.", parent=self.dialog)
+            return None
+        return {"leader_id": leader, "participant_id": participant, "repeat": bool(self.repeat_var.get())}
+
+    def save(self):
+        settings = self.selection()
+        if settings is not None:
+            self.bot.own_rally_settings = settings
+            self.bot.save_config()
+            self.dialog.destroy()
+
+    def start(self):
+        settings = self.selection()
+        if settings is not None and self.bot.start_own_rally_mode(settings):
+            self.dialog.destroy()
+
+
 class TaskSettingsDialog:
     def __init__(self, parent, bot, task, refresh):
         self.parent = parent
@@ -1224,6 +1279,9 @@ def build_compact_ui(root, bot):
     pause_button.pack(side=tk.LEFT, padx=5)
     stop_button = action_button(action_panel, "СТОП ВСЕ", bot.stop_all_emulators, colors["surface_alt"], colors["red"], "#C98E87")
     stop_button.pack(side=tk.LEFT, padx=5)
+    own_rally_button = action_button(action_panel, "СВОИ СБОРЫ", lambda: OwnRallyDialog(root, bot),
+                                    colors["surface_alt"], colors["text"])
+    own_rally_button.pack(side=tk.LEFT, padx=5)
     root.bind("<F5>", lambda _event: bot.start_all_emulators())
     root.bind("<F6>", lambda _event: bot.stop_all_emulators())
 
@@ -1730,13 +1788,13 @@ def build_compact_ui(root, bot):
                             fallback = int(variable.get().lstrip("-"))
                         except ValueError:
                             fallback = 3
-                        current_task.setdefault("settings", {})["fallback_levels"] = min(3, max(0, fallback))
+                        current_task.setdefault("settings", {})["fallback_levels"] = min(10, max(0, fallback))
                         bot.save_config()
 
                     fallback_combo = ttk.Combobox(
                         row,
                         textvariable=fallback_var,
-                        values=("-0", "-1", "-2", "-3"),
+                        values=tuple(f"-{level}" for level in range(11)),
                         state="readonly",
                         width=3,
                         style="Deck.TCombobox",
